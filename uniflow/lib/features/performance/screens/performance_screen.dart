@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:uniflow/core/api/tulsu_api.dart';
+import 'package:uniflow/core/theme/spacing.dart';
+import 'package:uniflow/core/theme/typography.dart';
 import 'package:uniflow/app.dart';
 import 'package:uniflow/core/widgets/update_feedback.dart';
 import 'package:uniflow/features/performance/providers/performance_provider.dart';
+import 'package:uniflow/shared/widgets/empty_state.dart';
+import 'package:uniflow/shared/widgets/loading_indicator.dart';
 
 /// Performance (academic marks) screen
 class PerformanceScreen extends ConsumerWidget {
@@ -41,7 +45,7 @@ class PerformanceScreen extends ConsumerWidget {
           // background sync (slim progress bar on top); the full spinner
           // only appears when there is nothing local to show yet.
           : state.isLoading && state.marks.isEmpty
-              ? const Center(child: CircularProgressIndicator())
+              ? const LoadingIndicator()
               : state.error != null
                   ? _buildError(context, ref, state, colorScheme, theme)
                   : state.marks.isEmpty
@@ -60,33 +64,15 @@ class PerformanceScreen extends ConsumerWidget {
 
   Widget _buildNotConfigured(BuildContext context, WidgetRef ref,
       ColorScheme colorScheme, ThemeData theme) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.school_outlined,
-                size: 80, color: colorScheme.primary.withValues(alpha: 0.3)),
-            const Gap(24),
-            Text('Настройте профиль',
-                style: theme.textTheme.headlineSmall
-                    ?.copyWith(fontWeight: FontWeight.w600)),
-            const Gap(8),
-            Text(
-              'Для просмотра успеваемости укажите\nномер зачётки и подгруппу в профиле',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(color: colorScheme.onSurfaceVariant),
-            ),
-            const Gap(32),
-            FilledButton.icon(
-              onPressed: () => ref.read(currentTabProvider.notifier).state = 3,
-              icon: const Icon(Icons.person),
-              label: const Text('Открыть профиль'),
-            ),
-          ],
-        ),
+    return EmptyState(
+      icon: Icons.school_outlined,
+      title: 'Настройте профиль',
+      message:
+          'Для просмотра успеваемости укажите\nномер зачётки и подгруппу в профиле',
+      action: FilledButton.icon(
+        onPressed: () => ref.read(currentTabProvider.notifier).state = 3,
+        icon: const Icon(Icons.person),
+        label: const Text('Открыть профиль'),
       ),
     );
   }
@@ -164,12 +150,18 @@ class PerformanceScreen extends ConsumerWidget {
                 final isSelected = state.selectedSemester == sem;
                 // Map actual term number to display: "1 семестр", "2 семестр"...
                 final displayIndex = index + 1;
-                return FilterChip(
-                  label: Text('$displayIndex семестр'),
+                return Semantics(
+                  // Чип — переключатель одного выбора: без selected скринридер
+                  // читает только подпись и не сообщает текущий семестр.
                   selected: isSelected,
-                  onSelected: (_) => ref
-                      .read(performanceProvider.notifier)
-                      .selectSemester(sem),
+                  inMutuallyExclusiveGroup: true,
+                  child: FilterChip(
+                    label: Text('$displayIndex семестр'),
+                    selected: isSelected,
+                    onSelected: (_) => ref
+                        .read(performanceProvider.notifier)
+                        .selectSemester(sem),
+                  ),
                 );
               },
             ),
@@ -266,13 +258,18 @@ class _StatItem extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(value,
-            style: theme.textTheme.titleLarge
-                ?.copyWith(fontWeight: FontWeight.w700, color: color)),
-        const Gap(2),
-        Text(label,
-            style: theme.textTheme.labelSmall
-                ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+        Text(
+          value,
+          style: AppTypography.emphasizedHeadlineSmall(
+            theme.textTheme.headlineSmall!,
+          ).copyWith(color: color),
+        ),
+        const SizedBox(height: AppSpacing.xxs),
+        Text(
+          label,
+          style: theme.textTheme.labelMedium
+              ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+        ),
       ],
     );
   }

@@ -4,6 +4,8 @@ import 'package:gap/gap.dart';
 import 'package:uniflow/core/models/app_settings.dart';
 import 'package:uniflow/core/services/notification_service.dart';
 import 'package:uniflow/core/services/storage_service.dart';
+import 'package:uniflow/core/theme/color_utils.dart';
+import 'package:uniflow/core/theme/motion.dart';
 import 'package:uniflow/core/theme/theme_provider.dart';
 import 'package:uniflow/features/profile/screens/onboarding_screen.dart';
 import 'package:uniflow/features/profile/screens/student_profile_screen.dart';
@@ -91,7 +93,11 @@ class SettingsScreen extends ConsumerWidget {
                   return GestureDetector(
                     onTap: () => notifier.updateSeedColor(option.colorValue),
                     child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
+                      // Выбор цвета — только цвет и толщина рамки: effects.
+                      duration: springDuration(
+                        MotionScheme.of(context).defaultEffects,
+                      ),
+                      curve: Curves.easeOut,
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
@@ -105,8 +111,8 @@ class SettingsScreen extends ConsumerWidget {
                             : null,
                       ),
                       child: isSelected
-                          ? const Icon(Icons.check,
-                              color: Colors.white, size: 22)
+                          ? Icon(Icons.check,
+                              color: onColorFor(option.color), size: 22)
                           : null,
                     ),
                   );

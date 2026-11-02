@@ -1436,7 +1436,7 @@ class _SegmentLabel extends StatelessWidget {
         text,
         maxLines: 1,
         overflow: TextOverflow.clip,
-        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+        style: Theme.of(context).textTheme.labelLarge,
       ),
     );
   }
@@ -1483,10 +1483,8 @@ class _StatCard extends StatelessWidget {
               const Gap(2),
               Text(
                 label,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  fontSize: 10,
-                ),
+                style: theme.textTheme.labelSmall
+                    ?.copyWith(color: colorScheme.onSurfaceVariant),
                 textAlign: TextAlign.center,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,

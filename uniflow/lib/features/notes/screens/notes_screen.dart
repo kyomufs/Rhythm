@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:uniflow/core/models/note_models.dart';
+import 'package:uniflow/core/theme/color_utils.dart';
 import 'package:uniflow/features/notes/providers/notes_provider.dart';
 import 'package:uniflow/features/notes/screens/subject_detail_screen.dart';
 import 'package:uniflow/features/schedule/providers/schedule_provider.dart';
@@ -517,7 +518,8 @@ class _AddSubjectSheetState extends ConsumerState<_AddSubjectSheet> {
                         : null,
                   ),
                   child: isSelected
-                      ? const Icon(Icons.check, color: Colors.white, size: 18)
+                      ? Icon(Icons.check,
+                          color: onColorFor(Color(subjectColors[i])), size: 18)
                       : null,
                 ),
               );

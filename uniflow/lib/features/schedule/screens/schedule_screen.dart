@@ -13,6 +13,8 @@ import 'package:uniflow/features/schedule/screens/schedule_changes_screen.dart';
 import 'package:uniflow/features/schedule/screens/schedule_preview_screen.dart';
 import 'package:uniflow/features/schedule/widgets/day_schedule.dart';
 import 'package:uniflow/features/schedule/widgets/lesson_detail_sheet.dart';
+import 'package:uniflow/shared/widgets/empty_state.dart';
+import 'package:uniflow/shared/widgets/expressive_loading_indicator.dart';
 import 'package:uniflow/shared/widgets/loading_indicator.dart';
 
 /// Main Schedule Screen
@@ -124,11 +126,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
           if (state.currentGroup != null || state.isDemo) ...[
             IconButton(
               icon: state.schedule.isLoading
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
+                  ? const ExpressiveLoadingIndicator(size: 20)
                   : const Icon(Icons.refresh),
               onPressed: state.schedule.isLoading
                   ? null
@@ -164,38 +162,16 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
   }
 
   Widget _buildNoGroupView(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.school_outlined,
-                size: 80, color: colorScheme.primary.withValues(alpha: 0.3)),
-            const Gap(24),
-            Text('Выберите группу',
-                style: theme.textTheme.headlineSmall
-                    ?.copyWith(fontWeight: FontWeight.w600)),
-            const Gap(8),
-            Text(
-              'Укажите номер группы\nв разделе «Профиль» → «Настройки»',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(color: colorScheme.onSurfaceVariant),
-            ),
-            const Gap(32),
-            FilledButton.icon(
-              onPressed: () {
-                ref.read(currentTabProvider.notifier).state = 3;
-              },
-              icon: const Icon(Icons.person),
-              label: const Text('Открыть профиль'),
-            ),
-          ],
-        ),
+    return EmptyState(
+      icon: Icons.school_outlined,
+      title: 'Выберите группу',
+      message: 'Укажите номер группы\nв разделе «Профиль» → «Настройки»',
+      action: FilledButton.icon(
+        onPressed: () {
+          ref.read(currentTabProvider.notifier).state = 3;
+        },
+        icon: const Icon(Icons.person),
+        label: const Text('Открыть профиль'),
       ),
     );
   }
@@ -820,7 +796,7 @@ class _SearchBottomSheetState extends ConsumerState<_SearchBottomSheet> {
               // Results
               Expanded(
                 child: _isLoading
-                    ? const Center(child: CircularProgressIndicator())
+                    ? const LoadingIndicator()
                     : _results.isEmpty
                         ? _buildEmptyState(context)
                         : Material(

@@ -93,8 +93,6 @@ class LessonTile extends ConsumerWidget {
                         .toUpperCase(),
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: lessonColor,
-                      fontFamily: 'Rubik',
-                      fontSize: 9.5,
                       fontWeight: FontWeight.w600,
                     ),
                     maxLines: 1,

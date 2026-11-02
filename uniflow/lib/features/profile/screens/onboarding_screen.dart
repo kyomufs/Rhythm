@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:uniflow/core/services/storage_service.dart';
+import 'package:uniflow/core/theme/motion.dart';
 import 'package:uniflow/app.dart';
 import 'package:uniflow/features/profile/providers/profile_providers.dart';
 import 'package:uniflow/features/schedule/providers/schedule_provider.dart';
@@ -44,8 +45,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   void _nextPage() {
     if (_currentPage < _totalPages - 1) {
       _pageController.nextPage(
-        duration: const Duration(milliseconds: 400),
-        curve: Curves.easeInOut,
+        // PageView принимает только Duration + Curve, поэтому длительность
+        // берётся из времени затухания slow-пружины, а не из «400 мс».
+        duration: springDuration(MotionScheme.of(context).slowSpatial),
+        curve: Curves.easeOutCubic,
       );
     }
   }
@@ -55,8 +58,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       // Dismiss the keyboard before sliding back.
       FocusManager.instance.primaryFocus?.unfocus();
       _pageController.previousPage(
-        duration: const Duration(milliseconds: 400),
-        curve: Curves.easeInOut,
+        duration: springDuration(MotionScheme.of(context).slowSpatial),
+        curve: Curves.easeOutCubic,
       );
     }
   }
@@ -154,7 +157,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   final isActive = i == _currentPage;
                   return Expanded(
                     child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
+                      // Меняется только цвет — значит effects-пружина.
+                      duration: springDuration(
+                        MotionScheme.of(context).defaultEffects,
+                      ),
+                      curve: Curves.easeOut,
                       height: 4,
                       margin: const EdgeInsets.symmetric(horizontal: 2),
                       decoration: BoxDecoration(
@@ -199,7 +206,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       _currentPage == _totalPages - 1 ? _finish : _nextPage,
                   child: Text(
                     _currentPage == _totalPages - 1 ? 'Начать' : 'Далее',
-                    style: const TextStyle(fontSize: 16),
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),
@@ -281,7 +290,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 prefixIcon: Icon(Icons.group_outlined),
               ),
               keyboardType: TextInputType.number,
-              style: const TextStyle(fontSize: 18),
+              style: Theme.of(context).textTheme.titleLarge,
             ),
           ],
         ),
@@ -321,7 +330,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 prefixIcon: Icon(Icons.subdirectory_arrow_right),
               ),
               keyboardType: TextInputType.number,
-              style: const TextStyle(fontSize: 18),
+              style: Theme.of(context).textTheme.titleLarge,
             ),
             const Gap(16),
             Text('Можно пропустить',
@@ -370,7 +379,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 prefixIcon: Icon(Icons.badge_outlined),
               ),
               keyboardType: TextInputType.number,
-              style: const TextStyle(fontSize: 18),
+              style: Theme.of(context).textTheme.titleLarge,
             ),
           ],
         ),

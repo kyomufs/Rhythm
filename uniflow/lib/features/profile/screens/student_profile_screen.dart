@@ -6,6 +6,7 @@ import 'package:uniflow/core/services/schedule_service.dart';
 import 'package:uniflow/core/services/storage_service.dart';
 import 'package:uniflow/features/profile/providers/profile_providers.dart';
 import 'package:uniflow/features/schedule/providers/schedule_provider.dart';
+import 'package:uniflow/shared/widgets/loading_indicator.dart';
 
 /// Student profile editor: group, subgroup and student ID (зачётка)
 /// combined into ONE screen with THREE fields, as requested —
@@ -308,7 +309,7 @@ class _GroupSearchSheetState extends ConsumerState<_GroupSearchSheet> {
               const Gap(8),
               Expanded(
                 child: _isLoading
-                    ? const Center(child: CircularProgressIndicator())
+                    ? const LoadingIndicator()
                     : _results.isEmpty
                         ? Center(
                             child: Text('Введите минимум 2 символа',

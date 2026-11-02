@@ -30,10 +30,15 @@ class AppShapes {
 
   static BorderRadius circular(double radius) => BorderRadius.circular(radius);
 
-  static BorderRadius get cardRadius => circular(largeIncreased);
+  /// Карточка: `CornerMedium`. Крупный радиус на информационно-плотной
+  /// карточке срезает содержимое по углам.
+  static BorderRadius get cardRadius => circular(medium);
   static BorderRadius get dialogRadius => circular(extraLarge);
   static BorderRadius get sheetRadius =>
       const BorderRadius.vertical(top: Radius.circular(extraLarge));
   static BorderRadius get chipRadius => circular(small);
-  static BorderRadius get buttonRadius => circular(largeIncreased);
+
+  /// Кнопка в покое — `CornerFull` (`StadiumBorder` в теме). При нажатии M3E
+  /// сжимает форму до `CornerSmall`; это и есть морф формы, а не анимация цвета.
+  static BorderRadius get pressedButtonRadius => circular(small);
 }

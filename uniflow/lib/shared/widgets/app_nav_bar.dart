@@ -18,9 +18,10 @@ class AppNavDestination {
 /// Нижнее меню в духе Material 3 Expressive.
 ///
 /// Своя вёрстка вместо `NavigationBar` нужна по двум причинам: штатный виджет
-/// не даёт управлять зазором между иконкой и подписью (а он просился меньше), и
-/// на iOS контент оказывался выше нижней кромки, чем на Android. Здесь иконка и
-/// подпись стоят вплотную, а весь блок прижат к нижней безопасной зоне.
+/// не даёт управлять геометрией индикатора (56 × 32dp) и зазором иконка ↔
+/// подпись, а на iOS контент оказывался выше нижней кромки, чем на Android.
+/// Геометрия здесь повторяет `ContainerHeight` 64dp и `ContainerBetweenSpace`
+/// 6dp, весь блок прижат к нижней безопасной зоне.
 class AppNavBar extends StatelessWidget {
   const AppNavBar({
     super.key,
@@ -33,8 +34,16 @@ class AppNavBar extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onSelected;
 
-  /// Высота полосы без системного отступа.
-  static const double _contentHeight = 58;
+  /// Высота полосы без системного отступа: `ContainerHeight` 64dp.
+  static const double _contentHeight = 64;
+
+  /// Индикатор активного пункта: `ActiveIndicatorWidth` ×
+  /// `ActiveIndicatorHeight` = 56 × 32dp.
+  static const double _indicatorWidth = 56;
+  static const double _indicatorHeight = 32;
+
+  /// `ContainerBetweenSpace`: иконка ↔ подпись.
+  static const double _iconLabelGap = 6;
 
   @override
   Widget build(BuildContext context) {
@@ -46,8 +55,8 @@ class AppNavBar extends StatelessWidget {
       child: Padding(
         // Иконки прижаты к низу: сверху воздух, снизу только системный отступ.
         padding: EdgeInsets.only(
-          top: 6,
-          bottom: bottomInset > 0 ? bottomInset : 6,
+          top: 8,
+          bottom: bottomInset > 0 ? bottomInset : 8,
         ),
         child: SizedBox(
           height: _contentHeight,
@@ -134,15 +143,20 @@ class _NavItemState extends State<_NavItem>
               builder: (context, _) {
                 final t = _controller.value.clamp(0.0, 1.4);
                 return SizedBox(
-                  height: 32,
+                  height: AppNavBar._indicatorHeight,
                   child: Center(
                     child: Container(
-                      width: 32 + 32 * t,
-                      height: 32,
+                      // В покое индикатор уже 56dp: пружина раскрывает его
+                      // из сжатого состояния, а не «наращивает» с нуля.
+                      width: AppNavBar._indicatorWidth * (0.55 + 0.45 * t),
+                      height: AppNavBar._indicatorHeight,
                       decoration: BoxDecoration(
                         color: colorScheme.secondaryContainer
                             .withValues(alpha: t.clamp(0.0, 1.0)),
-                        borderRadius: AppShapes.circular(AppShapes.extraLarge),
+                        // CornerFull: радиус = половине высоты индикатора.
+                        borderRadius: AppShapes.circular(
+                          AppNavBar._indicatorHeight / 2,
+                        ),
                       ),
                       child: Icon(
                         widget.selected
@@ -160,8 +174,7 @@ class _NavItemState extends State<_NavItem>
                 );
               },
             ),
-            // Подпись вплотную к иконке: 2dp вместо штатных 4+.
-            const SizedBox(height: 2),
+            const SizedBox(height: AppNavBar._iconLabelGap),
             Text(
               widget.destination.label,
               maxLines: 1,

@@ -81,9 +81,42 @@ InputDecorationTheme _inputDecoration(ColorScheme colorScheme) =>
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     );
 
-/// Единый сборщик темы. Светлая и тёмная схемы раньше дублировались двумя
+/// Форма кнопки: `CornerFull` в покое, `CornerSmall` при нажатии.
+///
+/// Это морф формы из M3E (`ContainerShapeRound` → `PressedContainerShape`),
+/// а не анимация цвета: размер и положение не меняются.
+WidgetStateProperty<OutlinedBorder> _buttonShape() =>
+    WidgetStateProperty.resolveWith((states) {
+      if (states.contains(WidgetState.pressed)) {
+        return RoundedRectangleBorder(
+          borderRadius: AppShapes.pressedButtonRadius,
+        );
+      }
+      return const StadiumBorder();
+    });
+
+/// Базовая геометрия кнопки: `ContainerHeight` 40dp, `LeadingSpace` /
+/// `TrailingSpace` 24dp, `IconSize` 20dp.
+ButtonStyle _buttonStyle({
+  required TextTheme textTheme,
+  required FontWeight labelWeight,
+}) {
+  return ButtonStyle(
+    minimumSize: const WidgetStatePropertyAll(Size(64, 40)),
+    padding: const WidgetStatePropertyAll(
+      EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+    ),
+    shape: _buttonShape(),
+    textStyle: WidgetStatePropertyAll(
+      textTheme.labelLarge?.copyWith(fontWeight: labelWeight),
+    ),
+    iconSize: const WidgetStatePropertyAll(20),
+  );
+}
+
+/// Единый сборщик темы (публичный — тесты проверяют геометрию и формы). Светлая и тёмная схемы раньше дублировались двумя
 /// почти одинаковыми билдерами — расхождения между ними были неизбежны.
-ThemeData _buildTheme({
+ThemeData buildAppTheme({
   required ColorScheme colorScheme,
   required Brightness brightness,
 }) {
@@ -167,23 +200,21 @@ ThemeData _buildTheme({
       ),
     ),
     filledButtonTheme: FilledButtonThemeData(
-      style: FilledButton.styleFrom(
-        shape: RoundedRectangleBorder(borderRadius: AppShapes.buttonRadius),
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-        textStyle: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+      style: _buttonStyle(
+        textTheme: textTheme,
+        labelWeight: FontWeight.w700,
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
-      style: OutlinedButton.styleFrom(
-        shape: RoundedRectangleBorder(borderRadius: AppShapes.buttonRadius),
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-        textStyle: textTheme.labelLarge,
+      style: _buttonStyle(
+        textTheme: textTheme,
+        labelWeight: FontWeight.w500,
       ),
     ),
     textButtonTheme: TextButtonThemeData(
-      style: TextButton.styleFrom(
-        shape: RoundedRectangleBorder(borderRadius: AppShapes.buttonRadius),
-        textStyle: textTheme.labelLarge,
+      style: _buttonStyle(
+        textTheme: textTheme,
+        labelWeight: FontWeight.w500,
       ),
     ),
     dialogTheme: DialogThemeData(
@@ -221,7 +252,7 @@ ThemeData _buildTheme({
 /// Derived provider that builds light ThemeData from AppSettings
 final themeDataProvider = Provider<ThemeData>((ref) {
   final settings = ref.watch(appSettingsProvider);
-  return _buildTheme(
+  return buildAppTheme(
     colorScheme: ColorScheme.fromSeed(
       seedColor: settings.seedColor,
       brightness: Brightness.light,
@@ -233,7 +264,7 @@ final themeDataProvider = Provider<ThemeData>((ref) {
 /// Derived provider that builds dark ThemeData from AppSettings
 final themeDataProviderDark = Provider<ThemeData>((ref) {
   final settings = ref.watch(appSettingsProvider);
-  return _buildTheme(
+  return buildAppTheme(
     colorScheme: ColorScheme.fromSeed(
       seedColor: settings.seedColor,
       brightness: Brightness.dark,

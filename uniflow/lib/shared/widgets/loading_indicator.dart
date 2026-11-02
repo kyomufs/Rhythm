@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:gap/gap.dart';
+import 'package:uniflow/core/theme/spacing.dart';
+import 'package:uniflow/shared/widgets/expressive_loading_indicator.dart';
 
 /// Loading indicator widget
 class LoadingIndicator extends StatelessWidget {
@@ -20,17 +21,10 @@ class LoadingIndicator extends StatelessWidget {
     final content = Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // Animated loading indicator
-        SizedBox(
-          width: 64,
-          height: 64,
-          child: CircularProgressIndicator(
-            strokeWidth: 3,
-            color: colorScheme.primary,
-          ),
-        ),
+        // M3E: морфящаяся фигура вместо вращающейся дуги.
+        const ExpressiveLoadingIndicator(size: 48),
         if (message != null) ...[
-          const Gap(16),
+          const SizedBox(height: AppSpacing.md),
           Text(
             message!,
             style: theme.textTheme.bodyMedium?.copyWith(
@@ -47,7 +41,7 @@ class LoadingIndicator extends StatelessWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 24),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
       child: Center(child: content),
     );
   }
@@ -65,24 +59,19 @@ class InlineLoadingIndicator extends StatelessWidget {
     final colorScheme = theme.colorScheme;
 
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.md),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: colorScheme.primary,
-            ),
-          ),
+          const ExpressiveLoadingIndicator(size: 24),
           if (message != null) ...[
-            const Gap(12),
-            Text(
-              message!,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
+            const SizedBox(width: AppSpacing.sm),
+            Flexible(
+              child: Text(
+                message!,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
           ],
