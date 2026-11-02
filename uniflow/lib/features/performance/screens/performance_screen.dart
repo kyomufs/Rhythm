@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:uniflow/core/api/tulsu_api.dart';
 import 'package:uniflow/app.dart';
+import 'package:uniflow/core/widgets/update_feedback.dart';
 import 'package:uniflow/features/performance/providers/performance_provider.dart';
 
 /// Performance (academic marks) screen
@@ -25,12 +26,10 @@ class PerformanceScreen extends ConsumerWidget {
             IconButton(
               icon: const Icon(Icons.refresh),
               onPressed: () async {
-                final msg =
+                final result =
                     await ref.read(performanceProvider.notifier).loadMarks();
                 if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(msg)),
-                );
+                showUpdateFeedback(context, result);
               },
               tooltip: 'Обновить',
             ),
@@ -133,11 +132,10 @@ class PerformanceScreen extends ConsumerWidget {
           const Gap(16),
           FilledButton.tonal(
             onPressed: () async {
-              final msg =
+              final result =
                   await ref.read(performanceProvider.notifier).loadMarks();
               if (!context.mounted) return;
-              ScaffoldMessenger.of(context)
-                  .showSnackBar(SnackBar(content: Text(msg)));
+              showUpdateFeedback(context, result);
             },
             child: const Text('Загрузить'),
           ),

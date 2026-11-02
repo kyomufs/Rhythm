@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:intl/intl.dart';
 import 'package:uniflow/core/models/schedule.dart';
+import 'package:uniflow/core/theme/shapes.dart';
 import 'package:uniflow/features/schedule/widgets/lesson_tile.dart';
 
 /// Day schedule widget: ONE card per day (MD3).
@@ -45,7 +46,7 @@ class DaySchedule extends StatelessWidget {
       elevation: 0,
       color: colorScheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: AppShapes.circular(AppShapes.largeIncreased),
         side: BorderSide(
           color: isHighlighted
               ? colorScheme.primary
@@ -160,22 +161,34 @@ class DaySchedule extends StatelessWidget {
               ),
             )
           else
-            for (var i = 0; i < sortedLessons.length; i++) ...[
-              if (i > 0)
-                Padding(
-                  padding: const EdgeInsets.only(left: 58, right: 16),
-                  child: Divider(
-                    color: colorScheme.outlineVariant.withValues(alpha: 0.4),
-                  ),
-                ),
-              LessonTile(
-                item: sortedLessons[i],
-                onTap: onLessonClick != null
-                    ? () => onLessonClick!(sortedLessons[i])
-                    : null,
-                isCompact: true,
+            // Внутренний отступ 4: радиус пары = радиус дня − отступ
+            // (20 − 4 = 16), поэтому скругление первой и последней пары
+            // повторяет скругление карточки, а не спорит с ним.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var i = 0; i < sortedLessons.length; i++) ...[
+                    if (i > 0)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 54, right: 12),
+                        child: Divider(
+                          color:
+                              colorScheme.outlineVariant.withValues(alpha: 0.4),
+                        ),
+                      ),
+                    LessonTile(
+                      item: sortedLessons[i],
+                      onTap: onLessonClick != null
+                          ? () => onLessonClick!(sortedLessons[i])
+                          : null,
+                      isCompact: true,
+                    ),
+                  ],
+                ],
               ),
-            ],
+            ),
         ],
       ),
     );

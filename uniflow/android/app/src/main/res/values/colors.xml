@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Фирменный цвет фона заставки. Один и тот же на всех платформах:
+         Android (все версии) и iOS рисуют белый глиф на нём. -->
+    <color name="splash_background">#6750A4</color>
+</resources>

@@ -1,10 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:uniflow/core/demo/demo_schedule.dart';
 import 'package:uniflow/core/models/change_record.dart';
 import 'package:uniflow/core/models/schedule.dart';
 import 'package:uniflow/core/services/connectivity_service.dart';
 import 'package:uniflow/core/services/notification_service.dart';
 import 'package:uniflow/core/services/schedule_service.dart';
 import 'package:uniflow/core/services/storage_service.dart';
+import 'package:uniflow/core/services/update_coordinator.dart';
 import 'package:uniflow/features/schedule/providers/schedule_provider.dart';
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -46,6 +48,9 @@ class FakeScheduleService implements ScheduleService {
 
   @override
   Future<List<SearchResult>> search(String query) async => [];
+
+  @override
+  Future<bool> prefetch(String searchValue) async => true;
 
   @override
   Future<ScheduleState> getCurrentWeekSchedule(String searchValue) =>
@@ -147,11 +152,13 @@ ScheduleScreenNotifier _notifier({
   required FakeNotifications notifications,
   bool demo = false,
 }) {
+  final connectivity = FakeConnectivity();
   return ScheduleScreenNotifier(
     FakeScheduleService(data),
     storage,
-    FakeConnectivity(),
+    connectivity,
     notifications,
+    UpdateCoordinator(connectivity),
     demo: demo,
   );
 }
@@ -263,6 +270,7 @@ void main() {
       storage,
       connectivity,
       notifications,
+      UpdateCoordinator(connectivity),
     );
     await _flush();
 
@@ -437,16 +445,19 @@ void main() {
         reason: 'entries older than 14 days are dropped');
   });
 
-  test('demo mode skips the API and seeds a runnable schedule', () async {
+  test('demo mode skips the API and shows only real-functionality data',
+      () async {
     final storage = FakeStorage()..myGroupValue = '';
     final notifications = FakeNotifications();
     final service = FakeScheduleService([_item('Алгебра')]);
+    final connectivity = FakeConnectivity();
 
     final notifier = ScheduleScreenNotifier(
       service,
       storage,
-      FakeConnectivity(),
+      connectivity,
       notifications,
+      UpdateCoordinator(connectivity),
       demo: true,
     );
     await _flush();
@@ -457,21 +468,25 @@ void main() {
     expect(storage.changeLog, isEmpty, reason: 'demo journal is memory-only');
     expect(notifier.state.isDemo, isTrue);
     expect(notifier.state.schedule.items, isNotEmpty);
-    expect(notifier.state.changeJournal, isNotEmpty);
+    expect(notifier.state.schedule.searchValue, demoGroup);
     expect(
-      notifier.state.schedule.items.any((i) => i.isOngoingAt(DateTime.now())),
+      notifier.state.schedule.items.every(
+          (i) => i.groups.single.number == demoGroup),
       isTrue,
-      reason: 'a lesson must cover "now" so the countdown works',
+      reason: 'every demo row is marked with the fake group',
     );
+    expect(notifier.state.changeJournal, isEmpty,
+        reason: 'ничего не выдумываем: журнал изменений в демо пуст');
+    expect(notifier.state.hasUnseenChanges, isFalse);
     expect(notifications.shownIds, isEmpty);
 
-    // Demo refresh mutates a lesson and reports a change — still no API.
-    final msg = await notifier.refresh();
-    expect(msg, 'Демо-расписание обновлено');
+    // Refresh в демо отвечает успехом и ничего не меняет — так же, как
+    // настоящий путь, когда данные уже свежие.
+    final result = await notifier.refresh();
+    expect(result.outcome, UpdateOutcome.updated);
+    expect(result.message, 'Расписание обновлено');
     expect(service.getScheduleCalls, 0);
-    final fresh = notifier.state.changeRecords.first;
-    expect(fresh.kind, ChangeKind.modified);
-    expect(fresh.isDemo, isTrue);
-    expect(notifications.shownIds, [2]);
+    expect(notifier.state.changeRecords, isEmpty);
+    expect(notifications.shownIds, isEmpty);
   });
 }

@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:uniflow/core/models/schedule.dart';
 import 'package:uniflow/core/providers/clock_provider.dart';
 import 'package:uniflow/core/theme/app_theme.dart';
+import 'package:uniflow/core/theme/shapes.dart';
 import 'package:uniflow/features/schedule/providers/schedule_provider.dart';
 
 /// Opens the MD3 lesson detail bottom sheet.
@@ -35,10 +36,15 @@ class LessonDetailSheet extends ConsumerWidget {
     final colorScheme = theme.colorScheme;
     final lessonColor = AppTheme.getColor(lesson.cssClass);
 
-    // Live clock: banner while the lesson is running.
-    final now = ref.watch(clockProvider);
+    // Live clock: banner while the lesson is running. Minute resolution
+    // is enough to pick the banner; the exact seconds are rendered by the
+    // banner itself from the one-second clock.
+    final now = ref.watch(
+      clockProvider.select(
+        (t) => DateTime(t.year, t.month, t.day, t.hour, t.minute),
+      ),
+    );
     final isOngoing = lesson.isOngoingAt(now);
-    final minutesLeft = isOngoing ? lesson.minutesLeftAt(now) : 0;
 
     // Countdown for today's lesson that hasn't started yet.
     final startAt = lesson.startsAt;
@@ -48,8 +54,19 @@ class LessonDetailSheet extends ConsumerWidget {
         startAt.year == now.year &&
         startAt.month == now.month &&
         startAt.day == now.day;
-    final minutesUntilStart =
-        isUpcomingToday ? lesson.minutesUntilStartAt(now) : 0;
+
+    // API отдаёт GROUPS только те группы, по которым шёл запрос: при поиске
+    // по своей группе список состоит из неё же, и подпись «Группы» с одной
+    // строкой ничего не сообщает. Такие списки показываем только когда в них
+    // действительно есть другие группы.
+    final ownGroup = ref.watch(
+      scheduleScreenProvider.select((s) => s.currentGroup),
+    );
+    final visibleGroups = lesson.groups.length == 1 &&
+            ownGroup != null &&
+            lesson.groups.single.number == ownGroup
+        ? const <GroupInfo>[]
+        : lesson.groups;
 
     // Latest journal entry describing exactly this lesson.
     final changeRecord = ref.watch(scheduleScreenProvider
@@ -76,98 +93,86 @@ class LessonDetailSheet extends ConsumerWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // ── Section 1: Date + weekday ──
-          Row(
-            children: [
-              Icon(
-                Icons.calendar_today_outlined,
-                size: 18,
-                color: colorScheme.onSurfaceVariant,
+          // ── Шапка: дата и день недели по центру ──
+          Center(
+            child: Column(
+              children: [
+                if (weekdayStr.isNotEmpty)
+                  Text(
+                    weekdayStr,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: lessonColor,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                const Gap(2),
+                Text(
+                  dateStr,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Gap(18),
+
+          // ── Предмет по центру ──
+          Text(
+            lesson.subject,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              height: 1.2,
+            ),
+          ),
+          const Gap(8),
+          Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: lessonColor.withValues(alpha: 0.12),
+                borderRadius: AppShapes.circular(AppShapes.small),
               ),
-              const Gap(10),
-              Text(
-                dateStr,
-                style: theme.textTheme.titleMedium?.copyWith(
+              child: Text(
+                lesson.type.isEmpty
+                    ? lesson.lessonType.displayName
+                    : lesson.type,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: lessonColor,
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              if (weekdayStr.isNotEmpty) ...[
-                const Gap(8),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    weekdayStr,
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ],
-            ],
+            ),
           ),
-          const Gap(14),
+          const Gap(16),
 
-          // ── Section 2: Time + corpus ──
+          // ── Время и корпус по бокам, между ними — тихая линия ──
           Row(
             children: [
-              // Time
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: lessonColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.schedule, size: 15, color: lessonColor),
-                    const Gap(6),
-                    Text(
-                      lesson.time,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: lessonColor,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
+              _MetaPill(
+                icon: Icons.schedule,
+                text: lesson.time,
+                background: lessonColor.withValues(alpha: 0.12),
+                foreground: lessonColor,
+              ),
+              Expanded(
+                child: Divider(
+                  indent: 12,
+                  endIndent: 12,
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.6),
                 ),
               ),
-              // Corpus / classroom
-              if (lesson.classroom.isNotEmpty) ...[
-                const Gap(8),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.location_on_outlined,
-                        size: 15,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                      const Gap(6),
-                      Text(
-                        lesson.classroom,
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          color: colorScheme.onSurface,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
+              if (lesson.classroom.isNotEmpty)
+                _MetaPill(
+                  icon: Icons.location_on_outlined,
+                  text: lesson.classroom,
+                  background: colorScheme.surfaceContainerHighest,
+                  foreground: colorScheme.onSurface,
                 ),
-              ],
             ],
           ),
 
@@ -178,81 +183,62 @@ class LessonDetailSheet extends ConsumerWidget {
 
           if (isOngoing) ...[
             const Gap(14),
-            _OngoingBanner(minutesLeft: minutesLeft),
+            _OngoingBanner(lesson: lesson),
           ],
 
           if (isUpcomingToday) ...[
             const Gap(14),
-            _UpcomingBanner(minutesUntilStart: minutesUntilStart),
+            _UpcomingBanner(lesson: lesson),
           ],
 
           const Gap(16),
           Divider(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
-          const Gap(16),
-
-          // ── Section 3: The rest ──
-          // Subject
-          Text(
-            lesson.subject,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
           const Gap(14),
 
-          // Type
-          Row(
-            children: [
-              Icon(Icons.menu_book_outlined,
-                  size: 18, color: colorScheme.onSurfaceVariant),
-              const Gap(10),
-              Expanded(
-                child: Text(
-                  lesson.type.isEmpty
-                      ? lesson.lessonType.displayName
-                      : lesson.type,
-                  style: theme.textTheme.bodyMedium?.copyWith(
+          // ── Остальное: преподаватель и группы по центру ──
+          if (lesson.teacher.isNotEmpty)
+            Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.person_outline,
+                    size: 17,
                     color: colorScheme.onSurfaceVariant,
                   ),
-                ),
-              ),
-            ],
-          ),
-
-          // Teacher
-          if (lesson.teacher.isNotEmpty) ...[
-            const Gap(10),
-            _DetailRow(
-              icon: Icons.person_outline,
-              text: lesson.teacher,
-              colorScheme: colorScheme,
-              theme: theme,
-            ),
-          ],
-
-          // Groups
-          if (lesson.groups.isNotEmpty) ...[
-            const Gap(18),
-            Text(
-              'Группы',
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
+                  const Gap(6),
+                  Flexible(
+                    child: Text(
+                      lesson.teacher,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const Gap(8),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: lesson.groups.map((group) {
-                return Chip(
-                  label: Text(group.displayName,
-                      style: theme.textTheme.labelSmall),
-                  backgroundColor: colorScheme.surfaceContainerHighest,
-                  padding: EdgeInsets.zero,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  visualDensity: VisualDensity.compact,
-                );
-              }).toList(),
+
+          if (visibleGroups.isNotEmpty) ...[
+            const Gap(12),
+            Center(
+              child: Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 6,
+                runSpacing: 6,
+                children: visibleGroups.map((group) {
+                  return Chip(
+                    label: Text(group.displayName,
+                        style: theme.textTheme.labelSmall),
+                    backgroundColor: colorScheme.surfaceContainerHighest,
+                    side: BorderSide.none,
+                    padding: EdgeInsets.zero,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                  );
+                }).toList(),
+              ),
             ),
           ],
           const Gap(8),
@@ -262,49 +248,19 @@ class LessonDetailSheet extends ConsumerWidget {
   }
 }
 
-class _DetailRow extends StatelessWidget {
-  final IconData icon;
-  final String text;
-  final ColorScheme colorScheme;
-  final ThemeData theme;
-
-  const _DetailRow({
-    required this.icon,
-    required this.text,
-    required this.colorScheme,
-    required this.theme,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: colorScheme.onSurfaceVariant),
-        const Gap(6),
-        Expanded(
-          child: Text(
-            text,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 /// Full-width banner shown while the lesson is running: highlights the
-/// card and shows how much time is left until it ends.
-class _OngoingBanner extends StatelessWidget {
-  final int minutesLeft;
+/// card and shows exactly how much time is left until it ends.
+class _OngoingBanner extends ConsumerWidget {
+  final ScheduleItem lesson;
 
-  const _OngoingBanner({required this.minutesLeft});
+  const _OngoingBanner({required this.lesson});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final now = ref.watch(clockProvider);
+    final left = lesson.timeLeftAt(now);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
@@ -329,9 +285,10 @@ class _OngoingBanner extends StatelessWidget {
                 ),
                 const Gap(2),
                 Text(
-                  'До конца пары $minutesLeft мин',
+                  'До конца пары ${formatCountdown(left)}',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: colorScheme.onPrimaryContainer,
+                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
               ],
@@ -346,16 +303,18 @@ class _OngoingBanner extends StatelessWidget {
 }
 
 /// Banner shown before today's lesson starts: quiet secondary tonal
-/// card with a countdown to the start time.
-class _UpcomingBanner extends StatelessWidget {
-  final int minutesUntilStart;
+/// card with the exact countdown to the start time.
+class _UpcomingBanner extends ConsumerWidget {
+  final ScheduleItem lesson;
 
-  const _UpcomingBanner({required this.minutesUntilStart});
+  const _UpcomingBanner({required this.lesson});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final now = ref.watch(clockProvider);
+    final left = lesson.timeUntilStartAt(now);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
@@ -380,10 +339,10 @@ class _UpcomingBanner extends StatelessWidget {
                 ),
                 const Gap(2),
                 Text(
-                  'До начала пары '
-                  '${formatDurationShort(minutesUntilStart)}',
+                  'До начала пары ${formatCountdown(left)}',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: colorScheme.onSecondaryContainer,
+                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
               ],
@@ -428,6 +387,46 @@ class _ChangeBanner extends StatelessWidget {
                 fontWeight: FontWeight.w600,
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Компактная «пилюля» с иконкой и текстом — время и корпус в шапке листа.
+class _MetaPill extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final Color background;
+  final Color foreground;
+
+  const _MetaPill({
+    required this.icon,
+    required this.text,
+    required this.background,
+    required this.foreground,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: AppShapes.circular(AppShapes.small),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: foreground),
+          const Gap(5),
+          Text(
+            text,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: foreground,
+                  fontWeight: FontWeight.w700,
+                ),
           ),
         ],
       ),

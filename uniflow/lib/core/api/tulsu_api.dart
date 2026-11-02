@@ -26,7 +26,7 @@ class TulsuApiClient {
   Future<List<SearchSuggestion>> search(String query) async {
     if (query.isEmpty) return [];
     try {
-      final response = await _dio.get(
+      final response = await _dio.get<List<dynamic>>(
         TulsuEndpoints.dictionaries,
         queryParameters: {'term': query},
       );
@@ -40,7 +40,7 @@ class TulsuApiClient {
   /// Get date range for schedule
   Future<ApiDateRange> getDateRange(String searchValue) async {
     try {
-      final response = await _dio.get(
+      final response = await _dio.get<Map<String, dynamic>>(
         TulsuEndpoints.dates,
         queryParameters: {'search_value': searchValue},
       );
@@ -55,7 +55,7 @@ class TulsuApiClient {
   Future<List<ScheduleItem>> getSchedule(
       String searchField, String searchValue) async {
     try {
-      final response = await _dio.get(
+      final response = await _dio.get<List<dynamic>>(
         TulsuEndpoints.schedule,
         queryParameters: {
           'search_field': searchField,
@@ -72,7 +72,7 @@ class TulsuApiClient {
   /// Get academic calendar
   Future<List<CalendarItem>> getCalendar(String searchValue) async {
     try {
-      final response = await _dio.get(
+      final response = await _dio.get<List<dynamic>>(
         TulsuEndpoints.calendar,
         queryParameters: {'search_value': searchValue},
       );
@@ -184,7 +184,7 @@ class ProgressApiClient {
     required String groupTitle,
   }) async {
     try {
-      final response = await _dio.get(
+      final response = await _dio.get<List<dynamic>>(
         TulsuProgressEndpoints.marks,
         queryParameters: {
           'PERSONALAFFAIR': personalAffair,

@@ -10,6 +10,7 @@ import 'package:uniflow/core/services/storage_service.dart';
 import 'package:uniflow/core/services/update_service.dart';
 import 'package:uniflow/core/theme/theme_provider.dart';
 import 'package:uniflow/core/widgets/update_dialog.dart';
+import 'package:uniflow/shared/widgets/app_nav_bar.dart';
 import 'package:uniflow/features/schedule/screens/schedule_screen.dart';
 import 'package:uniflow/features/notes/screens/notes_screen.dart';
 import 'package:uniflow/features/performance/screens/performance_screen.dart';
@@ -123,7 +124,7 @@ class _MainShellState extends ConsumerState<MainShell> {
     // the navigation bar must follow the seed color like everything else.
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      systemNavigationBarColor: colorScheme.surfaceContainerLow,
+      systemNavigationBarColor: colorScheme.surfaceContainer,
       systemNavigationBarIconBrightness:
           colorScheme.brightness == Brightness.light
               ? Brightness.dark
@@ -141,46 +142,31 @@ class _MainShellState extends ConsumerState<MainShell> {
       // Material paints the gesture inset (iOS home indicator) with the
       // bar color — adding padding/transform here would double the inset
       // and float the menu high above the bottom edge.
-      bottomNavigationBar: NavigationBar(
+      bottomNavigationBar: AppNavBar(
         selectedIndex: currentTab,
-        onDestinationSelected: (index) {
+        onSelected: (index) {
           HapticFeedback.lightImpact();
           ref.read(currentTabProvider.notifier).state = index;
         },
-        animationDuration: const Duration(milliseconds: 400),
-        backgroundColor: colorScheme.surfaceContainerLow,
-        elevation: 0,
-        indicatorColor: colorScheme.primaryContainer,
-        height: 52,
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        labelTextStyle: WidgetStateProperty.resolveWith((states) {
-          final selected = states.contains(WidgetState.selected);
-          return TextStyle(
-            fontSize: 11,
-            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-            color:
-                selected ? colorScheme.onSurface : colorScheme.onSurfaceVariant,
-          );
-        }),
         destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.calendar_today_outlined),
-            selectedIcon: Icon(Icons.calendar_today),
+          AppNavDestination(
+            icon: Icons.calendar_today_outlined,
+            selectedIcon: Icons.calendar_today,
             label: 'Расписание',
           ),
-          NavigationDestination(
-            icon: Icon(Icons.note_alt_outlined),
-            selectedIcon: Icon(Icons.note_alt),
+          AppNavDestination(
+            icon: Icons.note_alt_outlined,
+            selectedIcon: Icons.note_alt,
             label: 'Заметки',
           ),
-          NavigationDestination(
-            icon: Icon(Icons.assessment_outlined),
-            selectedIcon: Icon(Icons.assessment),
+          AppNavDestination(
+            icon: Icons.assessment_outlined,
+            selectedIcon: Icons.assessment,
             label: 'Оценки',
           ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
+          AppNavDestination(
+            icon: Icons.person_outline,
+            selectedIcon: Icons.person,
             label: 'Профиль',
           ),
         ],

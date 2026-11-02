@@ -11,6 +11,7 @@ import 'package:uniflow/core/services/connectivity_service.dart';
 import 'package:uniflow/core/services/notification_service.dart';
 import 'package:uniflow/core/services/schedule_service.dart';
 import 'package:uniflow/core/services/storage_service.dart';
+import 'package:uniflow/core/services/update_coordinator.dart';
 import 'package:uniflow/features/performance/providers/performance_provider.dart';
 import 'package:uniflow/features/schedule/providers/schedule_provider.dart';
 
@@ -77,6 +78,9 @@ class FakeScheduleService implements ScheduleService {
 
   @override
   Future<List<SearchResult>> search(String query) async => [];
+
+  @override
+  Future<bool> prefetch(String searchValue) async => true;
 
   @override
   Future<ScheduleState> getCurrentWeekSchedule(String searchValue) =>
@@ -167,6 +171,7 @@ ScheduleScreenNotifier _scheduleNotifier({
       storage,
       connectivity,
       notifications,
+      UpdateCoordinator(connectivity),
     );
 
 // ── Performance fakes ──────────────────────────────────────────
@@ -309,15 +314,19 @@ void main() {
       final storage = FakeMarkStorage()..cachedMarks = [_mark('Из кэша')];
       final connectivity = FakeConnectivity();
 
-      final notifier = PerformanceNotifier(api, storage, connectivity);
+      final notifier =
+          PerformanceNotifier(api, storage, UpdateCoordinator(connectivity));
 
-      // Constructor ran the synchronous prefix of loadMarks: cached
-      // marks are visible while the API call is still in flight.
-      expect(api.calls, 1, reason: 'synced with the API in the background');
+      // Кэш отрисован синхронно, до проверки доступности и запроса.
       expect(notifier.state.marks.single.discipline, 'Из кэша');
+      expect(notifier.state.error, isNull);
+
+      // Запрос стартует после проверки доступности.
+      await _flush();
+      expect(api.calls, 1, reason: 'synced with the API in the background');
       expect(notifier.state.isLoading, isTrue,
           reason: 'background revalidation is still running');
-      expect(notifier.state.error, isNull);
+      expect(notifier.state.marks.single.discipline, 'Из кэша');
 
       pending.complete([_mark('Свежее из API')]);
       await _flush();
@@ -326,18 +335,19 @@ void main() {
       expect(notifier.state.error, isNull);
     });
 
-    test('API failure keeps the painted marks instead of an error screen',
+    test('offline keeps the painted marks instead of an error screen',
         () async {
       final pending = Completer<List<MarksItem>>();
       final api = FakeProgressApi(pending: pending);
       final storage = FakeMarkStorage()..cachedMarks = [_mark('Из кэша')];
       final connectivity = FakeConnectivity()..online = false;
 
-      final notifier = PerformanceNotifier(api, storage, connectivity);
+      final notifier =
+          PerformanceNotifier(api, storage, UpdateCoordinator(connectivity));
       expect(notifier.state.marks.single.discipline, 'Из кэша');
-
-      pending.completeError(const ApiException('offline'));
       await _flush();
+
+      expect(api.calls, 0, reason: 'офлайн не ходит в API вообще');
 
       expect(notifier.state.marks.single.discipline, 'Из кэша');
       expect(notifier.state.isLoading, isFalse);

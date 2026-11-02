@@ -37,7 +37,7 @@ class SettingsScreen extends ConsumerWidget {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
                   Navigator.of(context).push(
-                    MaterialPageRoute(
+                    MaterialPageRoute<void>(
                         builder: (_) => const StudentProfileScreen()),
                   );
                 },
@@ -243,7 +243,7 @@ class SettingsScreen extends ConsumerWidget {
                             if (ctx.mounted) Navigator.pop(ctx);
                             if (context.mounted) {
                               Navigator.of(context).pushAndRemoveUntil(
-                                MaterialPageRoute(
+                                MaterialPageRoute<void>(
                                   builder: (_) => const OnboardingScreen(),
                                 ),
                                 (_) => false,

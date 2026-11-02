@@ -4,6 +4,7 @@ import 'package:gap/gap.dart';
 import 'package:uniflow/core/models/schedule.dart';
 import 'package:uniflow/core/providers/clock_provider.dart';
 import 'package:uniflow/core/theme/app_theme.dart';
+import 'package:uniflow/core/theme/shapes.dart';
 
 /// Lesson tile widget for displaying a single lesson.
 ///
@@ -35,35 +36,29 @@ class LessonTile extends ConsumerWidget {
     final lessonColor = AppTheme.getColor(item.cssClass);
 
     // Live clock: highlight the ongoing lesson and show time left.
-    final now = ref.watch(clockProvider);
+    // Only minute resolution matters here — the second-precise text is
+    // rendered by the countdown blocks below, so the tile (and every
+    // other card of the week) does not rebuild on each second tick.
+    final now = ref.watch(
+      clockProvider.select(
+        (t) => DateTime(t.year, t.month, t.day, t.hour, t.minute),
+      ),
+    );
     final isOngoing = item.isOngoingAt(now);
-    final minutesLeft = isOngoing ? item.minutesLeftAt(now) : 0;
-
-    // Elapsed fraction of the ongoing lesson (for the progress bar).
-    var lessonProgress = 0.0;
-    final startAt = item.startsAt;
-    final endAt = item.endsAt;
-    if (isOngoing && startAt != null && endAt != null) {
-      final totalMin = endAt.difference(startAt).inMinutes;
-      if (totalMin > 0) {
-        lessonProgress = ((totalMin - minutesLeft) / totalMin).clamp(0.0, 1.0);
-      }
-    }
 
     // Upcoming today's lesson: countdown to its start (same tone of
     // "time left" UX as the ongoing block, but quieter colors).
+    final startAt = item.startsAt;
     final isUpcomingToday = !isOngoing &&
         startAt != null &&
         startAt.isAfter(now) &&
         startAt.year == now.year &&
         startAt.month == now.month &&
         startAt.day == now.day;
-    final minutesUntilStart =
-        isUpcomingToday ? item.minutesUntilStartAt(now) : 0;
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: AppShapes.circular(AppShapes.large),
       child: Container(
         padding: EdgeInsets.symmetric(
           horizontal: isCompact ? 12 : 16,
@@ -73,7 +68,7 @@ class LessonTile extends ConsumerWidget {
             ? BoxDecoration(
                 color: colorScheme.primary.withValues(alpha: 0.06),
                 border: Border.all(color: colorScheme.primary, width: 1.5),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: AppShapes.circular(AppShapes.large),
               )
             : null,
         child: IntrinsicHeight(
@@ -86,7 +81,7 @@ class LessonTile extends ConsumerWidget {
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: lessonColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: AppShapes.circular(AppShapes.small),
                 ),
                 child: RotatedBox(
                   quarterTurns: -1,
@@ -209,17 +204,12 @@ class LessonTile extends ConsumerWidget {
                       // Ongoing countdown block (under the teacher)
                       if (isOngoing) ...[
                         const Gap(8),
-                        _OngoingCountdown(
-                          minutesLeft: minutesLeft,
-                          progress: lessonProgress,
-                        ),
+                        _OngoingCountdown(lesson: item),
                       ],
                       // Countdown to today's upcoming lesson start
                       if (isUpcomingToday) ...[
                         const Gap(8),
-                        _UpcomingCountdown(
-                          minutesUntilStart: minutesUntilStart,
-                        ),
+                        _UpcomingCountdown(lesson: item),
                       ],
                       // Groups (only for full-size tile)
                       if (!isCompact && item.groups.isNotEmpty) ...[
@@ -277,20 +267,34 @@ class CompactLessonTile extends StatelessWidget {
 }
 
 /// Full-width "time left" block shown under the teacher while the lesson
-/// is running: timer icon + label + elapsed-progress bar (M3 tonal card).
-class _OngoingCountdown extends StatelessWidget {
-  final int minutesLeft;
-  final double progress;
+/// is running: timer icon + exact countdown + elapsed-progress bar
+/// (M3 tonal card).
+///
+/// Watches the one-second clock itself, so the ticking digits repaint
+/// without rebuilding the surrounding lesson tile.
+class _OngoingCountdown extends ConsumerWidget {
+  final ScheduleItem lesson;
 
-  const _OngoingCountdown({
-    required this.minutesLeft,
-    required this.progress,
-  });
+  const _OngoingCountdown({required this.lesson});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final now = ref.watch(clockProvider);
+    final left = lesson.timeLeftAt(now);
+
+    final start = lesson.startsAt;
+    final end = lesson.endsAt;
+    var progress = 0.0;
+    if (start != null && end != null) {
+      final totalSeconds = end.difference(start).inSeconds;
+      if (totalSeconds > 0) {
+        progress =
+            ((totalSeconds - left.inSeconds) / totalSeconds).clamp(0.0, 1.0);
+      }
+    }
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -308,10 +312,11 @@ class _OngoingCountdown extends StatelessWidget {
               const Gap(6),
               Expanded(
                 child: Text(
-                  'До конца пары — $minutesLeft мин',
+                  'До конца пары — ${formatCountdown(left)}',
                   style: theme.textTheme.labelMedium?.copyWith(
                     color: colorScheme.onPrimaryContainer,
                     fontWeight: FontWeight.w700,
+                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
               ),
@@ -335,17 +340,20 @@ class _OngoingCountdown extends StatelessWidget {
 }
 
 /// Tonal countdown block shown under the teacher while today's lesson
-/// hasn't started yet: clock icon + "До начала пары" label (secondary
-/// tonal colors — quieter than the ongoing primary card).
-class _UpcomingCountdown extends StatelessWidget {
-  final int minutesUntilStart;
+/// hasn't started yet: clock icon + exact "До начала пары" countdown
+/// (secondary tonal colors — quieter than the ongoing primary card).
+class _UpcomingCountdown extends ConsumerWidget {
+  final ScheduleItem lesson;
 
-  const _UpcomingCountdown({required this.minutesUntilStart});
+  const _UpcomingCountdown({required this.lesson});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final now = ref.watch(clockProvider);
+    final left = lesson.timeUntilStartAt(now);
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -360,11 +368,11 @@ class _UpcomingCountdown extends StatelessWidget {
           const Gap(6),
           Expanded(
             child: Text(
-              'До начала пары — '
-              '${formatDurationShort(minutesUntilStart)}',
+              'До начала пары — ${formatCountdown(left)}',
               style: theme.textTheme.labelMedium?.copyWith(
                 color: colorScheme.onSecondaryContainer,
                 fontWeight: FontWeight.w700,
+                fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
           ),

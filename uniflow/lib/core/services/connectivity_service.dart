@@ -36,7 +36,8 @@ class ConnectivityService {
       ));
 
       // Try a lightweight GET to the dictionaries endpoint with empty query
-      await dio.get(TulsuEndpoints.dictionaries, queryParameters: {'term': ''});
+      await dio.get<Map<String, dynamic>>(TulsuEndpoints.dictionaries,
+          queryParameters: {'term': ''});
       _lastResult = true;
     } catch (e) {
       // Any error (timeout, DNS, network) means offline

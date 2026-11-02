@@ -49,6 +49,10 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
+  assets:
+    # Монохромный герб ТулГУ для шапки расписания (щит с вырезанной «Т»).
+    - assets/branding/tulsu_shield.png
+
   fonts:
     - family: Rubik
       fonts:

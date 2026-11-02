@@ -1,6 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uniflow/core/demo/demo_schedule.dart';
-import 'package:uniflow/core/models/change_record.dart';
+
+/// Фиксированное время внутри второй пары (10:00–11:30) — тесты на
+/// «идущую сейчас» пару не должны зависеть от момента запуска.
+final _insidePair = DateTime(2026, 11, 4, 10, 15);
+final _outsidePair = DateTime(2026, 11, 4, 3, 0);
 
 void main() {
   final now = DateTime.now();
@@ -35,74 +39,60 @@ void main() {
     );
   });
 
-  test('demo schedule always contains a lesson running right now', () {
-    final items = buildDemoSchedule(now);
+  test('demo adds the running pair when one is on the bell grid', () {
+    final items = buildDemoSchedule(_insidePair);
     expect(
-      items.any((i) => i.isOngoingAt(now)),
+      items.any((i) => i.isOngoingAt(_insidePair)),
       isTrue,
       reason: 'the countdown gimmick needs a live lesson',
     );
+    expect(currentDemoSlot(_insidePair), '10:00 - 11:30');
   });
 
-  test('demo time ranges are parseable', () {
-    final items = buildDemoSchedule(now);
-    final unparseable = items.where((i) => i.startsAt == null).toList();
-    expect(unparseable, isEmpty);
+  test('no invented pair outside the bell grid', () {
+    expect(currentDemoSlot(_outsidePair), isNull);
+    final items = buildDemoSchedule(_outsidePair);
+    expect(items.any((i) => i.isOngoingAt(_outsidePair)), isFalse);
   });
 
-  test('demo changes seed all three kinds with isDemo flag', () {
-    final items = buildDemoSchedule(now);
-    final changes = buildDemoChanges(now, items);
-
-    expect(changes, isNotEmpty);
-    expect(changes.every((r) => r.isDemo), isTrue);
-    expect(changes.map((r) => r.kind), contains(ChangeKind.modified));
-    expect(changes.map((r) => r.kind), contains(ChangeKind.added));
-    expect(changes.map((r) => r.kind), contains(ChangeKind.removed));
-
-    // Modified/added demo records must point at real rows so the
-    // lesson detail sheet can match them by fingerprint.
-    final addedOrModified =
-        changes.where((r) => r.kind != ChangeKind.removed).toList();
-    for (final record in addedOrModified) {
+  test('demo time ranges are parseable and follow the TulSU grid', () {
+    final items = buildDemoSchedule(_insidePair);
+    for (final item in items) {
+      expect(item.startsAt, isNotNull, reason: 'unparseable "${item.time}"');
       expect(
-        items.any((i) => i.fingerprintRow == record.fingerprintRow),
-        isTrue,
-        reason: 'demo record "${record.subject}" must match a schedule row',
+        demoSlots,
+        contains(item.time),
+        reason: '"${item.time}" is not a TulSU pair',
       );
+      expect(item.endsAt!.isAfter(item.startsAt!), isTrue);
     }
   });
 
-  test('demo mutation moves one lesson and reports a room change', () {
+  test('demo rows all belong to the fake demo group', () {
     final items = buildDemoSchedule(now);
-    final mutation = mutateDemoLesson(items, now);
-
-    expect(mutation.change.kind, ChangeKind.modified);
-    expect(mutation.change.isDemo, isTrue);
-    expect(mutation.items, hasLength(items.length));
-    expect(mutation.change.fieldChanges.single.field, 'Аудитория');
+    for (final item in items) {
+      expect(item.groups.single.number, demoGroup);
+    }
     expect(
-      mutation.change.fieldChanges.single.before,
-      isNot(mutation.change.fieldChanges.single.after),
+      demoGroup,
+      contains('демо'),
+      reason: 'фейковые данные обязаны быть помечены в номере группы',
     );
-
-    // Exactly one row differs from the original schedule.
-    var differences = 0;
-    for (var i = 0; i < items.length; i++) {
-      if (items[i].classroom != mutation.items[i].classroom) differences++;
-    }
-    expect(differences, 1, reason: 'only one lesson is moved per refresh');
   });
 
-  test('demo changes are JSON round-trippable', () {
+  test('demo data carries no joke text or emoji', () {
     final items = buildDemoSchedule(now);
-    for (final record in buildDemoChanges(now, items)) {
-      final restored = ChangeRecord.fromJson(record.toJson());
-      expect(restored.kind, record.kind);
-      expect(restored.subject, record.subject);
-      expect(restored.fieldChanges.length, record.fieldChanges.length);
-      expect(restored.isDemo, isTrue);
-      expect(restored.fingerprintRow, record.fingerprintRow);
+    const banned = ['навсегда', 'снова', 'шанс', 'заказывали', 'отменили'];
+    for (final item in items) {
+      final text = '${item.subject} ${item.type} ${item.teacher}'.toLowerCase();
+      for (final word in banned) {
+        expect(text.contains(word), isFalse, reason: '$word found in $text');
+      }
+      expect(
+        item.subject.runes.any((r) => r > 0x2100),
+        isFalse,
+        reason: 'no emoji / symbols in "${item.subject}"',
+      );
     }
   });
 }

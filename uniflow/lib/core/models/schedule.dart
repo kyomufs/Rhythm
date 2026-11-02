@@ -61,21 +61,21 @@ class ScheduleItem {
     return !now.isBefore(start) && now.isBefore(end);
   }
 
-  /// Whole minutes until the lesson ends (rounded up, 0 when over).
-  int minutesLeftAt(DateTime now) {
+  /// Exact time left until the lesson ends (zero when over).
+  Duration timeLeftAt(DateTime now) {
     final end = endsAt;
-    if (end == null) return 0;
-    final seconds = end.difference(now).inSeconds;
-    return seconds <= 0 ? 0 : (seconds + 59) ~/ 60;
+    if (end == null) return Duration.zero;
+    final left = end.difference(now);
+    return left.isNegative ? Duration.zero : left;
   }
 
-  /// Whole minutes until the lesson starts (rounded up; 0 when the
-  /// lesson is already running or over).
-  int minutesUntilStartAt(DateTime now) {
+  /// Exact time until the lesson starts (zero when it is already
+  /// running or over).
+  Duration timeUntilStartAt(DateTime now) {
     final start = startsAt;
-    if (start == null) return 0;
-    final seconds = start.difference(now).inSeconds;
-    return seconds <= 0 ? 0 : (seconds + 59) ~/ 60;
+    if (start == null) return Duration.zero;
+    final left = start.difference(now);
+    return left.isNegative ? Duration.zero : left;
   }
 
   (DateTime, DateTime)? _parseTimeRange() {
@@ -378,10 +378,18 @@ class CalendarItem {
   }
 }
 
-/// Compact human-readable duration: "45 мин", "3 ч", "2 д".
-/// Shared by the "До начала/До конца пары" countdowns.
-String formatDurationShort(int minutes) {
-  if (minutes < 60) return '$minutes мин';
-  if (minutes < 24 * 60) return '${minutes ~/ 60} ч';
-  return '${minutes ~/ (24 * 60)} д';
+/// Exact countdown text with seconds: "34 с", "12 мин 34 с",
+/// "1 ч 05 мин 09 с". Values are truncated, never rounded up, so the
+/// label never overstates the time actually left.
+String formatCountdown(Duration remaining) {
+  final total = remaining.isNegative ? Duration.zero : remaining;
+  final hours = total.inHours;
+  final minutes = total.inMinutes.remainder(60);
+  final seconds = total.inSeconds.remainder(60);
+  String two(int value) => value.toString().padLeft(2, '0');
+  if (hours > 0) {
+    return '$hours ч ${two(minutes)} мин ${two(seconds)} с';
+  }
+  if (minutes > 0) return '$minutes мин ${two(seconds)} с';
+  return '$seconds с';
 }

@@ -3,11 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:intl/intl.dart';
 import 'package:uniflow/core/models/change_record.dart';
+import 'package:uniflow/core/theme/shapes.dart';
 import 'package:uniflow/features/schedule/providers/schedule_provider.dart';
 
 /// Dedicated screen listing every detected schedule change, grouped
 /// into one block per day. Changed lessons are visually highlighted;
-/// each record shows field-level «было → стало» diffs.
+/// изменённая пара показана двумя карточками: зачёркнутой «было» и обычной
+/// «стало».
 class ScheduleChangesScreen extends ConsumerStatefulWidget {
   const ScheduleChangesScreen({super.key});
 
@@ -288,23 +290,6 @@ class _ChangeCard extends StatelessWidget {
                 ),
               ),
               const Gap(8),
-              if (record.isDemo)
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surface,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    'ДЕМО',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 9,
-                    ),
-                  ),
-                ),
               const Spacer(),
               Text(
                 record.time,
@@ -315,60 +300,48 @@ class _ChangeCard extends StatelessWidget {
               ),
             ],
           ),
-          const Gap(8),
-          // The lesson itself — the visual highlight of the entry.
-          Wrap(
-            spacing: 6,
-            runSpacing: 4,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  record.subject,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: accent,
-                    fontWeight: FontWeight.w700,
-                    decoration: record.kind == ChangeKind.removed
-                        ? TextDecoration.lineThrough
-                        : null,
+          const Gap(10),
+          // Суть изменения без «12:00 → 13:30»: слева зачёркнутая карточка
+          // «было», справа обычная «стало». У нового и отменённого занятия
+          // карточка одна — сравнивать не с чем.
+          if (record.kind == ChangeKind.modified &&
+              record.fieldChanges.isNotEmpty)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _SnapshotCard(
+                    snapshot: _LessonSnapshot.previous(record),
+                    accent: colorScheme.outline,
+                    struck: true,
+                    label: 'Было',
+                    colorScheme: colorScheme,
+                    theme: theme,
                   ),
                 ),
-              ),
-              Text(
-                record.type,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: onBackground.withValues(alpha: 0.75),
+                const Gap(8),
+                Expanded(
+                  child: _SnapshotCard(
+                    snapshot: _LessonSnapshot.current(record),
+                    accent: accent,
+                    struck: false,
+                    label: 'Стало',
+                    colorScheme: colorScheme,
+                    theme: theme,
+                  ),
                 ),
-              ),
-            ],
-          ),
-          if (record.classroom.isNotEmpty || record.teacher.isNotEmpty) ...[
-            const Gap(4),
-            Text(
-              [
-                if (record.classroom.isNotEmpty) 'Ауд. ${record.classroom}',
-                if (record.teacher.isNotEmpty) record.teacher,
-              ].join(' · '),
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: onBackground.withValues(alpha: 0.8),
-              ),
+              ],
+            )
+          else
+            _SnapshotCard(
+              snapshot: _LessonSnapshot.current(record),
+              accent: accent,
+              struck: record.kind == ChangeKind.removed,
+              label: null,
+              colorScheme: colorScheme,
+              theme: theme,
             ),
-          ],
-          // Field-level «было → стало» diff (modified only).
-          if (record.kind == ChangeKind.modified &&
-              record.fieldChanges.isNotEmpty) ...[
-            const Gap(8),
-            for (final change in record.fieldChanges) ...[
-              _FieldChangeRow(change: change),
-              const Gap(4),
-            ],
-          ],
-          const Gap(4),
+          const Gap(6),
           Text(
             'Обнаружено: ${DateFormat('d MMMM, HH:mm', 'ru').format(record.detectedAt)}',
             style: theme.textTheme.labelSmall?.copyWith(
@@ -381,43 +354,148 @@ class _ChangeCard extends StatelessWidget {
   }
 }
 
-/// «Аудитория — Было: 305 → Стало: 407» with strikethrough old value
-/// and emphasized new value.
-class _FieldChangeRow extends StatelessWidget {
-  final FieldChange change;
+/// Занятие в том виде, в котором оно было или стало: без разбора по полям,
+/// просто карточка, которую видно целиком.
+class _LessonSnapshot {
+  final String subject;
+  final String type;
+  final String time;
+  final String classroom;
+  final String teacher;
 
-  const _FieldChangeRow({required this.change});
+  const _LessonSnapshot({
+    required this.subject,
+    required this.type,
+    required this.time,
+    required this.classroom,
+    required this.teacher,
+  });
+
+  factory _LessonSnapshot.current(ChangeRecord record) => _LessonSnapshot(
+        subject: record.subject,
+        type: record.type,
+        time: record.time,
+        classroom: record.classroom,
+        teacher: record.teacher,
+      );
+
+  /// Восстанавливает прежнее занятие: поля из записи, подменённые на
+  /// `before` для каждого изменённого поля.
+  factory _LessonSnapshot.previous(ChangeRecord record) {
+    var snapshot = _LessonSnapshot.current(record);
+    for (final change in record.fieldChanges) {
+      snapshot = switch (change.field) {
+        'Предмет' => snapshot._copyWith(subject: change.before),
+        'Тип' => snapshot._copyWith(type: change.before),
+        'Время' => snapshot._copyWith(time: change.before),
+        'Преподаватель' => snapshot._copyWith(teacher: change.before),
+        'Аудитория' => snapshot._copyWith(classroom: change.before),
+        _ => snapshot,
+      };
+    }
+    return snapshot;
+  }
+
+  _LessonSnapshot _copyWith({
+    String? subject,
+    String? type,
+    String? time,
+    String? classroom,
+    String? teacher,
+  }) =>
+      _LessonSnapshot(
+        subject: subject ?? this.subject,
+        type: type ?? this.type,
+        time: time ?? this.time,
+        classroom: classroom ?? this.classroom,
+        teacher: teacher ?? this.teacher,
+      );
+}
+
+class _SnapshotCard extends StatelessWidget {
+  final _LessonSnapshot snapshot;
+  final Color accent;
+  final bool struck;
+  final String? label;
+  final ColorScheme colorScheme;
+  final ThemeData theme;
+
+  const _SnapshotCard({
+    required this.snapshot,
+    required this.accent,
+    required this.struck,
+    required this.label,
+    required this.colorScheme,
+    required this.theme,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Text.rich(
-      TextSpan(
-        style: theme.textTheme.bodySmall?.copyWith(
-          color: colorScheme.onSurface,
+    final muted = colorScheme.onSurfaceVariant;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: struck
+            ? colorScheme.surface.withValues(alpha: 0.55)
+            : colorScheme.surface.withValues(alpha: 0.85),
+        borderRadius: AppShapes.circular(AppShapes.medium),
+        border: Border.all(
+          color: struck
+              ? colorScheme.outlineVariant
+              : accent.withValues(alpha: 0.5),
         ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TextSpan(
-            text: '${change.field}: ',
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-          TextSpan(
-            text: change.before,
-            style: TextStyle(
-              color: colorScheme.onSurfaceVariant,
-              decoration: TextDecoration.lineThrough,
+          if (label != null) ...[
+            Text(
+              label!,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: struck ? muted : accent,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.6,
+              ),
             ),
-          ),
-          const TextSpan(text: ' → '),
-          TextSpan(
-            text: change.after,
-            style: TextStyle(
-              color: colorScheme.primary,
+            const Gap(4),
+          ],
+          Text(
+            snapshot.subject,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: struck ? muted : colorScheme.onSurface,
               fontWeight: FontWeight.w700,
+              decoration: struck ? TextDecoration.lineThrough : null,
+              decorationColor: muted,
             ),
           ),
+          const Gap(4),
+          Text(
+            snapshot.time,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: struck ? muted : accent,
+              fontWeight: FontWeight.w700,
+              decoration: struck ? TextDecoration.lineThrough : null,
+              decorationColor: muted,
+            ),
+          ),
+          if (snapshot.classroom.isNotEmpty || snapshot.teacher.isNotEmpty) ...[
+            const Gap(2),
+            Text(
+              [
+                if (snapshot.classroom.isNotEmpty) 'Ауд. ${snapshot.classroom}',
+                if (snapshot.teacher.isNotEmpty) snapshot.teacher,
+              ].join(' · '),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: muted,
+                decoration: struck ? TextDecoration.lineThrough : null,
+                decorationColor: muted,
+              ),
+            ),
+          ],
         ],
       ),
     );

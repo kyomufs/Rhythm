@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +11,7 @@ import 'package:uniflow/core/services/connectivity_service.dart';
 import 'package:uniflow/core/services/notification_service.dart';
 import 'package:uniflow/core/services/schedule_service.dart';
 import 'package:uniflow/core/services/storage_service.dart';
+import 'package:uniflow/core/services/update_coordinator.dart';
 import 'package:uniflow/core/utils/week_utils.dart';
 
 /// Schedule screen state
@@ -164,6 +166,7 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
   final StorageService _storage;
   final ConnectivityService _connectivity;
   final NotificationService _notifications;
+  final UpdateCoordinator _updates;
   final bool _demo;
 
   /// Journal size and age limits (plan: cap 50, TTL 14 days).
@@ -174,7 +177,8 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
     this._service,
     this._storage,
     this._connectivity,
-    this._notifications, {
+    this._notifications,
+    this._updates, {
     bool demo = false,
   })  : _demo = demo,
         super(ScheduleScreenState(
@@ -262,23 +266,20 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
     );
   }
 
-  /// Demo mode: generated timetable + seeded in-memory change journal.
-  /// Nothing is persisted: real fingerprints and journals stay untouched.
+  /// Демо-режим: сгенерированное расписание и ничего больше. Ни журнал
+  /// изменений, ни отпечаток не подделываются — журнал в демо пуст, потому
+  /// что менять там нечего. В хранилище демо не пишет.
   void _initDemo(List<FavoriteGroup> favGroups) {
     final now = DateTime.now();
     final items = buildDemoSchedule(now);
-    final changes = buildDemoChanges(now, items);
     state = state.copyWith(
       isDemo: true,
       favoriteGroups: favGroups,
       schedule: ScheduleState(
-        searchValue: 'demo',
+        searchValue: demoGroup,
         dateRange: _rangeOf(items),
         items: items,
       ),
-      changeRecords: changes,
-      changeJournal: changes,
-      hasUnseenChanges: changes.isNotEmpty,
     );
   }
 
@@ -643,6 +644,19 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
     return _storage.isFavoriteGroup(groupNumber);
   }
 
+  /// Раскладывает снимки избранных групп в Hive, чтобы они открывались без
+  /// сети. Вызывается после успешного обновления своего расписания — молча и
+  /// без влияния на состояние экрана.
+  Future<void> prefetchFavorites() async {
+    if (_demo) return;
+    final groups = state.favoriteGroups;
+    if (groups.isEmpty) return;
+    for (final fav in groups) {
+      if (fav.groupNumber == state.currentGroup) continue;
+      await _service.prefetch(fav.groupNumber);
+    }
+  }
+
   /// Loads the schedule. Returns a note when data had to be served from
   /// cache after a failed refresh (explicit offline report); null when
   /// fresh data was loaded or [ScheduleState.error] was set.
@@ -666,7 +680,7 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
       // If the API returned an error, try cache as fallback
       if (result.error != null) {
         final cached = _storage.getCachedSchedule(searchValue);
-        if (cached != null && cached.isValid) {
+        if (cached != null && cached.data.items.isNotEmpty) {
           state =
               state.copyWith(schedule: _stateFromCache(searchValue, cached));
           return await _fallbackNote(result.error!);
@@ -679,7 +693,7 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
     } catch (e) {
       // Unexpected error — try cache
       final cached = _storage.getCachedSchedule(searchValue);
-      if (cached != null && cached.isValid) {
+      if (cached != null && cached.data.items.isNotEmpty) {
         state = state.copyWith(schedule: _stateFromCache(searchValue, cached));
         return await _fallbackNote(ErrorMessages.fromException(e));
       }
@@ -703,40 +717,41 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
     return 'Нет подключения к интернету — показано сохранённое расписание';
   }
 
-  /// Refreshes from the API and returns an explicit user-facing message
-  /// (offline / server error / served cache / success). In demo mode a
-  /// random lesson is moved to another room instead.
-  Future<String> refresh() async {
+  /// Обновляет расписание через единый путь: проверка доступности API →
+  /// загрузка → результат. Офлайн возвращает `unavailable` без сообщения и без
+  /// изменения состояния.
+  Future<UpdateResult> refresh() async {
     if (_demo) {
-      final mutation = mutateDemoLesson(state.schedule.items, DateTime.now());
-      final journal = pruneJournal([mutation.change, ...state.changeJournal]);
-      state = state.copyWith(
-        schedule: state.schedule.copyWith(items: mutation.items),
-        changeRecords: [mutation.change, ...state.changeRecords],
-        changeJournal: journal,
-        hasUnseenChanges: true,
-      );
-      await _notifications.show(
-        2,
-        'Расписание изменилось',
-        'Демо: ${_changeSummary([mutation.change])}. '
-            'Откройте значок «Изменения» в расписании.',
-      );
-      return 'Демо-расписание обновлено';
+      // В демо нечего обновлять: данные те же, изменений не выдумываем.
+      return const UpdateResult(UpdateOutcome.updated, 'Расписание обновлено');
     }
 
     final group = state.currentGroup;
-    if (group == null) return 'Группа не выбрана';
-    // Bypass the local cache so the user actually gets fresh data.
-    final note = await loadSchedule(group, forceRefresh: true);
-    // The user has just seen this data — use it as the new baseline.
-    if (state.schedule.error == null && state.schedule.items.isNotEmpty) {
-      await _storage.setScheduleFingerprint(_fingerprint(state.schedule.items));
-      // Fresh data reviewed → drop the session batch. The journal and
-      // the unseen flag are cleared only from the «Изменения» screen.
-      state = state.copyWith(clearChanges: true);
+    if (group == null) {
+      return const UpdateResult(UpdateOutcome.failed, 'Группа не выбрана');
     }
-    return note ?? state.schedule.error ?? 'Расписание обновлено';
+
+    return _updates.run(() async {
+      // Bypass the local cache so the user actually gets fresh data.
+      final note = await loadSchedule(group, forceRefresh: true);
+      // The user has just seen this data — use it as the new baseline.
+      if (state.schedule.error == null && state.schedule.items.isNotEmpty) {
+        await _storage.setScheduleFingerprint(
+            _fingerprint(state.schedule.items));
+        // Fresh data reviewed → drop the session batch. The journal and
+        // the unseen flag are cleared only from the «Изменения» screen.
+        state = state.copyWith(clearChanges: true);
+        // Снимки избранного догружаются фоном: они не должны задерживать
+        // уведомление об успехе.
+        unawaited(prefetchFavorites());
+        return const UpdateResult(
+            UpdateOutcome.updated, 'Расписание обновлено');
+      }
+      return UpdateResult(
+        UpdateOutcome.failed,
+        note ?? state.schedule.error ?? 'Не удалось обновить расписание',
+      );
+    });
   }
 
   // ── Week Navigation ──────────────────────────────────────
@@ -804,6 +819,7 @@ final scheduleScreenProvider =
     ref.watch(storageServiceProvider),
     ref.watch(connectivityServiceProvider),
     ref.watch(notificationServiceProvider),
+    ref.watch(updateCoordinatorProvider),
     demo: demo,
   );
 });

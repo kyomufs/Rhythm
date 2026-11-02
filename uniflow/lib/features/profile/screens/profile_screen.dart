@@ -49,7 +49,7 @@ class ProfileScreen extends ConsumerWidget {
             ].join(' · '),
             onTap: () {
               Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const StudentProfileScreen()),
+                MaterialPageRoute<void>(builder: (_) => const StudentProfileScreen()),
               );
             },
           ),
@@ -63,7 +63,7 @@ class ProfileScreen extends ConsumerWidget {
             subtitle: 'Тема, цвет, расписание',
             onTap: () {
               Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
               );
             },
           ),

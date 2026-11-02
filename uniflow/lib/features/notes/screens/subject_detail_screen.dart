@@ -1352,7 +1352,7 @@ class _TaskSheetState extends State<_TaskSheet> {
 
   void _showSubfolderPicker(BuildContext context,
       List<SubjectSubfolder> subfolders, SubjectSubfolder current) {
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -1365,24 +1365,18 @@ class _TaskSheetState extends State<_TaskSheet> {
           maxChildSize: 0.7,
           expand: false,
           builder: (ctx, scrollController) {
+            // Цвет и скругления — из bottomSheetTheme. Крестик убран:
+            // закрытие свайпом вниз или тапом по затемнению.
             return Material(
-              color: colorScheme.surface,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(28)),
+              type: MaterialType.transparency,
               child: Column(
                 children: [
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 16, 16, 8),
-                    child: Row(
-                      children: [
-                        Text('Выберите подпапку',
-                            style: theme.textTheme.titleLarge),
-                        const Spacer(),
-                        IconButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          icon: const Icon(Icons.close),
-                        ),
-                      ],
+                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text('Выберите подпапку',
+                          style: theme.textTheme.titleLarge),
                     ),
                   ),
                   Expanded(

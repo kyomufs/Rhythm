@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
@@ -12,6 +13,13 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
   bool _initialized = false;
 
+  /// Плагин умеет только Android и iOS. На десктопе `initialize` бросает
+  /// исключение, поэтому там сервис молча выключен.
+  static bool get _supported =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS);
+
   static const AndroidNotificationDetails _androidDetails =
       AndroidNotificationDetails(
     'uniflow_main',
@@ -24,6 +32,10 @@ class NotificationService {
   /// Initialize the plugin (idempotent).
   Future<void> init() async {
     if (_initialized) return;
+    if (!_supported) {
+      _initialized = true;
+      return;
+    }
     await _plugin.initialize(
       settings: const InitializationSettings(
         android: AndroidInitializationSettings('@mipmap/ic_launcher'),
@@ -65,6 +77,7 @@ class NotificationService {
   /// Show a local notification.
   Future<void> show(int id, String title, String body) async {
     await init();
+    if (!_supported) return;
     await _plugin.show(
       id: id,
       title: title,

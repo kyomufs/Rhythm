@@ -72,6 +72,19 @@ class ScheduleService {
     }
   }
 
+  /// Обновляет локальный снимок расписания, не трогая ни состояние экрана, ни
+  /// «последний поиск». Нужно для избранных групп: они должны открываться
+  /// офлайн из снимка.
+  Future<bool> prefetch(String searchValue) async {
+    try {
+      final data = await _api.getFullSchedule(searchValue);
+      await _storage.cacheSchedule(searchValue, data);
+      return true;
+    } on ApiException {
+      return false;
+    }
+  }
+
   /// Get schedule for current week
   Future<ScheduleState> getCurrentWeekSchedule(String searchValue) async {
     final state = await getSchedule(searchValue);

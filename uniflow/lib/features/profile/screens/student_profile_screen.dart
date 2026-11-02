@@ -71,9 +71,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Scaffold(
+      return Scaffold(
       appBar: AppBar(
         title: const Text('Профиль ученика'),
         centerTitle: false,
@@ -268,22 +266,19 @@ class _GroupSearchSheetState extends ConsumerState<_GroupSearchSheet> {
       maxChildSize: 0.95,
       expand: false,
       builder: (context, scrollController) {
+        // Цвет и скругления — из bottomSheetTheme: меню поиска не должно
+        // выделяться на фоне меню, из которого открыто. Крестик убран,
+        // закрытие — свайп вниз или тап по затемнению.
         return Material(
-          color: theme.colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          type: MaterialType.transparency,
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(24, 16, 16, 0),
-                child: Row(
-                  children: [
-                    Text('Поиск группы', style: theme.textTheme.titleLarge),
-                    const Spacer(),
-                    IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close),
-                    ),
-                  ],
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child:
+                      Text('Поиск группы', style: theme.textTheme.titleLarge),
                 ),
               ),
               Padding(

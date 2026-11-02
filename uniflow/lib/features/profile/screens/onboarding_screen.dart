@@ -109,14 +109,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     storage.setOnboardingCompleted();
 
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const MainShell()),
+      MaterialPageRoute<void>(builder: (_) => const MainShell()),
     );
   }
 
   void _skip() {
     ref.read(storageServiceProvider).setOnboardingCompleted();
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const MainShell()),
+      MaterialPageRoute<void>(builder: (_) => const MainShell()),
     );
   }
 

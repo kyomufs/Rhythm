@@ -75,7 +75,12 @@ void paintIcon(
 }
 
 Future<void> writePng(
-    double size, String path, ui.Image glyph, bool withBackground) async {
+  double size,
+  String path,
+  ui.Image glyph,
+  bool withBackground, {
+  double? glyphScale,
+}) async {
   final recorder = ui.PictureRecorder();
   final canvas = Canvas(recorder);
   canvas.scale(size / kCanvas);
@@ -83,7 +88,8 @@ Future<void> writePng(
     canvas,
     glyph,
     withBackground: withBackground,
-    glyphScale: withBackground ? kGlyphScaleFull : kGlyphScaleAdaptive,
+    glyphScale: glyphScale ??
+        (withBackground ? kGlyphScaleFull : kGlyphScaleAdaptive),
   );
   final image = await recorder.endRecording().toImage(
         size.round(),
@@ -145,5 +151,45 @@ void main() {
     // Adaptive icon foreground (108dp canvas, glyph fits the safe zone).
     await writePng(
         432, '$res/drawable/ic_launcher_foreground.png', glyph, false);
+
+    // ── Splash ────────────────────────────────────────────────────────
+    // Один и тот же вид на всех платформах: белый глиф на фирменном цвете.
+    // Android (и до 12, и с 12) рисует холст 288dp, внутри которого глиф
+    // занимает 128dp → 128/288 = 0.444. iOS показывает глиф напрямую в
+    // рамке 128pt, поэтому там масштаб 1.0.
+    const splashGlyphScale = 128 / 288;
+    stdout.writeln('iOS launch image:');
+    const launchImages = <String, double>{
+      'LaunchImage.png': 128,
+      'LaunchImage@2x.png': 256,
+      'LaunchImage@3x.png': 384,
+    };
+    for (final e in launchImages.entries) {
+      await writePng(
+        e.value,
+        'ios/Runner/Assets.xcassets/LaunchImage.imageset/${e.key}',
+        glyph,
+        false,
+        glyphScale: 1,
+      );
+    }
+
+    stdout.writeln('Android splash icon:');
+    const splashDensities = <String, double>{
+      'mdpi': 288,
+      'hdpi': 432,
+      'xhdpi': 576,
+      'xxhdpi': 864,
+      'xxxhdpi': 1152,
+    };
+    for (final e in splashDensities.entries) {
+      await writePng(
+        e.value,
+        '$res/drawable-${e.key}/splash_icon.png',
+        glyph,
+        false,
+        glyphScale: splashGlyphScale,
+      );
+    }
   }, timeout: const Timeout(Duration(minutes: 5)));
 }

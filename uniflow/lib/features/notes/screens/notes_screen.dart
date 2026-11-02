@@ -580,7 +580,7 @@ class _AddSubjectSheetState extends ConsumerState<_AddSubjectSheet> {
     final searchController = TextEditingController();
     List<String> filtered = List.from(subjects);
 
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -593,24 +593,18 @@ class _AddSubjectSheetState extends ConsumerState<_AddSubjectSheet> {
               maxChildSize: 0.9,
               expand: false,
               builder: (ctx, scrollController) {
+                // Цвет и скругления даёт bottomSheetTheme; крестик не нужен —
+                // закрытие свайпом вниз или тапом по затемнению.
                 return Material(
-                  color: colorScheme.surface,
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(28)),
+                  type: MaterialType.transparency,
                   child: Column(
                     children: [
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(24, 16, 16, 0),
-                        child: Row(
-                          children: [
-                            Text('Выберите предмет',
-                                style: theme.textTheme.titleLarge),
-                            const Spacer(),
-                            IconButton(
-                              onPressed: () => Navigator.pop(ctx),
-                              icon: const Icon(Icons.close),
-                            ),
-                          ],
+                        padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text('Выберите предмет',
+                              style: theme.textTheme.titleLarge),
                         ),
                       ),
                       // Search

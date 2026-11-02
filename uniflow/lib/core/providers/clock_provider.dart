@@ -11,22 +11,36 @@ final demoModeProvider = Provider<bool>((ref) {
   return ref.watch(appSettingsProvider.select((s) => s.demoMode));
 });
 
-/// App-wide ticking clock for "ongoing lesson" UI. Rebuilds subscribers
-/// every 30 seconds so countdowns stay accurate without per-widget timers.
+/// App-wide ticking clock for "ongoing lesson" UI and live countdowns.
+///
+/// Ticks once per second, aligned to the second boundary, so the
+/// displayed countdown never lags behind the wall clock by a fixed
+/// fraction of a second. Widgets that only need minute resolution
+/// (highlighting the ongoing lesson) subscribe through `select`, so the
+/// second tick does not rebuild the whole week.
 /// Demo mode keeps real time: the generated demo schedule always contains
 /// a lesson that is running right now, so the countdown works live.
 final clockProvider = StateNotifierProvider<ClockNotifier, DateTime>((ref) {
-  final notifier = ClockNotifier();
-  ref.onDispose(notifier.dispose);
-  return notifier;
+  // Riverpod сам вызывает dispose у notifier — повторный ref.onDispose
+  // приводил к «Tried to use ClockNotifier after dispose».
+  return ClockNotifier();
 });
 
 class ClockNotifier extends StateNotifier<DateTime> {
   Timer? _timer;
 
   ClockNotifier() : super(DateTime.now()) {
-    _timer = Timer.periodic(const Duration(seconds: 30), (_) {
+    _scheduleTick();
+  }
+
+  /// Re-arms a one-shot timer for the next second boundary instead of
+  /// `Timer.periodic`: the period would drift and the countdown with it.
+  void _scheduleTick() {
+    final delay = Duration(milliseconds: 1000 - DateTime.now().millisecond);
+    _timer = Timer(delay, () {
+      if (!mounted) return;
       state = DateTime.now();
+      _scheduleTick();
     });
   }
 
