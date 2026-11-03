@@ -4,6 +4,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:uniflow/core/api/tulsu_api.dart';
 import 'package:uniflow/core/theme/shapes.dart';
+import 'package:uniflow/core/utils/mark_labels.dart';
 
 /// Таблица успеваемости: липкая шапка, вертикальная прокрутка строк и
 /// горизонтальная прокрутка столбцов, ширины столбцов тянутся мышью или
@@ -22,7 +23,7 @@ class _MarksTableState extends State<MarksTable> {
     _ColumnSpec(_Col.discipline, 'Дисциплина', initial: 260, min: 150),
     _ColumnSpec(_Col.teacher, 'Преподаватель', initial: 200, min: 110),
     _ColumnSpec(_Col.mark, 'Оценка', initial: 96, min: 80),
-    _ColumnSpec(_Col.attestation, 'Аттестация', initial: 160, min: 120),
+    _ColumnSpec(_Col.attestation, 'Аттестация', initial: 130, min: 92),
     _ColumnSpec(_Col.retake, 'Пересдача', initial: 130, min: 96),
   ];
 
@@ -337,7 +338,7 @@ class _TableRow extends StatelessWidget {
         );
       case _Col.attestation:
         return Text(
-          item.markTitle.isEmpty ? '—' : item.markTitle,
+          item.markTitle.isEmpty ? '—' : shortMarkTitle(item.markTitle),
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: theme.textTheme.bodySmall?.copyWith(
@@ -360,23 +361,17 @@ class _TableRow extends StatelessWidget {
   }
 }
 
-/// Цвет оценки в схеме MD3 (перенесён из прежней плитки без изменений).
+/// Цвет оценки в схеме MD3; сравниваем по нормализованной подписи, потому что
+/// API отдаёт «зачёт»/«Зачет»/«Незачет» вразнобой.
 Color _markColor(ColorScheme colorScheme, MarksItem item) {
   if (item.markTitle.isEmpty) return colorScheme.onSurfaceVariant;
-  switch (item.markTitle) {
-    case 'Отлично':
-    case 'Зачет':
-      return colorScheme.primary;
-    case 'Хорошо':
-      return colorScheme.tertiary;
-    case 'Удовлетворительно':
-    case 'Незачет':
-      return colorScheme.secondary;
-    case 'Не аттестован':
-      return colorScheme.error;
-    default:
-      return colorScheme.onSurface;
-  }
+  return switch (normalizeMarkTitle(item.markTitle)) {
+    'отлично' || 'зачет' => colorScheme.primary,
+    'хорошо' => colorScheme.tertiary,
+    'удовлетворительно' || 'незачет' => colorScheme.secondary,
+    'не аттестован' => colorScheme.error,
+    _ => colorScheme.onSurface,
+  };
 }
 
 // ============================================================

@@ -46,7 +46,8 @@ void main() {
     expect(find.text('Оценка'), findsOneWidget);
     expect(find.text('Аттестация'), findsOneWidget);
     expect(find.text('Математический анализ'), findsOneWidget);
-    expect(find.text('Отлично'), findsOneWidget);
+    expect(find.text('Отл.'), findsOneWidget,
+        reason: 'аттестация сокращается до аббревиатуры');
     expect(find.text('Двоенко С. Д.'), findsOneWidget);
   });
 
