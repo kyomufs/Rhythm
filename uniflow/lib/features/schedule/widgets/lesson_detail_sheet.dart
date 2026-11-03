@@ -56,17 +56,38 @@ class LessonDetailSheet extends ConsumerWidget {
         startAt.day == now.day;
 
     // API отдаёт GROUPS только те группы, по которым шёл запрос: при поиске
-    // по своей группе список состоит из неё же, и подпись «Группы» с одной
-    // строкой ничего не сообщает. Такие списки показываем только когда в них
-    // действительно есть другие группы.
+    // по своей группе список состоит из неё же. Полный список добираем
+    // запросом по аудитории пары (см. LessonGroupResolver); пока он грузится
+    // или недоступен, остаёмся при том, что пришло с расписанием.
     final ownGroup = ref.watch(
       scheduleScreenProvider.select((s) => s.currentGroup),
     );
-    final visibleGroups = lesson.groups.length == 1 &&
+    final needsResolve =
+        lesson.groups.length <= 1 && lesson.classroom.isNotEmpty;
+    final resolvedGroups = needsResolve
+        ? ref
+                .watch(lessonGroupsProvider((
+                  date: lesson.date,
+                  time: lesson.time,
+                  subject: lesson.subject,
+                  classroom: lesson.classroom,
+                )))
+                .valueOrNull ??
+            const <GroupInfo>[]
+        : const <GroupInfo>[];
+    final allGroups = List<GroupInfo>.of(
+        resolvedGroups.isNotEmpty ? resolvedGroups : lesson.groups);
+    // Своя группа вперёд: остальные — в исходном порядке API.
+    if (ownGroup != null) {
+      allGroups.sort((a, b) => (a.number == ownGroup ? 0 : 1)
+          .compareTo(b.number == ownGroup ? 0 : 1));
+    }
+    // Одна группа, и это своя же — подпись «Группы» ничего не сообщает.
+    final visibleGroups = allGroups.length == 1 &&
             ownGroup != null &&
-            lesson.groups.single.number == ownGroup
+            allGroups.single.number == ownGroup
         ? const <GroupInfo>[]
-        : lesson.groups;
+        : allGroups;
 
     // Latest journal entry describing exactly this lesson.
     final changeRecord = ref.watch(scheduleScreenProvider
@@ -228,10 +249,20 @@ class LessonDetailSheet extends ConsumerWidget {
                 spacing: 6,
                 runSpacing: 6,
                 children: visibleGroups.map((group) {
+                  // Своя группа — первая и выделенная: в длинном списке
+                  // иначе не найти, к какой из них относится расписание.
+                  final isOwn = ownGroup != null && group.number == ownGroup;
                   return Chip(
-                    label: Text(group.displayName,
-                        style: theme.textTheme.labelSmall),
-                    backgroundColor: colorScheme.surfaceContainerHighest,
+                    label: Text(
+                      group.displayName,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: isOwn ? colorScheme.onPrimaryContainer : null,
+                        fontWeight: isOwn ? FontWeight.w700 : null,
+                      ),
+                    ),
+                    backgroundColor: isOwn
+                        ? colorScheme.primaryContainer
+                        : colorScheme.surfaceContainerHighest,
                     side: BorderSide.none,
                     padding: EdgeInsets.zero,
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,

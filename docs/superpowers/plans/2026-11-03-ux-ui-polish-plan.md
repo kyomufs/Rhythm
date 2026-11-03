@@ -311,3 +311,47 @@ nix develop --command bash -c "flutter build linux --debug"  # Built build/linux
 Новые тесты: `test/m3_expressive_theme_test.dart` — геометрия панели и кнопок,
 standard-схема при `disableAnimations`, морф и reduce-motion индикатора, семь фигур
 в боксе 0..1, `EmptyState` на textScale 2.0.
+
+## Третий заход: дата в шапке дня, группы в карточке пары, таблица оценок
+
+Три правки после живого прогона на десктопе.
+
+1. **День недели и дата в одну строку.** В шапке карточки дня был `Column`
+   из двух `Text`; заменён на один `Text.rich`: день (`titleSmall` w700) и дата
+   (`titleSmall` w400, `onSurfaceVariant`) в одну строку с `ellipsis`.
+   `DateFormat.EEEE` отдаёт lowercase — добавлен `_capitalize`.
+2. **Группы пары для поиска по группе.** Причина бага подтверждена запросами к API:
+   `GetSchedule.php?search_field=GROUP_P` возвращает `GROUPS` только с искомой
+   группой (для `221341:01` — `[{"GROUP_P":"221341:01","PRIM":""}]`), тогда как тот
+   же предмет по `search_field=AUD` (аудитория `Гл.-408`) отдаёт все 10 групп пары.
+   Клиентских данных о согруппниках в ответе нет вообще, поэтому нужен второй запрос.
+   Решение: `LessonGroupResolver` + `lessonGroupsProvider` (`FutureProvider.family`
+   по `date/time/subject/classroom`). Лист пары при `groups.length <= 1` и непустой
+   аудитории дозапрашивает расписание аудитории, находит пару по дате/времени/предмету
+   и показывает объединённый список; своя группа сортируется первой и подсвечена
+   `primaryContainer`. Кэш — LRU на 12 аудиторий (один запрос на аудиторию за сессию).
+3. **Оценки — прокручиваемая таблица.** Новый `MarksTable`
+   (`lib/features/performance/widgets/`): липкая шапка 48dp, вертикальный `ListView`
+   строк, горизонтальный `SingleChildScrollView` по всему блоку, ширины столбцов
+   тянутся за 12dp-захват в шапке (`DragStartBehavior.down`, минимум у каждого
+   столбца, двойной тап — сброс). Свободное место отдаётся «Дисциплине», но после
+   первой ручной правки растяжение выключается — иначе оно съедало бы сдвиг.
+   Столбец «Пересдача» скрывается, если пересдач в семестре нет. Старая `_MarkTile`
+   удалена, чипы семестров и строка статистики не менялись.
+
+Отклонение от плана: вместо метода в `ScheduleService` — отдельный сервис.
+Причина: `ScheduleService` реализуется фейками в двух тестах, добавление метода
+ломало бы их ради одной фичи.
+
+### Проверка после правок
+
+```
+nix develop --command bash -c "flutter analyze"   # No issues found! (ran in 1.5s)
+nix develop --command bash -c "flutter test"      # 76 тестов, All tests passed!
+nix develop --command bash -c "flutter build linux --debug"  # Built build/linux/x64/debug/bundle/uniflow
+```
+
+Новые тесты: `test/marks_table_test.dart` — шапка и строки, скрытие пустой
+«Пересдачи», ресайз столбца и сброс двойным тапом, кламп по минимуму, горизонтальная
+прокрутка на 360dp; в `test/schedule_ui_test.dart` — «день и дата в одной строке»
+и «группы пары добираются из расписания аудитории».

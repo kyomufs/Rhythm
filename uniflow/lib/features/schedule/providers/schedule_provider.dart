@@ -8,6 +8,7 @@ import 'package:uniflow/core/models/schedule.dart';
 import 'package:uniflow/core/providers/clock_provider.dart';
 import 'package:uniflow/core/utils/error_messages.dart';
 import 'package:uniflow/core/services/connectivity_service.dart';
+import 'package:uniflow/core/services/lesson_group_resolver.dart';
 import 'package:uniflow/core/services/notification_service.dart';
 import 'package:uniflow/core/services/schedule_service.dart';
 import 'package:uniflow/core/services/storage_service.dart';
@@ -736,8 +737,8 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
       final note = await loadSchedule(group, forceRefresh: true);
       // The user has just seen this data — use it as the new baseline.
       if (state.schedule.error == null && state.schedule.items.isNotEmpty) {
-        await _storage.setScheduleFingerprint(
-            _fingerprint(state.schedule.items));
+        await _storage
+            .setScheduleFingerprint(_fingerprint(state.schedule.items));
         // Fresh data reviewed → drop the session batch. The journal and
         // the unseen flag are cleared only from the «Изменения» screen.
         state = state.copyWith(clearChanges: true);
@@ -822,4 +823,24 @@ final scheduleScreenProvider =
     ref.watch(updateCoordinatorProvider),
     demo: demo,
   );
+});
+
+/// Ключ пары для запроса полного списка групп. Набор полей, а не объект:
+/// у `ScheduleItem` нет равенства, а `family` сравнивает аргумент.
+typedef LessonGroupsKey = ({
+  String date,
+  String time,
+  String subject,
+  String classroom,
+});
+
+/// Полный список групп пары — добирается запросом по аудитории.
+final lessonGroupsProvider = FutureProvider.autoDispose
+    .family<List<GroupInfo>, LessonGroupsKey>((ref, key) {
+  return ref.watch(lessonGroupResolverProvider).resolve(
+        date: key.date,
+        time: key.time,
+        subject: key.subject,
+        classroom: key.classroom,
+      );
 });

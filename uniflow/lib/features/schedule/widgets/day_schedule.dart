@@ -97,13 +97,13 @@ class DaySchedule extends StatelessWidget {
                   ),
                 ),
                 const Gap(12),
-                // Day info
+                // Day info — день недели и дата в одну строку: две строки
+                // в шапке карточки съедали высоту без пользы.
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title ?? dayName,
+                  child: Text.rich(
+                    TextSpan(children: [
+                      TextSpan(
+                        text: _capitalize(title ?? dayName),
                         style: theme.textTheme.titleSmall?.copyWith(
                           color: isToday || isHighlighted
                               ? colorScheme.onPrimaryContainer
@@ -111,16 +111,19 @@ class DaySchedule extends StatelessWidget {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      Text(
-                        dateStr,
-                        style: theme.textTheme.bodySmall?.copyWith(
+                      TextSpan(
+                        text: '  $dateStr',
+                        style: theme.textTheme.titleSmall?.copyWith(
                           color: isToday || isHighlighted
                               ? colorScheme.onPrimaryContainer
-                                  .withValues(alpha: 0.75)
+                                  .withValues(alpha: 0.8)
                               : colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w400,
                         ),
                       ),
-                    ],
+                    ]),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 // Lesson count badge
@@ -235,4 +238,10 @@ class WeekSchedule extends StatelessWidget {
       },
     );
   }
+}
+
+/// «понедельник» → «Понедельник»: `DateFormat.EEEE` отдаёт имя со строчной.
+String _capitalize(String value) {
+  if (value.isEmpty) return value;
+  return value[0].toUpperCase() + value.substring(1);
 }

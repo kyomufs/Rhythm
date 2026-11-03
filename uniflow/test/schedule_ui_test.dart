@@ -40,9 +40,12 @@ ScheduleItem _item({
 }
 
 class _FakeApi extends TulsuApiClient {
-  _FakeApi(this.items);
+  _FakeApi(this.items, {this.auditoriumItems});
 
   final List<ScheduleItem> items;
+
+  /// Ответ на запрос по аудитории: так проверяется добор групп пары.
+  final List<ScheduleItem>? auditoriumItems;
 
   @override
   Future<ApiDateRange> getDateRange(String searchValue) async => ApiDateRange(
@@ -53,8 +56,12 @@ class _FakeApi extends TulsuApiClient {
 
   @override
   Future<List<ScheduleItem>> getSchedule(
-          String searchField, String searchValue) async =>
-      items;
+      String searchField, String searchValue) async {
+    if (searchField == SearchFieldType.auditorium.value) {
+      return auditoriumItems ?? items;
+    }
+    return items;
+  }
 
   @override
   Future<List<CalendarItem>> getCalendar(String searchValue) async => [];
@@ -160,13 +167,20 @@ String _fmt(DateTime d) => '${d.day.toString().padLeft(2, '0')}.'
 
 Widget _app({
   required List<ScheduleItem> items,
+  List<ScheduleItem>? auditoriumItems,
   _FakeStorage? storage,
 }) {
   return ProviderScope(
     overrides: [
       demoModeProvider.overrideWithValue(false),
+      apiClientProvider.overrideWithValue(
+        _FakeApi(items, auditoriumItems: auditoriumItems),
+      ),
       scheduleServiceProvider.overrideWithValue(
-        ScheduleService(api: _FakeApi(items), storage: _FakeStorage()),
+        ScheduleService(
+          api: _FakeApi(items, auditoriumItems: auditoriumItems),
+          storage: _FakeStorage(),
+        ),
       ),
       storageServiceProvider.overrideWithValue(storage ?? _FakeStorage()),
       connectivityServiceProvider.overrideWithValue(_FakeConnectivity()),
@@ -192,7 +206,6 @@ void main() {
     Intl.defaultLocale = 'ru_RU';
   });
 
-
   testWidgets('шапка показывает номер группы, щит и звезду избранного',
       (tester) async {
     await tester.pumpWidget(_app(items: [
@@ -206,9 +219,7 @@ void main() {
         (w) =>
             w is Image &&
             w.image is AssetImage &&
-            (w.image as AssetImage)
-                .assetName
-                .contains('tulsu_shield.png'),
+            (w.image as AssetImage).assetName.contains('tulsu_shield.png'),
       ),
       findsOneWidget,
       reason: 'глиф-щит стоит перед номером группы',
@@ -261,9 +272,30 @@ void main() {
     final before = tester.widget<Text>(find.textContaining('Неделя')).data;
     await tester.tap(find.byIcon(Icons.chevron_right));
     await tester.pumpAndSettle();
-    expect(tester.widget<Text>(find.textContaining('Неделя')).data,
-        isNot(before),
+    expect(
+        tester.widget<Text>(find.textContaining('Неделя')).data, isNot(before),
         reason: 'стрелка переключает неделю');
+  });
+
+  testWidgets('в шапке карточки дня неделя и дата стоят в одной строке',
+      (tester) async {
+    await tester.pumpWidget(_app(items: [
+      _item(subject: 'Математический анализ', date: _now),
+    ]));
+    await tester.pumpAndSettle();
+
+    final dayName = DateFormat.EEEE('ru').format(_now);
+    final capital = dayName[0].toUpperCase() + dayName.substring(1);
+    final dateStr = DateFormat('d MMMM', 'ru').format(_now);
+
+    final header = tester
+        .widgetList<RichText>(find.byType(RichText))
+        .map((text) => text.text.toPlainText())
+        .firstWhere((text) => text.startsWith(capital));
+
+    expect(header, contains(dateStr));
+    expect(header, isNot(contains('\n')),
+        reason: 'день недели и дата — одна строка, а не два ряда');
   });
 
   testWidgets('карточка предмета открывает лист без блока «Группы»',
@@ -302,6 +334,37 @@ void main() {
         reason: 'чужие группы в паре видны');
     expect(find.widgetWithText(Chip, _group), findsOneWidget);
   });
+
+  testWidgets('группы пары добираются из расписания аудитории', (tester) async {
+    // Основной запрос по группе отдаёт GROUPS только со своей группой —
+    // полный список приходит из запроса по аудитории той же пары.
+    final lesson = _item(subject: 'Математический анализ', date: _now);
+    await tester.pumpWidget(_app(
+      items: [lesson],
+      auditoriumItems: [
+        _item(
+          subject: 'Математический анализ',
+          date: _now,
+          groups: const [
+            GroupInfo(number: _group),
+            GroupInfo(number: '221341и'),
+            GroupInfo(number: '220431'),
+          ],
+        ),
+      ],
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(LessonTile).first);
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(Chip, '221341и'), findsOneWidget,
+        reason: 'группа из расписания аудитории попала в карточку');
+    expect(find.widgetWithText(Chip, '220431'), findsOneWidget);
+    expect(find.widgetWithText(Chip, _group), findsOneWidget,
+        reason: 'своя группа тоже видна и стоит первой');
+  });
+
   group('шапка на узком экране', () {
     Future<void> pumpAt(WidgetTester tester, double width) async {
       tester.view.devicePixelRatio = 1;

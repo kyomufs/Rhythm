@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
-import 'package:uniflow/core/api/tulsu_api.dart';
 import 'package:uniflow/core/theme/spacing.dart';
 import 'package:uniflow/core/theme/typography.dart';
 import 'package:uniflow/app.dart';
 import 'package:uniflow/core/widgets/update_feedback.dart';
 import 'package:uniflow/features/performance/providers/performance_provider.dart';
+import 'package:uniflow/features/performance/widgets/marks_table.dart';
 import 'package:uniflow/shared/widgets/empty_state.dart';
 import 'package:uniflow/shared/widgets/loading_indicator.dart';
 
@@ -176,17 +176,10 @@ class PerformanceScreen extends ConsumerWidget {
 
         const Divider(height: 1),
 
-        // Marks list
+        // Marks table: семестр выбран чипами выше, внутри — таблица с
+        // прокруткой и перетаскиваемыми ширинами столбцов.
         Expanded(
-          child: ListView.separated(
-            padding: const EdgeInsets.only(bottom: 100),
-            itemCount: state.semesterMarks.length,
-            separatorBuilder: (_, __) =>
-                const Divider(height: 1, indent: 16, endIndent: 16),
-            itemBuilder: (context, index) {
-              return _MarkTile(item: state.semesterMarks[index]);
-            },
-          ),
+          child: MarksTable(items: state.semesterMarks),
         ),
       ],
     );
@@ -271,102 +264,6 @@ class _StatItem extends StatelessWidget {
               ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
         ),
       ],
-    );
-  }
-}
-
-// ============================================================
-// Mark Tile
-// ============================================================
-class _MarkTile extends StatelessWidget {
-  final MarksItem item;
-
-  const _MarkTile({required this.item});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    // MD3-compliant mark colors using color scheme
-    Color markColor;
-    if (item.markTitle.isEmpty) {
-      markColor = colorScheme.onSurfaceVariant;
-    } else if (item.markTitle == 'Отлично' || item.markTitle == 'Зачет') {
-      markColor = colorScheme.primary;
-    } else if (item.markTitle == 'Хорошо') {
-      markColor = colorScheme.tertiary;
-    } else if (item.markTitle == 'Удовлетворительно' ||
-        item.markTitle == 'Незачет') {
-      markColor = colorScheme.secondary;
-    } else if (item.markTitle == 'Не аттестован') {
-      markColor = colorScheme.error;
-    } else {
-      markColor = colorScheme.onSurface;
-    }
-
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      leading: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: markColor.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Center(
-          child: item.mark.isNotEmpty
-              ? Text(
-                  item.mark,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: markColor,
-                  ),
-                )
-              : Icon(Icons.hourglass_empty,
-                  size: 20, color: colorScheme.onSurfaceVariant),
-        ),
-      ),
-      title: Text(
-        item.discipline,
-        style: theme.textTheme.bodyMedium?.copyWith(
-          fontWeight: FontWeight.w500,
-        ),
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: item.teacherMark.isNotEmpty
-          ? Text(
-              item.teacherMark,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            )
-          : null,
-      trailing: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (item.markTitle.isNotEmpty)
-            Text(
-              item.markTitle,
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: markColor,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          if (item.recredit)
-            Text(
-              'перезачёт',
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: colorScheme.tertiary,
-              ),
-            ),
-        ],
-      ),
     );
   }
 }
