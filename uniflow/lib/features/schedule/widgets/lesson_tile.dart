@@ -112,6 +112,7 @@ class LessonTile extends ConsumerWidget {
                     children: [
                       // Top row: time (left) + corpus/classroom (right)
                       Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           // Time badge
                           Container(
@@ -131,38 +132,50 @@ class LessonTile extends ConsumerWidget {
                               ),
                             ),
                           ),
-                          const Spacer(),
-                          // Classroom / corpus
-                          if (item.classroom.isNotEmpty)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: colorScheme.surfaceContainerHighest,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.location_on_outlined,
-                                    size: 13,
-                                    color: colorScheme.onSurfaceVariant,
+                          // Classroom / corpus: остаток строки, длинный
+                          // номер аудитории обрезается, а не ломает ряд.
+                          if (item.classroom.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: colorScheme.surfaceContainerHighest,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                // Длинный номер аудитории в узкой паре
+                                // ужимается целиком, а не ломает ряд.
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.centerRight,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.location_on_outlined,
+                                        size: 13,
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                      const Gap(4),
+                                      Text(
+                                        item.classroom,
+                                        maxLines: 1,
+                                        softWrap: false,
+                                        style: theme.textTheme.labelMedium
+                                            ?.copyWith(
+                                          color: colorScheme.onSurface,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const Gap(4),
-                                  Text(
-                                    item.classroom,
-                                    style:
-                                        theme.textTheme.labelMedium?.copyWith(
-                                      color: colorScheme.onSurface,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
                             ),
+                          ],
                         ],
                       ),
                       const Gap(8),

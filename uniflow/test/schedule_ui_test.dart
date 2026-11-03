@@ -302,4 +302,43 @@ void main() {
         reason: 'чужие группы в паре видны');
     expect(find.widgetWithText(Chip, _group), findsOneWidget);
   });
+  group('шапка на узком экране', () {
+    Future<void> pumpAt(WidgetTester tester, double width) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = Size(width, 800);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(_app(items: [
+        _item(subject: 'Математический анализ', date: _now),
+      ]));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('шире 360dp действия стоят иконками', (tester) async {
+      await pumpAt(tester, 420);
+
+      expect(find.byType(PopupMenuButton<Object?>), findsNothing);
+      expect(find.byIcon(Icons.refresh), findsOneWidget);
+      expect(find.byIcon(Icons.search), findsOneWidget);
+      expect(find.byIcon(Icons.difference_outlined), findsOneWidget);
+      expect(find.text(_group), findsOneWidget);
+    });
+
+    testWidgets('уже 360dp действия уходят в меню, заголовок не обрезан',
+        (tester) async {
+      await pumpAt(tester, 320);
+
+      expect(find.byIcon(Icons.more_vert), findsOneWidget);
+      expect(find.byIcon(Icons.refresh), findsNothing);
+      expect(find.byIcon(Icons.search), findsNothing);
+      // Переполнение ряда — тоже провал теста: билдинг ловит его сам.
+
+      await tester.tap(find.byIcon(Icons.more_vert));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Изменения'), findsOneWidget);
+      expect(find.text('Обновить'), findsOneWidget);
+      expect(find.text('Поиск'), findsOneWidget);
+    });
+  });
 }

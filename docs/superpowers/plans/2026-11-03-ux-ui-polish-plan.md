@@ -271,7 +271,7 @@ nix develop --command flutter run -d linux
 | 1. Токены типографики и отступов | готово | `lib/core/theme/typography.dart` (табличная база + emphasized, эвристика `size<=16 → w700` удалена), `lib/core/theme/spacing.dart` (новый), `test/typography_tokens_test.dart` (7 тестов) |
 | 2. Компонентная геометрия | готово | `lib/core/theme/shapes.dart` (карточка 12, `pressedButtonRadius` 8), `lib/core/theme/theme_provider.dart` (`_buttonShape` — морф `StadiumBorder` → `CornerSmall` по `WidgetState.pressed`, кнопки 40dp, FAB 16), `lib/shared/widgets/app_nav_bar.dart` (64dp, индикатор 56×32, зазор 6) |
 | 3. Моушен-бюджет | готово | онбординг: `slowSpatial` на смену страницы, `defaultEffects` на точки; настройки: `defaultEffects` на выбор цвета |
-| 4. Иерархия и состояния | частично | `lib/shared/widgets/empty_state.dart` (новый; используется в расписании и успеваемости), `Semantics(selected:)` на чипах семестров, числа статистики — `headlineSmall` emphasized + `labelMedium` |
+| 4. Иерархия и состояния | готово | `lib/shared/widgets/empty_state.dart` (новый; используется в расписании и успеваемости), `Semantics(selected:)` на чипах семестров, числа статистики — `headlineSmall` emphasized + `labelMedium` |
 | 5. M3E loading indicator | готово | `lib/shared/widgets/expressive_loading_indicator.dart` (новый), `loading_indicator.dart`, три экрана со спиннером переведены на него |
 | 6. Доступность | готово частично | `lib/core/theme/color_utils.dart` (`onColorFor` по яркости) вместо `Colors.white` в настройках и заметках; `fontSize:` в `lib/` больше нет ни одного — всё через роли `TextTheme` |
 
@@ -287,16 +287,25 @@ nix develop --command flutter run -d linux
 3. **Палитры не объединены.** `AppTheme`-цвета типов пар и `subjectColors` заметок
    описывают разные домены (тип занятия vs папка предмета); сводить их в один список
    значило бы менять смысл, а не чинить дублирование.
-4. **`subject_detail_screen.dart` не разбит.** 1549 строк — задача механическая, но
-   широкая; вынесена в отдельный заход, чтобы не смешивать с полировкой.
+4. **Разбиение экрана предмета — три файла, а не четыре.** В плане значился
+   `attachments_section.dart`, но вложений в заметках нет вовсе (ни модели, ни UI),
+   поэтому вынесено то, что реально есть: `overview_tab.dart`, `task_list.dart`,
+   `task_sheet.dart`. `subject_detail_screen.dart` — 1549 → 405 строк, поведение
+   не менялось (только видимость классов поднята до публичной).
 5. **Фигуры индикатора — полярные функции, не SVG.** У всех семи фигур по 64 точки,
    морф = интерполяция радиусов; так масштаб не «дышит» и не нужны внешние ассеты.
+6. **Узкая шапка расписания и два переполнения.** Ниже 360dp четыре действия
+   складываются в `PopupMenuButton` «⋮» с теми же пунктами. Тест на 320dp вскрыл
+   реальные overflow: заголовок недели рядом с чипом чётности и бейдж аудитории
+   в паре. Починено: `Flexible` с ellipsis у текста недели и `FittedBox(scaleDown)`
+   у бейджа аудитории.
 
 ### Проверка после правок
 
 ```
 nix develop --command bash -c "flutter analyze"   # No issues found!
-nix develop --command bash -c "flutter test"      # 67 тестов, All tests passed!
+nix develop --command bash -c "flutter test"      # 69 тестов, All tests passed!
+nix develop --command bash -c "flutter build linux --debug"  # Built build/linux/x64/debug/bundle/uniflow
 ```
 
 Новые тесты: `test/m3_expressive_theme_test.dart` — геометрия панели и кнопок,

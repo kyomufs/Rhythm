@@ -17,6 +17,33 @@ import 'package:uniflow/shared/widgets/empty_state.dart';
 import 'package:uniflow/shared/widgets/expressive_loading_indicator.dart';
 import 'package:uniflow/shared/widgets/loading_indicator.dart';
 
+/// Ниже этой ширины панель действий не помещается рядом с заголовком.
+const double _compactWidth = 360;
+
+/// Действия шапки расписания.
+enum _ScheduleAction { changes, refresh, search, today }
+
+/// Пункт меню действий: иконка и подпись в одну строку.
+class _ActionLabel extends StatelessWidget {
+  const _ActionLabel({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 20, color: colorScheme.onSurfaceVariant),
+        const SizedBox(width: 12),
+        Text(label),
+      ],
+    );
+  }
+}
+
 /// Main Schedule Screen
 class ScheduleScreen extends ConsumerStatefulWidget {
   const ScheduleScreen({super.key});
@@ -106,59 +133,133 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
         titleSpacing: 16,
         title: _ScheduleHeader(state: state),
         centerTitle: false,
-        actions: [
-          // Change journal entry point — always visible (history
-          // survives refreshes; badge only marks unseen changes).
-          IconButton(
-            icon: Badge(
-              isLabelVisible: state.hasUnseenChanges,
-              label: state.changeRecords.isNotEmpty
-                  ? Text('${state.changeRecords.length}')
-                  : null,
-              child: const Icon(Icons.difference_outlined),
-            ),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                  builder: (_) => const ScheduleChangesScreen()),
-            ),
-            tooltip: 'Изменения',
-          ),
-          if (state.currentGroup != null || state.isDemo) ...[
-            IconButton(
-              icon: state.schedule.isLoading
-                  ? const ExpressiveLoadingIndicator(size: 20)
-                  : const Icon(Icons.refresh),
-              onPressed: state.schedule.isLoading
-                  ? null
-                  : () async {
-                      final result = await ref
-                          .read(scheduleScreenProvider.notifier)
-                          .refresh();
-                      if (!context.mounted) return;
-                      showUpdateFeedback(context, result);
-                    },
-              tooltip: 'Обновить',
-            ),
-          ],
-          if (state.currentGroup != null) ...[
-            IconButton(
-              icon: const Icon(Icons.search),
-              onPressed: () => _showSearchSheet(context, ref),
-              tooltip: 'Поиск',
-            ),
-          ],
-          if (!state.isCurrentWeek)
-            TextButton(
-              onPressed: () =>
-                  ref.read(scheduleScreenProvider.notifier).goToToday(),
-              child: const Text('Сегодня'),
-            ),
-        ],
+        actions: _buildActions(context, ref, state),
       ),
       body: state.currentGroup == null && !state.isDemo
           ? _buildNoGroupView(context, ref)
           : _buildScheduleView(context, ref, state),
     );
+  }
+
+  /// Панель действий. Уже 360dp четыре иконки выдавливают заголовок, поэтому
+  /// на узких экранах они складываются в одно меню «⋮».
+  List<Widget> _buildActions(
+    BuildContext context,
+    WidgetRef ref,
+    ScheduleScreenState state,
+  ) {
+    final hasGroup = state.currentGroup != null || state.isDemo;
+    final compact = MediaQuery.sizeOf(context).width < _compactWidth;
+
+    if (compact) {
+      return [
+        PopupMenuButton<_ScheduleAction>(
+          tooltip: 'Ещё',
+          icon: Badge(
+            isLabelVisible: state.hasUnseenChanges,
+            child: const Icon(Icons.more_vert),
+          ),
+          onSelected: (action) => _handleAction(action, context, ref, state),
+          itemBuilder: (ctx) => [
+            PopupMenuItem(
+              value: _ScheduleAction.changes,
+              child: _ActionLabel(
+                icon: Icons.difference_outlined,
+                label: state.changeRecords.isNotEmpty
+                    ? 'Изменения (${state.changeRecords.length})'
+                    : 'Изменения',
+              ),
+            ),
+            if (hasGroup)
+              PopupMenuItem(
+                value: _ScheduleAction.refresh,
+                enabled: !state.schedule.isLoading,
+                child: _ActionLabel(
+                  icon: Icons.refresh,
+                  label: state.schedule.isLoading ? 'Обновление…' : 'Обновить',
+                ),
+              ),
+            if (state.currentGroup != null)
+              const PopupMenuItem(
+                value: _ScheduleAction.search,
+                child: _ActionLabel(icon: Icons.search, label: 'Поиск'),
+              ),
+            if (!state.isCurrentWeek)
+              const PopupMenuItem(
+                value: _ScheduleAction.today,
+                child: _ActionLabel(icon: Icons.today, label: 'Сегодня'),
+              ),
+          ],
+        ),
+      ];
+    }
+
+    return [
+      // Change journal entry point — always visible (history
+      // survives refreshes; badge only marks unseen changes).
+      IconButton(
+        icon: Badge(
+          isLabelVisible: state.hasUnseenChanges,
+          label: state.changeRecords.isNotEmpty
+              ? Text('${state.changeRecords.length}')
+              : null,
+          child: const Icon(Icons.difference_outlined),
+        ),
+        onPressed: () => _handleAction(
+            _ScheduleAction.changes, context, ref, state),
+        tooltip: 'Изменения',
+      ),
+      if (hasGroup) ...[
+        IconButton(
+          icon: state.schedule.isLoading
+              ? const ExpressiveLoadingIndicator(size: 20)
+              : const Icon(Icons.refresh),
+          onPressed: state.schedule.isLoading
+              ? null
+              : () => _handleAction(
+                  _ScheduleAction.refresh, context, ref, state),
+          tooltip: 'Обновить',
+        ),
+      ],
+      if (state.currentGroup != null) ...[
+        IconButton(
+          icon: const Icon(Icons.search),
+          onPressed: () =>
+              _handleAction(_ScheduleAction.search, context, ref, state),
+          tooltip: 'Поиск',
+        ),
+      ],
+      if (!state.isCurrentWeek)
+        TextButton(
+          onPressed: () =>
+              _handleAction(_ScheduleAction.today, context, ref, state),
+          child: const Text('Сегодня'),
+        ),
+    ];
+  }
+
+  Future<void> _handleAction(
+    _ScheduleAction action,
+    BuildContext context,
+    WidgetRef ref,
+    ScheduleScreenState state,
+  ) async {
+    switch (action) {
+      case _ScheduleAction.changes:
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+              builder: (_) => const ScheduleChangesScreen()),
+        );
+      case _ScheduleAction.refresh:
+        final result =
+            await ref.read(scheduleScreenProvider.notifier).refresh();
+        if (!context.mounted) return;
+        showUpdateFeedback(context, result);
+      case _ScheduleAction.search:
+        _showSearchSheet(context, ref);
+      case _ScheduleAction.today:
+        ref.read(scheduleScreenProvider.notifier).goToToday();
+    }
   }
 
   Widget _buildNoGroupView(BuildContext context, WidgetRef ref) {
@@ -591,13 +692,19 @@ class _WeekNavigatorBar extends StatelessWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(
-                            'Неделя ${weekInfo.weekNumber}',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: state.isCurrentWeek
-                                  ? colorScheme.onPrimaryContainer
-                                  : colorScheme.onSurface,
+                          // На 320dp «Неделя 46» + чип не влезают: текст
+                          // сжимается, чип остаётся целиком.
+                          Flexible(
+                            child: Text(
+                              'Неделя ${weekInfo.weekNumber}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: state.isCurrentWeek
+                                    ? colorScheme.onPrimaryContainer
+                                    : colorScheme.onSurface,
+                              ),
                             ),
                           ),
                           const Gap(6),
