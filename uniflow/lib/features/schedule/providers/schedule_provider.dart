@@ -168,6 +168,9 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
   final ConnectivityService _connectivity;
   final NotificationService _notifications;
   final UpdateCoordinator _updates;
+
+  /// Добор групп пар; в тестах не нужен, поэтому необязателен.
+  final LessonGroupResolver? _resolver;
   final bool _demo;
 
   /// Journal size and age limits (plan: cap 50, TTL 14 days).
@@ -180,8 +183,10 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
     this._connectivity,
     this._notifications,
     this._updates, {
+    LessonGroupResolver? resolver,
     bool demo = false,
-  })  : _demo = demo,
+  })  : _resolver = resolver,
+        _demo = demo,
         super(ScheduleScreenState(
           currentWeekStart: getCurrentWeekStart(),
         )) {
@@ -234,11 +239,15 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
       if (isOnline) {
         // Sync with the API: fresh data replaces the painted copy.
         await loadSchedule(myGroup);
-        // Silently compare with the last seen version and alert on changes.
-        await _checkForScheduleChanges(myGroup, previousFingerprint);
-        _bootRefresh.complete(
-          state.schedule.error == null && state.schedule.items.isNotEmpty,
-        );
+        final refreshed =
+            state.schedule.error == null && state.schedule.items.isNotEmpty;
+        if (refreshed) {
+          // Silently compare with the last seen version and alert on changes.
+          await _checkForScheduleChanges(myGroup, previousFingerprint);
+          // Группы пар — сразу за расписанием, а не по факту открытия карточки.
+          unawaited(_enrichGroups(myGroup));
+        }
+        _bootRefresh.complete(refreshed);
       } else if (!hadLocalCopy) {
         state = state.copyWith(
           schedule: state.schedule.copyWith(
@@ -764,6 +773,37 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
     return 'Нет подключения к интернету — показано сохранённое расписание';
   }
 
+  /// Признак идущего добора групп: повторный запуск не нужен, второй проход
+  /// сделал бы те же запросы.
+  bool _enrichingGroups = false;
+
+  /// Догружает полные списки групп к уже показанному расписанию.
+  ///
+  /// API отдаёт все группы пары только в ответе по аудитории, поэтому при
+  /// поиске по группе чипы в карточке появлялись позже расписания. Здесь они
+  /// подтягиваются сразу после загрузки — пакетом и с записью в снимок, чтобы
+  /// следующий запуск показывал их без сети.
+  Future<void> _enrichGroups(String searchValue) async {
+    final resolver = _resolver;
+    if (_demo || _enrichingGroups || resolver == null) return;
+    final items = state.schedule.items;
+    if (items.isEmpty) return;
+    _enrichingGroups = true;
+    try {
+      final enriched =
+          await resolver.enrich(items, weekStart: state.currentWeekStart);
+      if (!mounted || identical(enriched, items)) return;
+      // Пока шёл добор, пользователь мог сменить группу.
+      if (state.schedule.searchValue != searchValue) return;
+      state = state.copyWith(
+        schedule: state.schedule.copyWith(items: enriched),
+      );
+      await _storage.cacheScheduleGroups(searchValue, enriched);
+    } finally {
+      _enrichingGroups = false;
+    }
+  }
+
   /// Обновляет расписание через единый путь: проверка доступности API →
   /// загрузка → результат. Офлайн возвращает `unavailable` без сообщения и без
   /// изменения состояния.
@@ -788,11 +828,11 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
         // Fresh data reviewed → drop the session batch. The journal and
         // the unseen flag are cleared only from the «Изменения» screen.
         state = state.copyWith(clearChanges: true);
-        // Снимки избранного догружаются фоном: они не должны задерживать
-        // уведомление об успехе.
+        // Снимки избранного и группы пар догружаются фоном: они не должны
+        // задерживать уведомление об успехе.
         unawaited(prefetchFavorites());
-        return const UpdateResult(
-            UpdateOutcome.updated, scheduleUpdatedText);
+        unawaited(_enrichGroups(group));
+        return const UpdateResult(UpdateOutcome.updated, scheduleUpdatedText);
       }
       return UpdateResult(
         UpdateOutcome.failed,
@@ -867,6 +907,7 @@ final scheduleScreenProvider =
     ref.watch(connectivityServiceProvider),
     ref.watch(notificationServiceProvider),
     ref.watch(updateCoordinatorProvider),
+    resolver: ref.watch(lessonGroupResolverProvider),
     demo: demo,
   );
 });
@@ -885,8 +926,8 @@ typedef LessonGroupsKey = ({
 /// Без `autoDispose`: карточка пары открывается и закрывается постоянно, а
 /// результат уже известен — повторный запрос каждый раз показывал «пустые»
 /// группы и подгружал их заново.
-final lessonGroupsProvider = FutureProvider.family<List<GroupInfo>,
-    LessonGroupsKey>((ref, key) {
+final lessonGroupsProvider =
+    FutureProvider.family<List<GroupInfo>, LessonGroupsKey>((ref, key) {
   return ref.watch(lessonGroupResolverProvider).resolve(
         date: key.date,
         time: key.time,

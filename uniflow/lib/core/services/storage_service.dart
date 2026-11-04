@@ -338,6 +338,26 @@ class StorageService {
     }
   }
 
+  /// Дописывает полные списки групп в уже сохранённый снимок расписания.
+  ///
+  /// Группы приходят отдельным проходом после самой пары; переписывать снимок
+  /// целиком ради них незачем — берём сохранённый и меняем только пары.
+  Future<void> cacheScheduleGroups(
+    String searchValue,
+    List<ScheduleItem> items,
+  ) async {
+    final cached = getCachedSchedule(searchValue);
+    if (cached == null) return;
+    await cacheSchedule(
+      searchValue,
+      ScheduleData(
+        dateRange: cached.data.dateRange,
+        items: items,
+        calendar: cached.data.calendar,
+      ),
+    );
+  }
+
   Future<void> cacheSchedule(String searchValue, ScheduleData data) async {
     await _box.put(
       '${StorageKeys.scheduleCache}_$searchValue',

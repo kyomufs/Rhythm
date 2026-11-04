@@ -5,7 +5,6 @@ import 'package:gap/gap.dart';
 import 'package:uniflow/app.dart';
 import 'package:uniflow/core/demo/demo_schedule.dart';
 import 'package:uniflow/core/models/schedule.dart';
-import 'package:uniflow/core/services/lesson_group_resolver.dart';
 import 'package:uniflow/core/services/schedule_service.dart';
 import 'package:uniflow/core/theme/typography.dart';
 import 'package:uniflow/core/widgets/refresh_confirmation.dart';
@@ -66,80 +65,6 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
     return _dayKeys.putIfAbsent(key, () => GlobalKey());
   }
 
-  /// Прогрев групп пар текущей недели.
-  ///
-  /// Полный список групп пары API отдаёт только в ответе по аудитории,
-  /// поэтому в момент открытия карточки его ещё нет и блок «Группы»
-  /// появлялся с задержкой. Тянем заранее: сначала расписания аудиторий
-  /// (их заведомо меньше, чем пар, — одна аудитория раскрывает все свои
-  /// пары), по три параллельно, затем раздаём готовые значения провайдерам.
-  bool _warmingGroups = false;
-  bool _warmQueued = false;
-
-  Future<void> _warmLessonGroups(
-    List<ScheduleItem> items,
-    DateTime weekStart,
-  ) async {
-    if (_warmingGroups) {
-      // Расписание сменилось во время прогрева — добираем новое после.
-      _warmQueued = true;
-      return;
-    }
-    _warmingGroups = true;
-    try {
-      await _warmPass(items, weekStart);
-      while (_warmQueued && mounted) {
-        _warmQueued = false;
-        await _warmPass(items, weekStart);
-      }
-    } finally {
-      _warmingGroups = false;
-    }
-  }
-
-  Future<void> _warmPass(List<ScheduleItem> items, DateTime weekStart) async {
-    final weekEnd = weekStart.add(const Duration(days: 7));
-    final keys = <(String, String, String, String)>[];
-    final seen = <String>{};
-    for (final item in items) {
-      if (item.groups.length > 1 || item.classroom.isEmpty) continue;
-      DateTime date;
-      try {
-        date = item.parsedDate;
-      } catch (_) {
-        continue;
-      }
-      if (date.isBefore(weekStart) || !date.isBefore(weekEnd)) continue;
-      final key = '${item.date}|${item.time}|${item.subject}|'
-          '${item.classroom}';
-      if (!seen.add(key)) continue;
-      keys.add((item.date, item.time, item.subject, item.classroom));
-      if (keys.length >= 24) break;
-    }
-    if (keys.isEmpty) return;
-
-    final resolver = ref.read(lessonGroupResolverProvider);
-    final rooms = <String>{for (final k in keys) k.$4}.toList();
-    const parallel = 3;
-    for (var i = 0; i < rooms.length; i += parallel) {
-      if (!mounted) return;
-      await Future.wait([
-        for (final room in rooms.skip(i).take(parallel)) resolver.prefetch(room),
-      ]);
-    }
-
-    // Сеть уже отработала: провайдеры получают значения из кэша аудитории.
-    for (final k in keys) {
-      if (!mounted) return;
-      ref.read(lessonGroupsProvider((
-        date: k.$1,
-        time: k.$2,
-        subject: k.$3,
-        classroom: k.$4,
-      )));
-    }
-  }
-
   @override
   void dispose() {
     _scrollController.dispose();
@@ -186,12 +111,6 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
       if (next.highlightedDate != null &&
           next.highlightedDate != prev?.highlightedDate) {
         _scrollToDay(next.highlightedDate!, onDone: (_) {});
-      }
-      // Новое расписание — сразу прогреваем группы пар текущей недели,
-      // чтобы расширенная карточка открывалась уже с полным списком.
-      if (!next.isDemo &&
-          !identical(next.schedule.items, prev?.schedule.items)) {
-        _warmLessonGroups(next.schedule.items, next.currentWeekStart);
       }
     });
 
@@ -288,8 +207,8 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
               : null,
           child: const Icon(Icons.difference_outlined),
         ),
-        onPressed: () => _handleAction(
-            _ScheduleAction.changes, context, ref, state),
+        onPressed: () =>
+            _handleAction(_ScheduleAction.changes, context, ref, state),
         tooltip: 'Изменения',
       ),
       if (hasGroup) ...[
@@ -299,8 +218,8 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
               : const Icon(Icons.refresh),
           onPressed: state.schedule.isLoading
               ? null
-              : () => _handleAction(
-                  _ScheduleAction.refresh, context, ref, state),
+              : () =>
+                  _handleAction(_ScheduleAction.refresh, context, ref, state),
           tooltip: 'Обновить',
         ),
       ],
@@ -467,7 +386,8 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
         // Жест вниз — это намерение, а не команда: сначала подтверждение.
         final confirmed = await _confirmRefresh(context);
         if (!confirmed || !context.mounted) return;
-        final result = await ref.read(scheduleScreenProvider.notifier).refresh();
+        final result =
+            await ref.read(scheduleScreenProvider.notifier).refresh();
         if (!context.mounted) return;
         showUpdateFeedback(context, result);
       },
@@ -635,7 +555,8 @@ class _FavoritesSheet extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(24, 8, 24, 4),
               child: Row(
                 children: [
-                  Icon(Icons.star_rounded, size: 20, color: colorScheme.primary),
+                  Icon(Icons.star_rounded,
+                      size: 20, color: colorScheme.primary),
                   const Gap(8),
                   Text('Избранные группы', style: theme.textTheme.titleLarge),
                 ],
@@ -682,8 +603,7 @@ class _FavoritesSheet extends ConsumerWidget {
                       leading: CircleAvatar(
                         backgroundColor: colorScheme.secondaryContainer,
                         child: Icon(Icons.groups_outlined,
-                            size: 20,
-                            color: colorScheme.onSecondaryContainer),
+                            size: 20, color: colorScheme.onSecondaryContainer),
                       ),
                       title: Text(fav.groupNumber,
                           style: theme.textTheme.titleMedium),

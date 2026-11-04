@@ -62,3 +62,8 @@ flutter:
           weight: 500
         - asset: assets/fonts/Rubik-SemiBold.ttf
           weight: 600
+
+dependency_overrides:
+  # path_provider_android 2.3.x тянет jni (нативная сборка через NDK+CMake).
+  # Приложению JNI не нужен, а NDK в окружении нет — держим ветку без него.
+  path_provider_android: 2.2.21

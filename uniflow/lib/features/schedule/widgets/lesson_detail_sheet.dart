@@ -127,171 +127,182 @@ class LessonDetailSheet extends ConsumerWidget {
     final typeName =
         lesson.type.isEmpty ? lesson.lessonType.displayName : lesson.type;
 
+    // Список групп пары бывает длинным (поток на несколько групп), поэтому
+    // содержимое листа живёт в прокрутке: иначе хвост чипов просто обрезался
+    // нижней кромкой шторки. Высота ограничена долей экрана — лист остаётся
+    // шторкой, а не разворачивается на весь экран.
     return _SheetReveal(
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(
-            20, 0, 20, MediaQuery.of(context).viewInsets.bottom + 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // ── Шапка: тип пары крупной плиткой, день и дата рядом. Одна
-            // тональная поверхность вместо трёх центрированных строк —
-            // взгляд сразу цепляется за то, что это за пара. ──
-            Container(
-              padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHigh,
-                borderRadius: AppShapes.circular(AppShapes.extraLarge),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.85,
+        ),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+              20, 0, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // ── Шапка: тип пары крупной плиткой, день и дата рядом. Одна
+              // тональная поверхность вместо трёх центрированных строк —
+              // взгляд сразу цепляется за то, что это за пара. ──
+              Container(
+                padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHigh,
+                  borderRadius: AppShapes.circular(AppShapes.extraLarge),
+                ),
+                child: Row(
+                  children: [
+                    _TypeBadge(
+                      color: lessonColor,
+                      icon: _typeIcon(lesson.lessonType),
+                    ),
+                    const Gap(14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            [weekdayTitle, dateStr]
+                                .where((s) => s.isNotEmpty)
+                                .join(' · ')
+                                .toUpperCase(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.emphasizedLabelMedium(
+                              theme.textTheme.labelMedium!.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                          const Gap(2),
+                          Text(
+                            typeName,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.emphasizedTitleLarge(
+                              theme.textTheme.titleLarge!
+                                  .copyWith(color: lessonColor),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (isOngoing || isUpcomingToday) ...[
+                      const Gap(10),
+                      _StatusPill(
+                        label: isOngoing
+                            ? 'Идёт'
+                            : 'Через ${lesson.timeUntilStartAt(now).inMinutes} мин',
+                        ongoing: isOngoing,
+                      ),
+                    ],
+                  ],
+                ),
               ),
-              child: Row(
-                children: [
-                  _TypeBadge(
-                    color: lessonColor,
-                    icon: _typeIcon(lesson.lessonType),
+              const Gap(16),
+
+              // ── Предмет ──
+              Text(
+                lesson.subject,
+                style: AppTypography.emphasizedHeadlineSmall(
+                  theme.textTheme.headlineSmall!,
+                ),
+              ),
+              // Вторая строка только когда она сообщает новое: тип пары уже
+              // стоит в шапке, повторять его под предметом — шум.
+              if (isOngoing || isUpcomingToday) ...[
+                const Gap(6),
+                Text(
+                  isOngoing
+                      ? 'Идёт сейчас · до конца ${formatCountdown(lesson.timeLeftAt(now))}'
+                      : 'Начнётся через ${formatCountdown(lesson.timeUntilStartAt(now))}',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
-                  const Gap(14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          [weekdayTitle, dateStr]
-                              .where((s) => s.isNotEmpty)
-                              .join(' · ')
-                              .toUpperCase(),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                ),
+              ],
+
+              if (changeNote != null) ...[
+                const Gap(14),
+                _ChangeBanner(note: changeNote),
+              ],
+              const Gap(18),
+
+              // ── Факты пары: время / аудитория / препод / группы. Один
+              // столбец, одинаковые строки: подпись сверху, значение снизу. ──
+              _DetailRow(
+                icon: Icons.schedule,
+                label: 'Время',
+                child: Text(
+                  lesson.time,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+              if (lesson.classroom.isNotEmpty) ...[
+                const Gap(14),
+                _DetailRow(
+                  icon: Icons.place_outlined,
+                  label: 'Аудитория',
+                  child:
+                      Text(lesson.classroom, style: theme.textTheme.bodyLarge),
+                ),
+              ],
+              if (lesson.teacher.isNotEmpty) ...[
+                const Gap(14),
+                _DetailRow(
+                  icon: Icons.person_outline,
+                  label: 'Преподаватель',
+                  child: Text(lesson.teacher, style: theme.textTheme.bodyLarge),
+                ),
+              ],
+              if (visibleGroups.isNotEmpty) ...[
+                const Gap(14),
+                _DetailRow(
+                  icon: Icons.groups_outlined,
+                  label: 'Группы',
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: visibleGroups.map((group) {
+                      // Своя группа — первая и выделенная: в длинном списке
+                      // иначе не найти, к какой из них относится расписание.
+                      final isOwn =
+                          ownGroup != null && group.number == ownGroup;
+                      return Container(
+                        key: ValueKey('lesson-group-${group.number}'),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isOwn
+                              ? colorScheme.primaryContainer
+                              : colorScheme.surfaceContainerHighest,
+                          borderRadius: AppShapes.circular(
+                            AppShapes.extraLarge,
+                          ),
+                        ),
+                        child: Text(
+                          group.displayName,
                           style: AppTypography.emphasizedLabelMedium(
                             theme.textTheme.labelMedium!.copyWith(
-                              color: colorScheme.onSurfaceVariant,
+                              color: isOwn
+                                  ? colorScheme.onPrimaryContainer
+                                  : colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ),
-                        const Gap(2),
-                        Text(
-                          typeName,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTypography.emphasizedTitleLarge(
-                            theme.textTheme.titleLarge!
-                                .copyWith(color: lessonColor),
-                          ),
-                        ),
-                      ],
-                    ),
+                      );
+                    }).toList(),
                   ),
-                  if (isOngoing || isUpcomingToday) ...[
-                    const Gap(10),
-                    _StatusPill(
-                      label: isOngoing
-                          ? 'Идёт'
-                          : 'Через ${lesson.timeUntilStartAt(now).inMinutes} мин',
-                      ongoing: isOngoing,
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const Gap(16),
-
-            // ── Предмет ──
-            Text(
-              lesson.subject,
-              style: AppTypography.emphasizedHeadlineSmall(
-                theme.textTheme.headlineSmall!,
-              ),
-            ),
-            // Вторая строка только когда она сообщает новое: тип пары уже
-            // стоит в шапке, повторять его под предметом — шум.
-            if (isOngoing || isUpcomingToday) ...[
-              const Gap(6),
-              Text(
-                isOngoing
-                    ? 'Идёт сейчас · до конца ${formatCountdown(lesson.timeLeftAt(now))}'
-                    : 'Начнётся через ${formatCountdown(lesson.timeUntilStartAt(now))}',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
-              ),
+              ],
             ],
-
-            if (changeNote != null) ...[
-              const Gap(14),
-              _ChangeBanner(note: changeNote),
-            ],
-            const Gap(18),
-
-            // ── Факты пары: время / аудитория / препод / группы. Один
-            // столбец, одинаковые строки: подпись сверху, значение снизу. ──
-            _DetailRow(
-              icon: Icons.schedule,
-              label: 'Время',
-              child: Text(
-                lesson.time,
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-            ),
-            if (lesson.classroom.isNotEmpty) ...[
-              const Gap(14),
-              _DetailRow(
-                icon: Icons.place_outlined,
-                label: 'Аудитория',
-                child: Text(lesson.classroom, style: theme.textTheme.bodyLarge),
-              ),
-            ],
-            if (lesson.teacher.isNotEmpty) ...[
-              const Gap(14),
-              _DetailRow(
-                icon: Icons.person_outline,
-                label: 'Преподаватель',
-                child: Text(lesson.teacher, style: theme.textTheme.bodyLarge),
-              ),
-            ],
-            if (visibleGroups.isNotEmpty) ...[
-              const Gap(14),
-              _DetailRow(
-                icon: Icons.groups_outlined,
-                label: 'Группы',
-                child: Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: visibleGroups.map((group) {
-                    // Своя группа — первая и выделенная: в длинном списке
-                    // иначе не найти, к какой из них относится расписание.
-                    final isOwn = ownGroup != null && group.number == ownGroup;
-                    return Container(
-                      key: ValueKey('lesson-group-${group.number}'),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: isOwn
-                            ? colorScheme.primaryContainer
-                            : colorScheme.surfaceContainerHighest,
-                        borderRadius: AppShapes.circular(
-                          AppShapes.extraLarge,
-                        ),
-                      ),
-                      child: Text(
-                        group.displayName,
-                        style: AppTypography.emphasizedLabelMedium(
-                          theme.textTheme.labelMedium!.copyWith(
-                            color: isOwn
-                                ? colorScheme.onPrimaryContainer
-                                : colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-            ],
-          ],
+          ),
         ),
       ),
     );

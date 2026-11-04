@@ -13,6 +13,7 @@ import 'package:uniflow/core/services/notification_service.dart';
 import 'package:uniflow/core/services/schedule_service.dart';
 import 'package:uniflow/core/services/storage_service.dart';
 import 'package:uniflow/features/schedule/screens/schedule_screen.dart';
+import 'package:uniflow/features/schedule/widgets/lesson_detail_sheet.dart';
 import 'package:uniflow/features/schedule/widgets/lesson_tile.dart';
 
 // ── Fakes ──────────────────────────────────────────────────────
@@ -299,7 +300,8 @@ void main() {
     expect(find.text(capital), findsOneWidget,
         reason: 'день недели остаётся в шапке');
     expect(find.textContaining(dateStr), findsNothing,
-        reason: 'число уже стоит в квадратике слева — словами его не повторяем');
+        reason:
+            'число уже стоит в квадратике слева — словами его не повторяем');
   });
 
   testWidgets('карточка предмета открывает лист без блока «Группы»',
@@ -360,8 +362,8 @@ void main() {
     // факта — одинаковые строки с иконкой в одном столбце. Иконка той же
     // пары есть и в плитке под листом, поэтому берём иконки строк листа —
     // они 18dp, как в _DetailRow.
-    Finder rowIcon(IconData icon) => find.byWidgetPredicate(
-        (w) => w is Icon && w.icon == icon && w.size == 18);
+    Finder rowIcon(IconData icon) => find
+        .byWidgetPredicate((w) => w is Icon && w.icon == icon && w.size == 18);
 
     final time = tester.getTopLeft(rowIcon(Icons.schedule));
     final room = tester.getTopLeft(rowIcon(Icons.place_outlined));
@@ -434,6 +436,45 @@ void main() {
     expect(find.byKey(const ValueKey('lesson-group-220431')), findsOneWidget);
     expect(find.byKey(const ValueKey('lesson-group-$_group')), findsOneWidget,
         reason: 'своя группа тоже видна и стоит первой');
+  });
+
+  testWidgets('много групп прокручиваются внутри карточки', (tester) async {
+    // Поток на два десятка групп: чипы обязаны переноситься и прокручиваться,
+    // а не обрезаться нижней кромкой шторки.
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 520);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final groups = <GroupInfo>[
+      const GroupInfo(number: _group),
+      for (var i = 1; i <= 24; i++) GroupInfo(number: '2204$i'),
+    ];
+    await tester.pumpWidget(_app(items: [
+      _item(subject: 'Математический анализ', date: _now, groups: groups),
+    ]));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(LessonTile).first);
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull,
+        reason: 'переполнения нет: содержимое живёт в прокрутке');
+    final scroller = find.descendant(
+      of: find.byType(LessonDetailSheet),
+      matching: find.byType(SingleChildScrollView),
+    );
+    expect(scroller, findsOneWidget);
+
+    final last = find.byKey(const ValueKey('lesson-group-220424'));
+    expect(find.byKey(const ValueKey('lesson-group-220424')).hitTestable(),
+        findsNothing,
+        reason: 'последняя группа ниже сгиба, пока лист не прокрутили');
+
+    await tester.drag(scroller, const Offset(0, -400));
+    await tester.pumpAndSettle();
+    expect(last.hitTestable(), findsOneWidget,
+        reason: 'до последней группы можно доскроллить');
   });
 
   group('шапка на узком экране', () {

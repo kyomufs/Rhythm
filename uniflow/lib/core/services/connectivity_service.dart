@@ -36,8 +36,13 @@ class ConnectivityService {
       ));
 
       // Try a lightweight GET to the dictionaries endpoint with empty query
-      await dio.get<Map<String, dynamic>>(TulsuEndpoints.dictionaries,
-          queryParameters: {'term': ''});
+      // `GetDates.php` с пустым значением отвечает десятками байт: проверка
+      // доступности не должна тянуть полмегабайта словарей. Ответ читаем как
+      // `dynamic` — приведение к `Map` падало на любом ответе-списке, и такой
+      // сбой разбора записывался в «офлайн» (из-за этого автообновление при
+      // входе молчало, а плашка об успехе не появлялась).
+      await dio.get<dynamic>(TulsuEndpoints.dates,
+          queryParameters: {'search_value': ''});
       _lastResult = true;
     } catch (e) {
       // Any error (timeout, DNS, network) means offline

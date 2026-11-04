@@ -79,6 +79,72 @@ class LessonGroupResolver {
     await _roomSchedule(classroom);
   }
 
+  /// Дописывает полные списки групп к парам недели, начиная с [weekStart].
+  ///
+  /// Возвращает исходный список без изменений, если добирать нечего: новый
+  /// список отдаётся только тогда, когда хоть одна пара получила группы, —
+  /// иначе состояние экрана перерисовывалось бы зря.
+  Future<List<ScheduleItem>> enrich(
+    List<ScheduleItem> items, {
+    required DateTime weekStart,
+    int parallel = 6,
+    int maxRooms = 32,
+  }) async {
+    final weekEnd = weekStart.add(const Duration(days: 7));
+    final rooms = <String>{};
+    for (final item in items) {
+      if (item.groups.length > 1 || item.classroom.isEmpty) continue;
+      final DateTime date;
+      try {
+        date = item.parsedDate;
+      } catch (_) {
+        continue;
+      }
+      if (date.isBefore(weekStart) || !date.isBefore(weekEnd)) continue;
+      rooms.add(item.classroom);
+      if (rooms.length >= maxRooms) break;
+    }
+    if (rooms.isEmpty) return items;
+
+    final queue = rooms.toList();
+    for (var i = 0; i < queue.length; i += parallel) {
+      await Future.wait([
+        for (final room in queue.skip(i).take(parallel)) _roomSchedule(room),
+      ]);
+    }
+
+    var changed = false;
+    final result = <ScheduleItem>[];
+    for (final item in items) {
+      if (item.groups.length > 1 || item.classroom.isEmpty) {
+        result.add(item);
+        continue;
+      }
+      final found = cachedGroups(
+        date: item.date,
+        time: item.time,
+        subject: item.subject,
+        classroom: item.classroom,
+      );
+      if (found == null || found.length <= item.groups.length) {
+        result.add(item);
+        continue;
+      }
+      changed = true;
+      result.add(ScheduleItem(
+        date: item.date,
+        time: item.time,
+        subject: item.subject,
+        type: item.type,
+        classroom: item.classroom,
+        teacher: item.teacher,
+        groups: found,
+        cssClass: item.cssClass,
+      ));
+    }
+    return changed ? result : items;
+  }
+
   Future<List<ScheduleItem>> _roomSchedule(String classroom) async {
     final cached = _rooms[classroom];
     if (cached != null) return cached;
