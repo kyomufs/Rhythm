@@ -188,10 +188,19 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
     _init();
   }
 
+  /// Журнал изменений, отпечаток и автообновление при входе.
+  ///
+  /// Завершается `true`, когда автообновление при старте реально сходило в
+  /// API и данные получены: по этому флагу оболочка показывает плашку
+  /// «Расписание успешно обновлено» без нажатия пользователя.
+  final Completer<bool> _bootRefresh = Completer<bool>();
+  Future<bool> get bootRefresh => _bootRefresh.future;
+
   Future<void> _init() async {
     final favGroups = _storage.getFavoriteGroups();
     if (_demo) {
       _initDemo(favGroups);
+      _bootRefresh.complete(false);
       return;
     }
     final myGroup = _storage.getMyGroup();
@@ -227,6 +236,9 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
         await loadSchedule(myGroup);
         // Silently compare with the last seen version and alert on changes.
         await _checkForScheduleChanges(myGroup, previousFingerprint);
+        _bootRefresh.complete(
+          state.schedule.error == null && state.schedule.items.isNotEmpty,
+        );
       } else if (!hadLocalCopy) {
         state = state.copyWith(
           schedule: state.schedule.copyWith(
@@ -235,11 +247,16 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
             error: 'Нет подключения к интернету',
           ),
         );
+        _bootRefresh.complete(false);
+      } else {
+        _bootRefresh.complete(false);
       }
       // Offline with a painted local copy: keep showing it silently —
       // a stale timetable beats an error screen; pull-to-refresh still
       // reports "no internet" explicitly.
+      return;
     }
+    _bootRefresh.complete(false);
   }
 
   /// Paints the cached snapshot for [searchValue] into the state without
@@ -550,23 +567,23 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
   /// Silently fetch the freshest schedule on app open and notify the user
   /// when it differs from the version they last saw. No server involved:
   /// we compare a local fingerprint against a fresh pull from TULSU.
-  Future<void> _checkForScheduleChanges(
+  Future<bool> _checkForScheduleChanges(
       String group, String? previousFingerprint) async {
     try {
       final fresh = await _service.getSchedule(group, forceRefresh: true);
-      if (!mounted) return;
-      if (fresh.error != null || fresh.items.isEmpty) return;
+      if (!mounted) return false;
+      if (fresh.error != null || fresh.items.isEmpty) return false;
       final newFingerprint = _fingerprint(fresh.items);
       await _storage.setScheduleFingerprint(newFingerprint);
       if (previousFingerprint == null ||
           previousFingerprint == newFingerprint) {
-        return; // First run or no changes — nothing to report.
+        return false; // First run or no changes — nothing to report.
       }
       final records = _diffSchedule(previousFingerprint, fresh.items);
       if (records.isEmpty) {
         // Only the fingerprint format changed (e.g. teacher column
         // added) — update the baseline silently.
-        return;
+        return false;
       }
       final journal = pruneJournal([...records, ...state.changeJournal]);
       // Show the updated data immediately along with the alert.
@@ -577,14 +594,43 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
         hasUnseenChanges: true,
       );
       await _persistJournal();
+      // id фиксирован на тип события: повторный опрос не плодит уведомления
+      // в шторке, а заменяет прошлое про тот же журнал.
       await _notifications.show(
         2,
         'Расписание изменилось',
         'Для группы $group: ${_changeSummary(records)}. '
             'Откройте значок «Изменения» в расписании.',
+        payload: changesNotificationPayload,
       );
+      return true;
     } catch (_) {
       // Background check is best-effort — ignore failures.
+      return false;
+    }
+  }
+
+  /// Один фоновый опрос: сверяет расписание с API по сохранённому
+  /// отпечатку. Вызывается таймером из [BackgroundSyncHost] и при возврате
+  /// приложения на передний план. Возвращает true, если журнал пополнился.
+  ///
+  /// Демо и пустая группа не опрашиваются: в демо менять нечего, а без
+  /// группы запрос ушёл бы в пустоту.
+  bool _polling = false;
+
+  Future<bool> pollForChanges() async {
+    if (_demo || _polling) return false;
+    final group = state.currentGroup;
+    if (group == null || group.isEmpty) return false;
+    if (state.schedule.items.isEmpty) return false;
+    _polling = true;
+    try {
+      return await _checkForScheduleChanges(
+        group,
+        _storage.getScheduleFingerprint(),
+      );
+    } finally {
+      _polling = false;
     }
   }
 
@@ -724,7 +770,7 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
   Future<UpdateResult> refresh() async {
     if (_demo) {
       // В демо нечего обновлять: данные те же, изменений не выдумываем.
-      return const UpdateResult(UpdateOutcome.updated, 'Расписание обновлено');
+      return const UpdateResult(UpdateOutcome.updated, scheduleUpdatedText);
     }
 
     final group = state.currentGroup;
@@ -746,7 +792,7 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
         // уведомление об успехе.
         unawaited(prefetchFavorites());
         return const UpdateResult(
-            UpdateOutcome.updated, 'Расписание обновлено');
+            UpdateOutcome.updated, scheduleUpdatedText);
       }
       return UpdateResult(
         UpdateOutcome.failed,
@@ -835,8 +881,12 @@ typedef LessonGroupsKey = ({
 });
 
 /// Полный список групп пары — добирается запросом по аудитории.
-final lessonGroupsProvider = FutureProvider.autoDispose
-    .family<List<GroupInfo>, LessonGroupsKey>((ref, key) {
+///
+/// Без `autoDispose`: карточка пары открывается и закрывается постоянно, а
+/// результат уже известен — повторный запрос каждый раз показывал «пустые»
+/// группы и подгружал их заново.
+final lessonGroupsProvider = FutureProvider.family<List<GroupInfo>,
+    LessonGroupsKey>((ref, key) {
   return ref.watch(lessonGroupResolverProvider).resolve(
         date: key.date,
         time: key.time,

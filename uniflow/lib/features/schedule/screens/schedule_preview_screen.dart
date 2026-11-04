@@ -4,9 +4,11 @@ import 'package:gap/gap.dart';
 import 'package:uniflow/core/models/schedule.dart';
 import 'package:uniflow/core/services/schedule_service.dart';
 import 'package:uniflow/core/utils/week_utils.dart';
+import 'package:uniflow/core/widgets/refresh_confirmation.dart';
 import 'package:uniflow/features/schedule/providers/schedule_provider.dart';
 import 'package:uniflow/features/schedule/widgets/day_schedule.dart';
 import 'package:uniflow/features/schedule/widgets/lesson_detail_sheet.dart';
+import 'package:uniflow/features/schedule/widgets/week_navigator.dart';
 import 'package:uniflow/shared/widgets/loading_indicator.dart';
 
 /// Read-only schedule preview for any search value (group, teacher, auditorium).
@@ -100,7 +102,7 @@ class _SchedulePreviewScreenState extends ConsumerState<SchedulePreviewScreen> {
         centerTitle: false,
         actions: [
           IconButton(
-            icon: Icon(isFav ? Icons.star : Icons.star_border),
+            icon: Icon(isFav ? Icons.star_rounded : Icons.star_outline_rounded),
             color: isFav ? colorScheme.primary : null,
             onPressed: () {
               if (isFav) {
@@ -121,7 +123,16 @@ class _SchedulePreviewScreenState extends ConsumerState<SchedulePreviewScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _loadSchedule,
+            onPressed: () async {
+              final confirmed = await confirmRefresh(
+                context,
+                title: 'Обновить расписание?',
+                body: 'Данные будут запрошены заново. Показанное расписание '
+                    'останется, если сеть недоступна.',
+              );
+              if (!confirmed || !mounted) return;
+              await _loadSchedule();
+            },
             tooltip: 'Обновить',
           ),
         ],
@@ -132,11 +143,11 @@ class _SchedulePreviewScreenState extends ConsumerState<SchedulePreviewScreen> {
               ? _buildError(colorScheme, theme)
               : _items.isEmpty
                   ? _buildEmpty(colorScheme, theme)
-                  : _buildContent(colorScheme, theme),
+                  : _buildContent(),
     );
   }
 
-  Widget _buildContent(ColorScheme colorScheme, ThemeData theme) {
+  Widget _buildContent() {
     final allDays = List.generate(6, (i) {
       final day = _weekStart.add(Duration(days: i));
       return DateTime(day.year, day.month, day.day);
@@ -144,50 +155,17 @@ class _SchedulePreviewScreenState extends ConsumerState<SchedulePreviewScreen> {
 
     return Column(
       children: [
-        // Week navigation
-        Container(
-          margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          decoration: BoxDecoration(
-            color: _isCurrentWeek
-                ? colorScheme.primaryContainer.withValues(alpha: 0.5)
-                : colorScheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            children: [
-              IconButton(
-                onPressed: () => setState(() {
-                  _weekStart = getPrevWeekStart(_weekStart);
-                }),
-                icon: const Icon(Icons.chevron_left),
-              ),
-              Expanded(
-                child: Column(
-                  children: [
-                    Text(
-                      'Неделя ${_weekInfo.weekNumber}',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    Text(
-                      '${_weekInfo.dateRangeShort} (${_weekInfo.isEven ? 'чётная' : 'нечётная'})',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                onPressed: () => setState(() {
-                  _weekStart = getNextWeekStart(_weekStart);
-                }),
-                icon: const Icon(Icons.chevron_right),
-              ),
-            ],
-          ),
+        // Навигатор недели общий с главным экраном: своя упрощённая полоса
+        // здесь выглядела как другая версия приложения.
+        WeekNavigatorBar(
+          weekInfo: _weekInfo,
+          isCurrentWeek: _isCurrentWeek,
+          onPrevWeek: () => setState(() {
+            _weekStart = getPrevWeekStart(_weekStart);
+          }),
+          onNextWeek: () => setState(() {
+            _weekStart = getNextWeekStart(_weekStart);
+          }),
         ),
         const Gap(8),
         // Schedule list

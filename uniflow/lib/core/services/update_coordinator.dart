@@ -13,6 +13,22 @@ enum UpdateOutcome {
   failed,
 }
 
+/// Что именно обновилось — из этого собирается текст плашки об успехе.
+enum RefreshScope { schedule, marks }
+
+/// Тексты уведомлений об успешном обновлении. Одна формулировка на всё
+/// приложение: и для автообновления при входе, и для кнопки/жеста.
+const String scheduleUpdatedText = 'Расписание успешно обновлено';
+const String marksUpdatedText = 'Оценки успешно обновлены';
+const String bothUpdatedText = 'Расписание и оценки успешно обновлены';
+
+/// Текст плашки для набора обновлённых данных.
+String updateSuccessText({required bool schedule, required bool marks}) {
+  if (schedule && marks) return bothUpdatedText;
+  if (schedule) return scheduleUpdatedText;
+  return marksUpdatedText;
+}
+
 class UpdateResult {
   const UpdateResult(this.outcome, [this.message]);
 

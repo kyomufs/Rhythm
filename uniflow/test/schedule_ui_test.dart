@@ -47,6 +47,9 @@ class _FakeApi extends TulsuApiClient {
   /// Ответ на запрос по аудитории: так проверяется добор групп пары.
   final List<ScheduleItem>? auditoriumItems;
 
+  /// Сколько раз спросили расписание аудитории (прогрев групп пары).
+  int auditoriumCalls = 0;
+
   @override
   Future<ApiDateRange> getDateRange(String searchValue) async => ApiDateRange(
         minDate: DateTime(2026, 9, 1),
@@ -58,6 +61,7 @@ class _FakeApi extends TulsuApiClient {
   Future<List<ScheduleItem>> getSchedule(
       String searchField, String searchValue) async {
     if (searchField == SearchFieldType.auditorium.value) {
+      auditoriumCalls++;
       return auditoriumItems ?? items;
     }
     return items;
@@ -144,6 +148,9 @@ class _FakeConnectivity implements ConnectivityService {
 
 class _FakeNotifications implements NotificationService {
   @override
+  void Function(String? payload)? onTap;
+
+  @override
   Future<void> init() async {}
 
   @override
@@ -153,7 +160,8 @@ class _FakeNotifications implements NotificationService {
   Future<bool> areNotificationsEnabled() async => true;
 
   @override
-  Future<void> show(int id, String title, String body) async {}
+  Future<void> show(int id, String title, String body,
+      {String? payload}) async {}
 }
 
 // ── Harness ────────────────────────────────────────────────────
@@ -169,16 +177,16 @@ Widget _app({
   required List<ScheduleItem> items,
   List<ScheduleItem>? auditoriumItems,
   _FakeStorage? storage,
+  _FakeApi? api,
 }) {
+  final client = api ?? _FakeApi(items, auditoriumItems: auditoriumItems);
   return ProviderScope(
     overrides: [
       demoModeProvider.overrideWithValue(false),
-      apiClientProvider.overrideWithValue(
-        _FakeApi(items, auditoriumItems: auditoriumItems),
-      ),
+      apiClientProvider.overrideWithValue(client),
       scheduleServiceProvider.overrideWithValue(
         ScheduleService(
-          api: _FakeApi(items, auditoriumItems: auditoriumItems),
+          api: client,
           storage: _FakeStorage(),
         ),
       ),
@@ -224,7 +232,7 @@ void main() {
       findsOneWidget,
       reason: 'глиф-щит стоит перед номером группы',
     );
-    expect(find.byIcon(Icons.star_outline), findsOneWidget);
+    expect(find.byIcon(Icons.star_rounded), findsOneWidget);
     expect(find.text('Расписание'), findsNothing,
         reason: 'подпись «Расписание» из угла убрана');
   });
@@ -242,7 +250,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.star_outline));
+    await tester.tap(find.byIcon(Icons.star_rounded));
     await tester.pumpAndSettle();
 
     expect(find.text('Избранные группы'), findsOneWidget);
@@ -277,7 +285,7 @@ void main() {
         reason: 'стрелка переключает неделю');
   });
 
-  testWidgets('в шапке карточки дня неделя и дата стоят в одной строке',
+  testWidgets('в шапке карточки дня только день недели, без даты',
       (tester) async {
     await tester.pumpWidget(_app(items: [
       _item(subject: 'Математический анализ', date: _now),
@@ -288,14 +296,10 @@ void main() {
     final capital = dayName[0].toUpperCase() + dayName.substring(1);
     final dateStr = DateFormat('d MMMM', 'ru').format(_now);
 
-    final header = tester
-        .widgetList<RichText>(find.byType(RichText))
-        .map((text) => text.text.toPlainText())
-        .firstWhere((text) => text.startsWith(capital));
-
-    expect(header, contains(dateStr));
-    expect(header, isNot(contains('\n')),
-        reason: 'день недели и дата — одна строка, а не два ряда');
+    expect(find.text(capital), findsOneWidget,
+        reason: 'день недели остаётся в шапке');
+    expect(find.textContaining(dateStr), findsNothing,
+        reason: 'число уже стоит в квадратике слева — словами его не повторяем');
   });
 
   testWidgets('карточка предмета открывает лист без блока «Группы»',
@@ -309,7 +313,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Математический анализ'), findsWidgets);
-    expect(find.widgetWithText(Chip, _group), findsNothing,
+    expect(find.byKey(const ValueKey('lesson-group-$_group')), findsNothing,
         reason: 'чип своей же группы ничего не сообщает и не показывается');
   });
 
@@ -330,9 +334,76 @@ void main() {
     await tester.tap(find.byType(LessonTile).first);
     await tester.pumpAndSettle();
 
-    expect(find.widgetWithText(Chip, '221341и'), findsOneWidget,
+    expect(find.byKey(const ValueKey('lesson-group-221341и')), findsOneWidget,
         reason: 'чужие группы в паре видны');
-    expect(find.widgetWithText(Chip, _group), findsOneWidget);
+    expect(find.byKey(const ValueKey('lesson-group-$_group')), findsOneWidget);
+  });
+
+  testWidgets('в карточке время, аудитория, препод и группы — один список',
+      (tester) async {
+    await tester.pumpWidget(_app(items: [
+      _item(
+        subject: 'Математический анализ',
+        date: _now,
+        groups: const [
+          GroupInfo(number: _group),
+          GroupInfo(number: '221341и'),
+        ],
+      ),
+    ]));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(LessonTile).first);
+    await tester.pumpAndSettle();
+
+    // Время и аудитория больше не в отдельной тональной полосе: все четыре
+    // факта — одинаковые строки с иконкой в одном столбце. Иконка той же
+    // пары есть и в плитке под листом, поэтому берём иконки строк листа —
+    // они 18dp, как в _DetailRow.
+    Finder rowIcon(IconData icon) => find.byWidgetPredicate(
+        (w) => w is Icon && w.icon == icon && w.size == 18);
+
+    final time = tester.getTopLeft(rowIcon(Icons.schedule));
+    final room = tester.getTopLeft(rowIcon(Icons.place_outlined));
+    final teacher = tester.getTopLeft(rowIcon(Icons.person_outline));
+    final groups = tester.getTopLeft(rowIcon(Icons.groups_outlined));
+
+    expect(room.dx, time.dx, reason: 'иконки стоят в общем столбце');
+    expect(teacher.dx, time.dx);
+    expect(groups.dx, time.dx);
+    expect(room.dy, greaterThan(time.dy));
+    expect(teacher.dy, greaterThan(room.dy));
+    expect(groups.dy, greaterThan(teacher.dy));
+  });
+
+  testWidgets('группы пары прогреваются сразу после загрузки расписания',
+      (tester) async {
+    final lesson = _item(subject: 'Математический анализ', date: _now);
+    final api = _FakeApi(
+      [lesson],
+      auditoriumItems: [
+        _item(
+          subject: 'Математический анализ',
+          date: _now,
+          groups: const [
+            GroupInfo(number: _group),
+            GroupInfo(number: '221341и'),
+          ],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(_app(items: [lesson], api: api));
+    await tester.pumpAndSettle();
+
+    expect(api.auditoriumCalls, greaterThan(0),
+        reason: 'группы пары тянутся заранее, до открытия карточки');
+
+    // Карточка открывается с уже готовыми группами: одного кадра хватает,
+    // чипы не должны «доезжать» после появления листа.
+    await tester.tap(find.byType(LessonTile).first);
+    await tester.pump();
+    expect(find.byKey(const ValueKey('lesson-group-221341и')), findsOneWidget);
   });
 
   testWidgets('группы пары добираются из расписания аудитории', (tester) async {
@@ -358,10 +429,10 @@ void main() {
     await tester.tap(find.byType(LessonTile).first);
     await tester.pumpAndSettle();
 
-    expect(find.widgetWithText(Chip, '221341и'), findsOneWidget,
+    expect(find.byKey(const ValueKey('lesson-group-221341и')), findsOneWidget,
         reason: 'группа из расписания аудитории попала в карточку');
-    expect(find.widgetWithText(Chip, '220431'), findsOneWidget);
-    expect(find.widgetWithText(Chip, _group), findsOneWidget,
+    expect(find.byKey(const ValueKey('lesson-group-220431')), findsOneWidget);
+    expect(find.byKey(const ValueKey('lesson-group-$_group')), findsOneWidget,
         reason: 'своя группа тоже видна и стоит первой');
   });
 
@@ -403,5 +474,24 @@ void main() {
       expect(find.text('Обновить'), findsOneWidget);
       expect(find.text('Поиск'), findsOneWidget);
     });
+  });
+
+  testWidgets('кнопка обновления сначала спрашивает подтверждение',
+      (tester) async {
+    await tester.pumpWidget(_app(items: [
+      _item(subject: 'Математический анализ', date: _now),
+    ]));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.refresh));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Обновить расписание?'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Обновить'), findsOneWidget);
+
+    // Отмена закрывает диалог и не запускает запрос.
+    await tester.tap(find.text('Отмена'));
+    await tester.pumpAndSettle();
+    expect(find.text('Обновить расписание?'), findsNothing);
   });
 }

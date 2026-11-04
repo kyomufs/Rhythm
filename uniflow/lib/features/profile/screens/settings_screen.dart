@@ -7,8 +7,10 @@ import 'package:uniflow/core/services/storage_service.dart';
 import 'package:uniflow/core/theme/color_utils.dart';
 import 'package:uniflow/core/theme/motion.dart';
 import 'package:uniflow/core/theme/theme_provider.dart';
+import 'package:uniflow/core/theme/typography.dart';
 import 'package:uniflow/features/profile/screens/onboarding_screen.dart';
 import 'package:uniflow/features/profile/screens/student_profile_screen.dart';
+import 'package:uniflow/shared/widgets/app_segmented_selector.dart';
 
 /// Settings screen for app customization
 class SettingsScreen extends ConsumerWidget {
@@ -51,29 +53,22 @@ class SettingsScreen extends ConsumerWidget {
           // ── Theme Mode ──
           const _SectionHeader('Тема'),
           _SectionCard(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
             children: [
-              _ThemeModeTile(
-                title: 'Системная',
-                icon: Icons.brightness_auto,
-                value: 'system',
-                groupValue: settings.themeMode,
-                onChanged: notifier.updateThemeMode,
-              ),
-              const _TileDivider(),
-              _ThemeModeTile(
-                title: 'Светлая',
-                icon: Icons.light_mode,
-                value: 'light',
-                groupValue: settings.themeMode,
-                onChanged: notifier.updateThemeMode,
-              ),
-              const _TileDivider(),
-              _ThemeModeTile(
-                title: 'Тёмная',
-                icon: Icons.dark_mode,
-                value: 'dark',
-                groupValue: settings.themeMode,
-                onChanged: notifier.updateThemeMode,
+              AppSegmentedSelector<String>(
+                values: const ['system', 'light', 'dark'],
+                selected: settings.themeMode,
+                labelOf: (mode) => switch (mode) {
+                  'light' => 'Светлая',
+                  'dark' => 'Тёмная',
+                  _ => 'Системная',
+                },
+                iconOf: (mode) => switch (mode) {
+                  'light' => Icons.light_mode,
+                  'dark' => Icons.dark_mode,
+                  _ => Icons.brightness_auto,
+                },
+                onSelected: notifier.updateThemeMode,
               ),
             ],
           ),
@@ -173,6 +168,26 @@ class SettingsScreen extends ConsumerWidget {
                     );
                   }
                 },
+              ),
+              const _TileDivider(),
+              ListTile(
+                leading: const Icon(Icons.autorenew),
+                title: const Text('Фоновая проверка расписания'),
+                subtitle: Text(
+                  settings.backgroundCheckMinutes == 0
+                      ? 'Выключена — изменения придут только при обновлении'
+                      : 'Каждые ${AppSettings.backgroundCheckLabel(settings.backgroundCheckMinutes).toLowerCase()}'
+                          '. При изменениях придёт уведомление',
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: AppSegmentedSelector<int>(
+                  values: AppSettings.backgroundCheckPresets,
+                  selected: settings.backgroundCheckMinutes,
+                  labelOf: AppSettings.backgroundCheckLabel,
+                  onSelected: notifier.updateBackgroundCheckMinutes,
+                ),
               ),
             ],
           ),
@@ -315,11 +330,12 @@ class _SectionHeader extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
       child: Text(
-        title,
-        style: theme.textTheme.titleSmall?.copyWith(
-          color: theme.colorScheme.primary,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.3,
+        title.toUpperCase(),
+        style: AppTypography.emphasizedLabelMedium(
+          theme.textTheme.labelMedium!.copyWith(
+            color: theme.colorScheme.primary,
+            letterSpacing: 0.6,
+          ),
         ),
       ),
     );
@@ -362,39 +378,3 @@ class _TileDivider extends StatelessWidget {
   }
 }
 
-class _ThemeModeTile extends StatelessWidget {
-  final String title;
-  final IconData icon;
-  final String value;
-  final String groupValue;
-  final ValueChanged<String> onChanged;
-
-  const _ThemeModeTile({
-    required this.title,
-    required this.icon,
-    required this.value,
-    required this.groupValue,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final selected = groupValue == value;
-    final colorScheme = Theme.of(context).colorScheme;
-
-    // Modern radio replacement: check mark + tonal highlight instead of
-    // the deprecated Radio groupValue API.
-    return ListTile(
-      leading: Icon(icon,
-          color: selected ? colorScheme.primary : colorScheme.onSurfaceVariant),
-      title: Text(title,
-          style: TextStyle(
-              fontWeight: selected ? FontWeight.w600 : FontWeight.w400)),
-      trailing: Icon(
-        selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-        color: selected ? colorScheme.primary : colorScheme.outline,
-      ),
-      onTap: () => onChanged(value),
-    );
-  }
-}

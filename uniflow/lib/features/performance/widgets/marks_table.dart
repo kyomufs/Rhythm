@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:uniflow/core/api/tulsu_api.dart';
 import 'package:uniflow/core/theme/shapes.dart';
 import 'package:uniflow/core/utils/mark_labels.dart';
@@ -9,6 +10,11 @@ import 'package:uniflow/core/utils/mark_labels.dart';
 /// Таблица успеваемости: липкая шапка, вертикальная прокрутка строк и
 /// горизонтальная прокрутка столбцов, ширины столбцов тянутся мышью или
 /// пальцем за разделитель в шапке (двойной тап возвращает исходную ширину).
+///
+/// Масштаб меняется кнопками в полосе над шапкой и Ctrl/⌘ + колесо; он
+/// умножает и ширины столбцов, и кегль, поэтому вёрстка не разъезжается.
+/// Кулачковый пинч не подключён намеренно: он отбирает жест у горизонтальной
+/// прокрутки, а таблица на телефоне листается именно ею.
 class MarksTable extends StatefulWidget {
   final List<MarksItem> items;
 
@@ -19,18 +25,26 @@ class MarksTable extends StatefulWidget {
 }
 
 class _MarksTableState extends State<MarksTable> {
+  /// Базовые (несжатые) ширины: компактные, чтобы на телефоне таблица
+  /// влезала целиком без прокрутки.
   static const List<_ColumnSpec> _specs = [
-    _ColumnSpec(_Col.discipline, 'Дисциплина', initial: 260, min: 150),
-    _ColumnSpec(_Col.teacher, 'Преподаватель', initial: 200, min: 110),
-    _ColumnSpec(_Col.mark, 'Оценка', initial: 96, min: 80),
-    _ColumnSpec(_Col.attestation, 'Аттестация', initial: 130, min: 92),
-    _ColumnSpec(_Col.retake, 'Пересдача', initial: 130, min: 96),
+    _ColumnSpec(_Col.discipline, 'Дисциплина', initial: 180, min: 150),
+    _ColumnSpec(_Col.teacher, 'Преподаватель', initial: 120, min: 90),
+    _ColumnSpec(_Col.mark, 'Оценка', initial: 64, min: 56),
+    _ColumnSpec(_Col.attestation, 'Аттестация', initial: 84, min: 66),
+    _ColumnSpec(_Col.retake, 'Пересдача', initial: 88, min: 68),
   ];
+
+  static const double _minZoom = 0.85;
+  static const double _maxZoom = 1.8;
+  static const double _zoomStep = 0.15;
 
   final Map<_Col, double> _widths = {
     for (final spec in _specs) spec.col: spec.initial,
   };
   final ScrollController _horizontal = ScrollController();
+
+  double _zoom = 1;
 
   @override
   void dispose() {
@@ -44,7 +58,10 @@ class _MarksTableState extends State<MarksTable> {
           ? _specs
           : _specs.where((spec) => spec.col != _Col.retake).toList();
 
-  /// Свободное место, которое сейчас отдано «Дисциплине» (см. build).
+  double _base(_ColumnSpec spec) => _widths[spec.col] ?? spec.initial;
+
+  /// Свободное место, которое сейчас отдано «Дисциплине» (в базовых
+  /// единицах, как и ширины).
   double _stretch = 0;
 
   /// После первой ручной правки ширины растяжение выключается: иначе оно
@@ -54,12 +71,13 @@ class _MarksTableState extends State<MarksTable> {
   void _resize(_ColumnSpec spec, double delta) {
     setState(() {
       if (!_frozen) {
-        _widths[_Col.discipline] =
-            (_widths[_Col.discipline] ?? _specs.first.initial) + _stretch;
+        _widths[_Col.discipline] = _base(_specs.first) + _stretch;
         _frozen = true;
       }
+      // Перетаскивание приходит в экранных пикселях, ширины хранятся
+      // в базовых — делим на масштаб, иначе край «убегает» от курсора.
       _widths[spec.col] =
-          math.max(spec.min, (_widths[spec.col] ?? spec.initial) + delta);
+          math.max(spec.min, _base(spec) + delta / _zoom);
     });
   }
 
@@ -70,6 +88,12 @@ class _MarksTableState extends State<MarksTable> {
     });
   }
 
+  void _setZoom(double value) {
+    final next = value.clamp(_minZoom, _maxZoom);
+    if (next == _zoom) return;
+    setState(() => _zoom = next);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -78,60 +102,179 @@ class _MarksTableState extends State<MarksTable> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        var total = columns.fold<double>(
-            0, (sum, spec) => sum + (_widths[spec.col] ?? spec.initial));
+        final intrinsic = columns.fold<double>(
+            0, (sum, spec) => sum + _base(spec) * _zoom);
         // Узкая таблица не должна висеть у левого края: свободное место
         // отдаём «Дисциплине», остальные столбцы остаются по дефолту.
-        final stretch = !_frozen && total < constraints.maxWidth
-            ? constraints.maxWidth - total
-            : 0.0;
+        final freeSpace = constraints.maxWidth - intrinsic;
+        final stretch = !_frozen && freeSpace > 0 ? freeSpace / _zoom : 0.0;
         _stretch = stretch;
-        total += stretch;
 
-        return Scrollbar(
-          controller: _horizontal,
-          thumbVisibility: true,
-          scrollbarOrientation: ScrollbarOrientation.bottom,
-          child: SingleChildScrollView(
-            controller: _horizontal,
-            scrollDirection: Axis.horizontal,
-            child: SizedBox(
-              width: total,
-              child: Column(
-                children: [
-                  _HeaderRow(
-                    columns: columns,
-                    widthOf: (spec) =>
-                        (_widths[spec.col] ?? spec.initial) +
-                        (spec.col == _Col.discipline ? stretch : 0),
-                    onResize: _resize,
-                    onReset: _reset,
-                  ),
-                  Divider(height: 1, color: colorScheme.outlineVariant),
-                  Expanded(
-                    child: ListView.builder(
-                      padding: const EdgeInsets.only(bottom: 100),
-                      itemCount: widget.items.length,
-                      itemBuilder: (context, index) {
-                        final item = widget.items[index];
-                        return _TableRow(
-                          key: ValueKey('${item.term}-${item.discipline}'),
-                          item: item,
-                          index: index,
-                          columns: columns,
-                          widthOf: (spec) =>
-                              (_widths[spec.col] ?? spec.initial) +
-                              (spec.col == _Col.discipline ? stretch : 0),
-                        );
-                      },
+        double widthOf(_ColumnSpec spec) =>
+            (_base(spec) +
+                (spec.col == _Col.discipline ? stretch : 0)) *
+            _zoom;
+
+        return Column(
+          children: [
+            _ZoomBar(
+              zoom: _zoom,
+              onZoomOut: () => _setZoom(_zoom - _zoomStep),
+              onZoomIn: () => _setZoom(_zoom + _zoomStep),
+              onReset: () => _setZoom(1),
+            ),
+            Expanded(
+              child: Listener(
+                // Ctrl/⌘ + колесо — привычный зум: без модификатора колесо
+                // должно прокручивать таблицу, а не масштабировать её.
+                onPointerSignal: (event) {
+                  if (event is! PointerScrollEvent) return;
+                  final keys = HardwareKeyboard.instance;
+                  if (!keys.isControlPressed && !keys.isMetaPressed) return;
+                  _setZoom(_zoom - event.scrollDelta.dy / 400);
+                },
+                child: MediaQuery.withNoTextScaling(
+                  // Кегль масштабируется вместе с ширинами, но системный
+                  // text scale здесь не нужен: он ломал бы расчёт столбцов.
+                  child: Builder(
+                    builder: (context) => Scrollbar(
+                      controller: _horizontal,
+                      thumbVisibility: true,
+                      scrollbarOrientation: ScrollbarOrientation.bottom,
+                      child: SingleChildScrollView(
+                        controller: _horizontal,
+                        scrollDirection: Axis.horizontal,
+                        child: SizedBox(
+                          width: constraints.maxWidth > intrinsic + stretch * _zoom
+                              ? constraints.maxWidth
+                              : intrinsic + stretch * _zoom,
+                          child: Column(
+                            children: [
+                              _HeaderRow(
+                                columns: columns,
+                                zoom: _zoom,
+                                widthOf: widthOf,
+                                onResize: _resize,
+                                onReset: _reset,
+                              ),
+                              Divider(
+                                  height: 1,
+                                  color: colorScheme.outlineVariant),
+                              Expanded(
+                                child: ListView.builder(
+                                  padding: const EdgeInsets.only(bottom: 100),
+                                  itemCount: widget.items.length,
+                                  itemBuilder: (context, index) {
+                                    final item = widget.items[index];
+                                    return _TableRow(
+                                      key: ValueKey(
+                                          '${item.term}-${item.discipline}'),
+                                      item: item,
+                                      index: index,
+                                      columns: columns,
+                                      zoom: _zoom,
+                                      widthOf: widthOf,
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Полоса масштаба: «−», текущий процент, «+» и сброс.
+class _ZoomBar extends StatelessWidget {
+  final double zoom;
+  final VoidCallback onZoomOut;
+  final VoidCallback onZoomIn;
+  final VoidCallback onReset;
+
+  const _ZoomBar({
+    required this.zoom,
+    required this.onZoomOut,
+    required this.onZoomIn,
+    required this.onReset,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+      child: Row(
+        children: [
+          _ZoomButton(
+            icon: Icons.remove,
+            tooltip: 'Мельче',
+            onTap: onZoomOut,
+          ),
+          SizedBox(
+            width: 52,
+            child: Text(
+              '${(zoom * 100).round()}%',
+              key: const ValueKey('marks-zoom-label'),
+              textAlign: TextAlign.center,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
+                fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
           ),
-        );
-      },
+          _ZoomButton(
+            icon: Icons.add,
+            tooltip: 'Крупнее',
+            onTap: onZoomIn,
+          ),
+          const Spacer(),
+          _ZoomButton(
+            icon: Icons.restart_alt,
+            tooltip: 'Сбросить масштаб',
+            onTap: onReset,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ZoomButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  const _ZoomButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: onTap,
+      icon: Icon(icon),
+      iconSize: 18,
+      tooltip: tooltip,
+      visualDensity: VisualDensity.compact,
+      style: IconButton.styleFrom(
+        minimumSize: const Size(36, 32),
+        padding: EdgeInsets.zero,
+      ),
     );
   }
 }
@@ -141,12 +284,14 @@ class _MarksTableState extends State<MarksTable> {
 // ============================================================
 class _HeaderRow extends StatelessWidget {
   final List<_ColumnSpec> columns;
+  final double zoom;
   final double Function(_ColumnSpec) widthOf;
   final void Function(_ColumnSpec, double) onResize;
   final void Function(_ColumnSpec) onReset;
 
   const _HeaderRow({
     required this.columns,
+    required this.zoom,
     required this.widthOf,
     required this.onResize,
     required this.onReset,
@@ -160,7 +305,7 @@ class _HeaderRow extends StatelessWidget {
     // Высота фиксирована: в Column с Expanded шапка получает бесконечную
     // высоту, и stretch-строка внутри неё падает на раскладке.
     return SizedBox(
-      height: 48,
+      height: 36 * zoom,
       child: ColoredBox(
         color: colorScheme.surfaceContainerHigh,
         child: Row(
@@ -173,16 +318,23 @@ class _HeaderRow extends StatelessWidget {
                 child: Stack(
                   children: [
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 8 * zoom,
+                        vertical: 8 * zoom,
+                      ),
                       child: Align(
                         alignment: columns[i].col.alignment,
                         child: Text(
                           columns[i].title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.labelLarge?.copyWith(
+                          style: theme.textTheme.labelSmall?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                             fontWeight: FontWeight.w700,
+                            letterSpacing: 0.2,
+                            fontSize:
+                                (theme.textTheme.labelSmall?.fontSize ?? 11) *
+                                    zoom,
                           ),
                         ),
                       ),
@@ -245,6 +397,7 @@ class _TableRow extends StatelessWidget {
   final MarksItem item;
   final int index;
   final List<_ColumnSpec> columns;
+  final double zoom;
   final double Function(_ColumnSpec) widthOf;
 
   const _TableRow({
@@ -252,13 +405,13 @@ class _TableRow extends StatelessWidget {
     required this.item,
     required this.index,
     required this.columns,
+    required this.zoom,
     required this.widthOf,
   });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
     // Полосы по чётности: без них длинная таблица читается хуже, а рамки
     // между ячейками добавляют визуального шума.
     final background = index.isOdd
@@ -282,8 +435,10 @@ class _TableRow extends StatelessWidget {
               SizedBox(
                 width: widthOf(spec),
                 child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 10 * zoom,
+                    vertical: 8 * zoom,
+                  ),
                   child: Align(
                     alignment: spec.col.alignment,
                     child: _cell(context, spec.col),
@@ -300,29 +455,35 @@ class _TableRow extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final markColor = _markColor(colorScheme, item);
+    final small = theme.textTheme.bodySmall?.copyWith(
+      fontSize: (theme.textTheme.bodySmall?.fontSize ?? 12) * zoom,
+    );
 
     switch (col) {
       case _Col.discipline:
+        // Название не обрезаем: предмет должен читаться целиком, высота
+        // строки растёт по содержимому (IntrinsicHeight выше).
         return Text(
           item.discipline,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.bodyMedium?.copyWith(
+          style: small?.copyWith(
             fontWeight: FontWeight.w500,
+            height: 1.25,
           ),
         );
       case _Col.teacher:
         return Text(
           item.teacherMark.isEmpty ? '—' : item.teacherMark,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.bodySmall?.copyWith(
+          style: small?.copyWith(
             color: colorScheme.onSurfaceVariant,
+            height: 1.2,
           ),
         );
       case _Col.mark:
         return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          padding: EdgeInsets.symmetric(
+            horizontal: 8 * zoom,
+            vertical: 2 * zoom,
+          ),
           decoration: BoxDecoration(
             color: markColor.withValues(alpha: 0.12),
             borderRadius: AppShapes.circular(AppShapes.small),
@@ -330,7 +491,7 @@ class _TableRow extends StatelessWidget {
           child: Text(
             item.mark.isEmpty ? '—' : item.mark,
             maxLines: 1,
-            style: theme.textTheme.labelLarge?.copyWith(
+            style: small?.copyWith(
               color: markColor,
               fontWeight: FontWeight.w700,
             ),
@@ -339,23 +500,16 @@ class _TableRow extends StatelessWidget {
       case _Col.attestation:
         return Text(
           item.markTitle.isEmpty ? '—' : shortMarkTitle(item.markTitle),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: item.markTitle.isEmpty
-                ? colorScheme.onSurfaceVariant
-                : markColor,
+          style: small?.copyWith(
+            color:
+                item.markTitle.isEmpty ? colorScheme.onSurfaceVariant : markColor,
             fontWeight: FontWeight.w600,
           ),
         );
       case _Col.retake:
         return Text(
           item.retake.isEmpty ? '—' : item.retake,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-          ),
+          style: small?.copyWith(color: colorScheme.onSurfaceVariant),
         );
     }
   }

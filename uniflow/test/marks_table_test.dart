@@ -123,4 +123,36 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.getRect(find.text('Дисциплина')).left, lessThan(before));
   });
+
+  testWidgets('масштаб меняется кнопками ± и сбрасывается', (tester) async {
+    await tester.pumpWidget(_app([
+      _mark('Математический анализ',
+          mark: '5', markTitle: 'Отлично', teacher: 'Двоенко С. Д.'),
+    ]));
+    await tester.pumpAndSettle();
+
+    String label() =>
+        tester.widget<Text>(find.byKey(const ValueKey('marks-zoom-label'))).data!;
+
+    expect(label(), '100%');
+    final base = _headerWidth(tester, 'mark');
+
+    await tester.tap(find.byTooltip('Крупнее'));
+    await tester.pumpAndSettle();
+    expect(label(), '115%');
+    expect(_headerWidth(tester, 'mark'), greaterThan(base),
+        reason: 'столбец растёт вместе с масштабом');
+
+    await tester.tap(find.byTooltip('Мельче'));
+    await tester.pumpAndSettle();
+    expect(label(), '100%');
+
+    await tester.tap(find.byTooltip('Крупнее'));
+    await tester.tap(find.byTooltip('Крупнее'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Сбросить масштаб'));
+    await tester.pumpAndSettle();
+    expect(label(), '100%');
+    expect(_headerWidth(tester, 'mark'), closeTo(base, 0.5));
+  });
 }

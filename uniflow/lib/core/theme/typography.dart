@@ -140,4 +140,6 @@ class AppTypography {
       fontWeight: _emphLabelLarge.$2, letterSpacing: _emphLabelLarge.$1);
   static TextStyle emphasizedLabelMedium(TextStyle base) => base.copyWith(
       fontWeight: _emphLabelMedium.$2, letterSpacing: _emphLabelMedium.$1);
+  static TextStyle emphasizedLabelSmall(TextStyle base) => base.copyWith(
+      fontWeight: _emphLabelSmall.$2, letterSpacing: _emphLabelSmall.$1);
 }

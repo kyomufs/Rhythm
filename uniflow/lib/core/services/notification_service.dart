@@ -7,18 +7,22 @@ final notificationServiceProvider = Provider<NotificationService>((ref) {
   return NotificationService();
 });
 
+/// Payload нажатия: открыть журнал изменений расписания.
+const String changesNotificationPayload = 'changes';
+
 /// Wraps flutter_local_notifications: permission request + local notifications.
 class NotificationService {
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
   bool _initialized = false;
 
-  /// Плагин умеет только Android и iOS. На десктопе `initialize` бросает
-  /// исключение, поэтому там сервис молча выключен.
-  static bool get _supported =>
-      !kIsWeb &&
-      (defaultTargetPlatform == TargetPlatform.android ||
-          defaultTargetPlatform == TargetPlatform.iOS);
+  /// Обработчик нажатия по уведомлению. Ставит оболочка приложения:
+  /// сервис не знает ни про навигатор, ни про вкладки.
+  void Function(String? payload)? onTap;
+
+  /// Все поддерживаемые платформы, кроме web. Плагин умеет Android, iOS,
+  /// macOS, Linux (через org.freedesktop.Notifications) и Windows.
+  static bool get _supported => !kIsWeb;
 
   static const AndroidNotificationDetails _androidDetails =
       AndroidNotificationDetails(
@@ -29,7 +33,23 @@ class NotificationService {
     priority: Priority.high,
   );
 
-  /// Initialize the plugin (idempotent).
+  /// На Linux уведомление живёт в демоне рабочего стола, поэтому важность и
+  /// категорию задаём явно: с `low` его сворачивают в «Не беспокоить».
+  static const LinuxNotificationDetails _linuxDetails =
+      LinuxNotificationDetails(
+    urgency: LinuxNotificationUrgency.normal,
+    category: LinuxNotificationCategory.im,
+    defaultActionName: 'Открыть',
+  );
+
+  static const NotificationDetails _details = NotificationDetails(
+    android: _androidDetails,
+    iOS: DarwinNotificationDetails(),
+    macOS: DarwinNotificationDetails(),
+    linux: _linuxDetails,
+  );
+
+  /// Initialize the plugin (idempotent). Safe to call from `build`.
   Future<void> init() async {
     if (_initialized) return;
     if (!_supported) {
@@ -40,7 +60,12 @@ class NotificationService {
       settings: const InitializationSettings(
         android: AndroidInitializationSettings('@mipmap/ic_launcher'),
         iOS: DarwinInitializationSettings(),
+        macOS: DarwinInitializationSettings(),
+        linux: LinuxInitializationSettings(defaultActionName: 'Открыть'),
       ),
+      onDidReceiveNotificationResponse: (response) {
+        onTap?.call(response.payload);
+      },
     );
     _initialized = true;
   }
@@ -60,6 +85,13 @@ class NotificationService {
               alert: true, badge: true, sound: true) ??
           false;
     }
+    final macos = _plugin.resolvePlatformSpecificImplementation<
+        MacOSFlutterLocalNotificationsPlugin>();
+    if (macos != null) {
+      return await macos.requestPermissions(
+              alert: true, badge: true, sound: true) ??
+          false;
+    }
     return true; // Desktop and other platforms: no runtime permission.
   }
 
@@ -74,18 +106,21 @@ class NotificationService {
     return true;
   }
 
-  /// Show a local notification.
-  Future<void> show(int id, String title, String body) async {
+  /// Show a local notification. [payload] is handed back to [onTap].
+  Future<void> show(
+    int id,
+    String title,
+    String body, {
+    String? payload,
+  }) async {
     await init();
     if (!_supported) return;
     await _plugin.show(
       id: id,
       title: title,
       body: body,
-      notificationDetails: const NotificationDetails(
-        android: _androidDetails,
-        iOS: DarwinNotificationDetails(),
-      ),
+      payload: payload,
+      notificationDetails: _details,
     );
   }
 }

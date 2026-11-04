@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:uniflow/core/theme/motion.dart';
-import 'package:uniflow/core/theme/shapes.dart';
+import 'package:uniflow/core/theme/typography.dart';
 
 /// Один пункт нижнего меню.
 class AppNavDestination {
@@ -123,17 +123,20 @@ class _NavItemState extends State<_NavItem>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    // M3E: активная подпись — secondary, не onSurface.
-    final activeColor = colorScheme.secondary;
+    // M3E: активный пункт заливается акцентом. `secondaryContainer` давал
+    // бледный пастельный овал, который спорил с яркими точками интерфейса.
+    final activeColor = colorScheme.primary;
 
     return Semantics(
       button: true,
       selected: widget.selected,
       label: widget.destination.label,
-      child: InkWell(
+      // Тап ловит весь пункт (овал + подпись), а всплеск рисуется только
+      // внутри овала: InkWell живёт внутри Material овала и обрезается его
+      // StadiumBorder, поэтому подсветка не заливает весь блок меню.
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: widget.onTap,
-        borderRadius: AppShapes.circular(AppShapes.large),
-        splashFactory: InkSparkle.splashFactory,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.end,
           mainAxisSize: MainAxisSize.min,
@@ -145,28 +148,37 @@ class _NavItemState extends State<_NavItem>
                 return SizedBox(
                   height: AppNavBar._indicatorHeight,
                   child: Center(
-                    child: Container(
-                      // В покое индикатор уже 56dp: пружина раскрывает его
-                      // из сжатого состояния, а не «наращивает» с нуля.
-                      width: AppNavBar._indicatorWidth * (0.55 + 0.45 * t),
-                      height: AppNavBar._indicatorHeight,
-                      decoration: BoxDecoration(
-                        color: colorScheme.secondaryContainer
-                            .withValues(alpha: t.clamp(0.0, 1.0)),
-                        // CornerFull: радиус = половине высоты индикатора.
-                        borderRadius: AppShapes.circular(
-                          AppNavBar._indicatorHeight / 2,
-                        ),
+                    child: Material(
+                      key: ValueKey('nav-indicator-${widget.destination.label}'),
+                      color: Color.lerp(
+                        colorScheme.primary.withValues(alpha: 0),
+                        colorScheme.primary,
+                        t.clamp(0.0, 1.0),
                       ),
-                      child: Icon(
-                        widget.selected
-                            ? widget.destination.selectedIcon
-                            : widget.destination.icon,
-                        size: 24,
-                        color: Color.lerp(
-                          colorScheme.onSurfaceVariant,
-                          colorScheme.onSecondaryContainer,
-                          t.clamp(0.0, 1.0),
+                      shape: const StadiumBorder(),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        // Навигацию делает тот же колбэк: раньше здесь стоял
+                        // пустой `onTap`, и он выигрывал арену у внешнего
+                        // GestureDetector — пункт подсвечивался, но не открывался.
+                        onTap: widget.onTap,
+                        splashFactory: InkSparkle.splashFactory,
+                        child: SizedBox(
+                          // В покое индикатор уже 56dp: пружина раскрывает
+                          // его из сжатого состояния, а не растит с нуля.
+                          width: AppNavBar._indicatorWidth * (0.55 + 0.45 * t),
+                          height: AppNavBar._indicatorHeight,
+                          child: Icon(
+                            widget.selected
+                                ? widget.destination.selectedIcon
+                                : widget.destination.icon,
+                            size: 24,
+                            color: Color.lerp(
+                              colorScheme.onSurfaceVariant,
+                              colorScheme.onPrimary,
+                              t.clamp(0.0, 1.0),
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -179,10 +191,16 @@ class _NavItemState extends State<_NavItem>
               widget.destination.label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.labelMedium?.copyWith(
-                fontWeight: widget.selected ? FontWeight.w700 : FontWeight.w500,
-                color: widget.selected ? activeColor : colorScheme.onSurfaceVariant,
-              ),
+              // Выбранный пункт получает emphasized-начертание: подпись
+              // должна читаться как состояние, а не как тот же текст другим
+              // цветом.
+              style: widget.selected
+                  ? AppTypography.emphasizedLabelMedium(
+                      theme.textTheme.labelMedium!.copyWith(color: activeColor),
+                    )
+                  : theme.textTheme.labelMedium!.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
             ),
           ],
         ),

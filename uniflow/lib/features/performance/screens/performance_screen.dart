@@ -4,6 +4,7 @@ import 'package:gap/gap.dart';
 import 'package:uniflow/core/theme/spacing.dart';
 import 'package:uniflow/core/theme/typography.dart';
 import 'package:uniflow/app.dart';
+import 'package:uniflow/core/widgets/refresh_confirmation.dart';
 import 'package:uniflow/core/widgets/update_feedback.dart';
 import 'package:uniflow/features/performance/providers/performance_provider.dart';
 import 'package:uniflow/features/performance/widgets/marks_table.dart';
@@ -30,6 +31,14 @@ class PerformanceScreen extends ConsumerWidget {
             IconButton(
               icon: const Icon(Icons.refresh),
               onPressed: () async {
+                // Как и в расписании: сначала подтверждение, потом запрос.
+                final confirmed = await confirmRefresh(
+                  context,
+                  title: 'Обновить оценки?',
+                  body: 'Данные будут запрошены заново. Сохранённые оценки '
+                      'останутся, если сеть недоступна.',
+                );
+                if (!confirmed || !context.mounted) return;
                 final result =
                     await ref.read(performanceProvider.notifier).loadMarks();
                 if (!context.mounted) return;

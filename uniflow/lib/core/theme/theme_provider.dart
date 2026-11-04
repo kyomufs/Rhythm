@@ -32,6 +32,11 @@ class AppSettingsNotifier extends StateNotifier<AppSettings> {
     _save();
   }
 
+  void updateBackgroundCheckMinutes(int minutes) {
+    state = state.copyWith(backgroundCheckMinutes: minutes);
+    _save();
+  }
+
   void reset() {
     state = const AppSettings();
     _save();

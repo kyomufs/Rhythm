@@ -5,6 +5,7 @@ import 'package:uniflow/core/models/schedule.dart';
 import 'package:uniflow/core/providers/clock_provider.dart';
 import 'package:uniflow/core/theme/app_theme.dart';
 import 'package:uniflow/core/theme/shapes.dart';
+import 'package:uniflow/shared/widgets/press_scale.dart';
 
 /// Lesson tile widget for displaying a single lesson.
 ///
@@ -56,9 +57,9 @@ class LessonTile extends ConsumerWidget {
         startAt.month == now.month &&
         startAt.day == now.day;
 
-    return InkWell(
+    return PressScale(
       onTap: onTap,
-      borderRadius: AppShapes.circular(AppShapes.large),
+      borderRadius: AppShapes.circular(AppShapes.extraLarge - 4),
       child: Container(
         padding: EdgeInsets.symmetric(
           horizontal: isCompact ? 12 : 16,
@@ -66,9 +67,9 @@ class LessonTile extends ConsumerWidget {
         ),
         decoration: isOngoing
             ? BoxDecoration(
-                color: colorScheme.primary.withValues(alpha: 0.06),
+                color: colorScheme.primary.withValues(alpha: 0.07),
                 border: Border.all(color: colorScheme.primary, width: 1.5),
-                borderRadius: AppShapes.circular(AppShapes.large),
+                borderRadius: AppShapes.circular(AppShapes.extraLarge - 4),
               )
             : null,
         child: IntrinsicHeight(

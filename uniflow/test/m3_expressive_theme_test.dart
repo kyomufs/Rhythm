@@ -61,14 +61,35 @@ void main() {
           .first);
       expect(content.height, 64);
 
-      final indicator = tester.getSize(find
-          .ancestor(
-            of: find.byIcon(Icons.calendar_today),
-            matching: find.byType(Container),
-          )
-          .first);
+      // Индикатор — Material со StadiumBorder, а не Container: важно, что
+      // при выбранном пункте он занимает ровно 56×32, а не как он нарисован.
+      final indicator =
+          tester.getSize(find.byKey(const ValueKey('nav-indicator-Расписание')));
       expect(indicator.width, closeTo(56, 0.5));
       expect(indicator.height, 32);
+    });
+
+    testWidgets('тап по иконке и по подписи переключает пункт', (tester) async {
+      final tapped = <int>[];
+      await tester.pumpWidget(host(
+        AppNavBar(
+          destinations: destinations,
+          selectedIndex: 0,
+          onSelected: tapped.add,
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      // Иконка лежит внутри овала с InkWell: раньше пустой колбэк внутри
+      // InkWell забирал тап, и пункт только подсвечивался.
+      await tester.tap(find.byIcon(Icons.person_outline));
+      await tester.pumpAndSettle();
+      expect(tapped, [1]);
+
+      // Подпись вне овала — её ловит внешний жест всей ячейки.
+      await tester.tap(find.text('Расписание'));
+      await tester.pumpAndSettle();
+      expect(tapped, [1, 0]);
     });
   });
 

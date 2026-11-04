@@ -5,14 +5,17 @@ import 'package:gap/gap.dart';
 import 'package:uniflow/app.dart';
 import 'package:uniflow/core/demo/demo_schedule.dart';
 import 'package:uniflow/core/models/schedule.dart';
+import 'package:uniflow/core/services/lesson_group_resolver.dart';
 import 'package:uniflow/core/services/schedule_service.dart';
-import 'package:uniflow/core/theme/shapes.dart';
+import 'package:uniflow/core/theme/typography.dart';
+import 'package:uniflow/core/widgets/refresh_confirmation.dart';
 import 'package:uniflow/core/widgets/update_feedback.dart';
 import 'package:uniflow/features/schedule/providers/schedule_provider.dart';
 import 'package:uniflow/features/schedule/screens/schedule_changes_screen.dart';
 import 'package:uniflow/features/schedule/screens/schedule_preview_screen.dart';
 import 'package:uniflow/features/schedule/widgets/day_schedule.dart';
 import 'package:uniflow/features/schedule/widgets/lesson_detail_sheet.dart';
+import 'package:uniflow/features/schedule/widgets/week_navigator.dart';
 import 'package:uniflow/shared/widgets/empty_state.dart';
 import 'package:uniflow/shared/widgets/expressive_loading_indicator.dart';
 import 'package:uniflow/shared/widgets/loading_indicator.dart';
@@ -63,6 +66,80 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
     return _dayKeys.putIfAbsent(key, () => GlobalKey());
   }
 
+  /// Прогрев групп пар текущей недели.
+  ///
+  /// Полный список групп пары API отдаёт только в ответе по аудитории,
+  /// поэтому в момент открытия карточки его ещё нет и блок «Группы»
+  /// появлялся с задержкой. Тянем заранее: сначала расписания аудиторий
+  /// (их заведомо меньше, чем пар, — одна аудитория раскрывает все свои
+  /// пары), по три параллельно, затем раздаём готовые значения провайдерам.
+  bool _warmingGroups = false;
+  bool _warmQueued = false;
+
+  Future<void> _warmLessonGroups(
+    List<ScheduleItem> items,
+    DateTime weekStart,
+  ) async {
+    if (_warmingGroups) {
+      // Расписание сменилось во время прогрева — добираем новое после.
+      _warmQueued = true;
+      return;
+    }
+    _warmingGroups = true;
+    try {
+      await _warmPass(items, weekStart);
+      while (_warmQueued && mounted) {
+        _warmQueued = false;
+        await _warmPass(items, weekStart);
+      }
+    } finally {
+      _warmingGroups = false;
+    }
+  }
+
+  Future<void> _warmPass(List<ScheduleItem> items, DateTime weekStart) async {
+    final weekEnd = weekStart.add(const Duration(days: 7));
+    final keys = <(String, String, String, String)>[];
+    final seen = <String>{};
+    for (final item in items) {
+      if (item.groups.length > 1 || item.classroom.isEmpty) continue;
+      DateTime date;
+      try {
+        date = item.parsedDate;
+      } catch (_) {
+        continue;
+      }
+      if (date.isBefore(weekStart) || !date.isBefore(weekEnd)) continue;
+      final key = '${item.date}|${item.time}|${item.subject}|'
+          '${item.classroom}';
+      if (!seen.add(key)) continue;
+      keys.add((item.date, item.time, item.subject, item.classroom));
+      if (keys.length >= 24) break;
+    }
+    if (keys.isEmpty) return;
+
+    final resolver = ref.read(lessonGroupResolverProvider);
+    final rooms = <String>{for (final k in keys) k.$4}.toList();
+    const parallel = 3;
+    for (var i = 0; i < rooms.length; i += parallel) {
+      if (!mounted) return;
+      await Future.wait([
+        for (final room in rooms.skip(i).take(parallel)) resolver.prefetch(room),
+      ]);
+    }
+
+    // Сеть уже отработала: провайдеры получают значения из кэша аудитории.
+    for (final k in keys) {
+      if (!mounted) return;
+      ref.read(lessonGroupsProvider((
+        date: k.$1,
+        time: k.$2,
+        subject: k.$3,
+        classroom: k.$4,
+      )));
+    }
+  }
+
   @override
   void dispose() {
     _scrollController.dispose();
@@ -109,6 +186,12 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
       if (next.highlightedDate != null &&
           next.highlightedDate != prev?.highlightedDate) {
         _scrollToDay(next.highlightedDate!, onDone: (_) {});
+      }
+      // Новое расписание — сразу прогреваем группы пар текущей недели,
+      // чтобы расширенная карточка открывалась уже с полным списком.
+      if (!next.isDemo &&
+          !identical(next.schedule.items, prev?.schedule.items)) {
+        _warmLessonGroups(next.schedule.items, next.currentWeekStart);
       }
     });
 
@@ -251,6 +334,8 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
               builder: (_) => const ScheduleChangesScreen()),
         );
       case _ScheduleAction.refresh:
+        final confirmed = await _confirmRefresh(context);
+        if (!confirmed || !context.mounted) return;
         final result =
             await ref.read(scheduleScreenProvider.notifier).refresh();
         if (!context.mounted) return;
@@ -293,8 +378,9 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
 
     return Column(
       children: [
-        _WeekNavigatorBar(
-          state: state,
+        WeekNavigatorBar(
+          weekInfo: state.weekInfo,
+          isCurrentWeek: state.isCurrentWeek,
           onNextWeek: () =>
               ref.read(scheduleScreenProvider.notifier).goToNextWeek(),
           onPrevWeek: () =>
@@ -415,35 +501,14 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
     showLessonDetailSheet(context, lesson);
   }
 
-  /// Подтверждение обновления по жесту вниз.
-  Future<bool> _confirmRefresh(BuildContext context) async {
-    final theme = Theme.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        icon: const Icon(Icons.refresh),
-        title: const Text('Обновить расписание?'),
-        content: const Text(
-          'Данные будут запрошены заново. Сохранённое расписание '
+  /// Подтверждение обновления: и для кнопки в шапке, и для жеста вниз.
+  Future<bool> _confirmRefresh(BuildContext context) {
+    return confirmRefresh(
+      context,
+      title: 'Обновить расписание?',
+      body: 'Данные будут запрошены заново. Сохранённое расписание '
           'останется, если сеть недоступна.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Отмена'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text(
-              'Обновить',
-              style: theme.textTheme.labelLarge
-                  ?.copyWith(fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
-      ),
     );
-    return confirmed ?? false;
   }
 
   Future<void> _openCalendar(BuildContext context, WidgetRef ref) async {
@@ -507,18 +572,27 @@ class _ScheduleHeader extends ConsumerWidget {
             group,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w600,
+            style: AppTypography.emphasizedTitleLarge(
+              theme.textTheme.titleLarge!,
             ),
           ),
         ),
         const Gap(2),
-        IconButton(
-          onPressed: () => _showFavoritesSheet(context),
-          icon: const Icon(Icons.star_outline),
-          iconSize: 22,
-          visualDensity: VisualDensity.compact,
-          tooltip: 'Избранные группы',
+        // Тональный кружок с залитой звездой: обводка `star_outline` на 22dp
+        // смазывается в кашу, а залитая форма читается и как «избранное»,
+        // и как кнопка.
+        Material(
+          color: colorScheme.primaryContainer.withValues(alpha: 0.7),
+          shape: const CircleBorder(),
+          clipBehavior: Clip.antiAlias,
+          child: IconButton(
+            onPressed: () => _showFavoritesSheet(context),
+            icon: const Icon(Icons.star_rounded),
+            iconSize: 20,
+            color: colorScheme.primary,
+            visualDensity: VisualDensity.compact,
+            tooltip: 'Избранные группы',
+          ),
         ),
       ],
     );
@@ -561,7 +635,7 @@ class _FavoritesSheet extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(24, 8, 24, 4),
               child: Row(
                 children: [
-                  Icon(Icons.star, size: 20, color: colorScheme.primary),
+                  Icon(Icons.star_rounded, size: 20, color: colorScheme.primary),
                   const Gap(8),
                   Text('Избранные группы', style: theme.textTheme.titleLarge),
                 ],
@@ -618,7 +692,7 @@ class _FavoritesSheet extends ConsumerWidget {
                         onPressed: () => ref
                             .read(scheduleScreenProvider.notifier)
                             .removeFavoriteGroup(fav.groupNumber),
-                        icon: const Icon(Icons.star),
+                        icon: const Icon(Icons.star_rounded),
                         color: colorScheme.primary,
                         tooltip: 'Убрать из избранного',
                       ),
@@ -644,168 +718,6 @@ class _FavoritesSheet extends ConsumerWidget {
   }
 }
 
-// ============================================================
-// Неделя: стрелки отдельно, карточка недели отдельно
-// ============================================================
-class _WeekNavigatorBar extends StatelessWidget {
-  final ScheduleScreenState state;
-  final VoidCallback onNextWeek;
-  final VoidCallback onPrevWeek;
-  final VoidCallback onOpenCalendar;
-
-  const _WeekNavigatorBar({
-    required this.state,
-    required this.onNextWeek,
-    required this.onPrevWeek,
-    required this.onOpenCalendar,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final weekInfo = state.weekInfo;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-      child: Row(
-        children: [
-          _WeekArrow(
-            icon: Icons.chevron_left,
-            tooltip: 'Предыдущая неделя',
-            onTap: onPrevWeek,
-          ),
-          const Gap(8),
-          Expanded(
-            child: Material(
-              color: state.isCurrentWeek
-                  ? colorScheme.primaryContainer
-                  : colorScheme.surfaceContainerHigh,
-              borderRadius: AppShapes.circular(AppShapes.largeIncreased),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                onTap: onOpenCalendar,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          // На 320dp «Неделя 46» + чип не влезают: текст
-                          // сжимается, чип остаётся целиком.
-                          Flexible(
-                            child: Text(
-                              'Неделя ${weekInfo.weekNumber}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: state.isCurrentWeek
-                                    ? colorScheme.onPrimaryContainer
-                                    : colorScheme.onSurface,
-                              ),
-                            ),
-                          ),
-                          const Gap(6),
-                          _ParityChip(
-                            isEven: weekInfo.isEven,
-                            onContainer: state.isCurrentWeek,
-                          ),
-                        ],
-                      ),
-                      const Gap(2),
-                      Text(
-                        weekInfo.dateRangeShort,
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: state.isCurrentWeek
-                              ? colorScheme.onPrimaryContainer
-                                  .withValues(alpha: 0.8)
-                              : colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const Gap(8),
-          _WeekArrow(
-            icon: Icons.chevron_right,
-            tooltip: 'Следующая неделя',
-            onTap: onNextWeek,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Стрелки живут отдельно от карточки недели: своя скруглённая кнопка на
-/// каждую, поэтому промахнуться мимо нужной недели сложнее.
-class _WeekArrow extends StatelessWidget {
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
-
-  const _WeekArrow({
-    required this.icon,
-    required this.tooltip,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Material(
-      color: colorScheme.surfaceContainerHighest,
-      shape: const CircleBorder(),
-      clipBehavior: Clip.antiAlias,
-      child: IconButton(
-        onPressed: onTap,
-        icon: Icon(icon),
-        tooltip: tooltip,
-        visualDensity: VisualDensity.compact,
-        color: colorScheme.onSurfaceVariant,
-      ),
-    );
-  }
-}
-
-class _ParityChip extends StatelessWidget {
-  final bool isEven;
-  final bool onContainer;
-
-  const _ParityChip({required this.isEven, required this.onContainer});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final background = onContainer
-        ? colorScheme.onPrimaryContainer.withValues(alpha: 0.12)
-        : colorScheme.secondaryContainer;
-    final foreground = onContainer
-        ? colorScheme.onPrimaryContainer
-        : colorScheme.onSecondaryContainer;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: AppShapes.circular(AppShapes.small),
-      ),
-      child: Text(
-        isEven ? 'чётная' : 'нечётная',
-        style: theme.textTheme.labelSmall?.copyWith(
-          color: foreground,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-}
 // ============================================================
 // Search Bottom Sheet — preview + favorite toggle
 // ============================================================
@@ -926,8 +838,8 @@ class _SearchBottomSheetState extends ConsumerState<_SearchBottomSheet> {
                                       IconButton(
                                         icon: Icon(
                                           isFav
-                                              ? Icons.star
-                                              : Icons.star_border,
+                                              ? Icons.star_rounded
+                                              : Icons.star_outline_rounded,
                                           size: 20,
                                         ),
                                         color: isFav

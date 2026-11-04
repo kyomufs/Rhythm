@@ -3,6 +3,7 @@ import 'package:gap/gap.dart';
 import 'package:intl/intl.dart';
 import 'package:uniflow/core/models/schedule.dart';
 import 'package:uniflow/core/theme/shapes.dart';
+import 'package:uniflow/core/theme/typography.dart';
 import 'package:uniflow/features/schedule/widgets/lesson_tile.dart';
 
 /// Day schedule widget: ONE card per day (MD3).
@@ -34,7 +35,6 @@ class DaySchedule extends StatelessWidget {
 
     // Format date
     final dayName = DateFormat.EEEE('ru').format(date);
-    final dateStr = DateFormat('d MMMM', 'ru').format(date);
 
     // Sort lessons by time
     final sortedLessons = List<ScheduleItem>.from(lessons)
@@ -46,129 +46,92 @@ class DaySchedule extends StatelessWidget {
       elevation: 0,
       color: colorScheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
-        borderRadius: AppShapes.circular(AppShapes.largeIncreased),
+        borderRadius: AppShapes.circular(AppShapes.extraLarge),
         side: BorderSide(
           color: isHighlighted
               ? colorScheme.primary
-              : colorScheme.outlineVariant.withValues(alpha: 0.4),
+              : colorScheme.outlineVariant.withValues(alpha: 0.35),
           width: isHighlighted ? 2 : 1,
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // ── Day header (same card) ──
+          // ── Шапка дня ──
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.fromLTRB(12, 10, 14, 10),
             decoration: BoxDecoration(
               color: isHighlighted
                   ? colorScheme.primaryContainer.withValues(alpha: 0.55)
                   : isToday
                       ? colorScheme.primaryContainer
-                      : colorScheme.surfaceContainer,
-              border: Border(
-                bottom: BorderSide(
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.4),
-                ),
-              ),
+                      : colorScheme.surfaceContainerHigh,
             ),
             child: Row(
               children: [
-                // Day number pill
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: isToday
-                        ? colorScheme.primary
-                        : colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Center(
-                    child: Text(
-                      DateFormat('d').format(date),
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: isToday
-                            ? colorScheme.onPrimary
-                            : colorScheme.onSurface,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
+                _DateBadge(date: date, isToday: isToday),
                 const Gap(12),
-                // Day info — день недели и дата в одну строку: две строки
-                // в шапке карточки съедали высоту без пользы.
                 Expanded(
-                  child: Text.rich(
-                    TextSpan(children: [
-                      TextSpan(
-                        text: _capitalize(title ?? dayName),
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          color: isToday || isHighlighted
-                              ? colorScheme.onPrimaryContainer
-                              : colorScheme.onSurface,
-                          fontWeight: FontWeight.w700,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _capitalize(title ?? dayName),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.emphasizedLabelLarge(
+                          theme.textTheme.labelLarge!.copyWith(
+                            color: isToday || isHighlighted
+                                ? colorScheme.onPrimaryContainer
+                                : colorScheme.onSurface,
+                          ),
                         ),
                       ),
-                      TextSpan(
-                        text: '  $dateStr',
-                        style: theme.textTheme.titleSmall?.copyWith(
+                      const Gap(2),
+                      Text(
+                        sortedLessons.isEmpty
+                            ? 'Нет пар'
+                            : '${sortedLessons.length} '
+                                '${_lessonsWord(sortedLessons.length)}',
+                        style: theme.textTheme.labelMedium?.copyWith(
                           color: isToday || isHighlighted
                               ? colorScheme.onPrimaryContainer
-                                  .withValues(alpha: 0.8)
+                                  .withValues(alpha: 0.75)
                               : colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w400,
                         ),
                       ),
-                    ]),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    ],
                   ),
                 ),
-                // Lesson count badge
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: isToday || isHighlighted
-                        ? colorScheme.onPrimary.withValues(alpha: 0.14)
-                        : colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    '${lessons.length} пар',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: isToday || isHighlighted
-                          ? colorScheme.onPrimaryContainer
-                          : colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
+                if (isToday)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary,
+                      borderRadius:
+                          AppShapes.circular(AppShapes.extraLargeIncreased),
+                    ),
+                    child: Text(
+                      'Сегодня',
+                      style: AppTypography.emphasizedLabelSmall(
+                        theme.textTheme.labelSmall!
+                            .copyWith(color: colorScheme.onPrimary),
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
           ),
 
-          // ── Lessons inside the same card ──
-          if (sortedLessons.isEmpty)
+          // ── Пары внутри той же карточки ──
+          // Внутренний отступ 4: радиус пары = радиус дня − отступ
+          // (28 − 4 = 24), поэтому скругление первой и последней пары
+          // повторяет скругление карточки, а не спорит с ним.
+          if (sortedLessons.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              child: Center(
-                child: Text(
-                  'Нет занятий',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-                  ),
-                ),
-              ),
-            )
-          else
-            // Внутренний отступ 4: радиус пары = радиус дня − отступ
-            // (20 − 4 = 16), поэтому скругление первой и последней пары
-            // повторяет скругление карточки, а не спорит с ним.
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
+              padding: const EdgeInsets.all(4),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -196,6 +159,64 @@ class DaySchedule extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Дата в шапке дня: число крупно, месяц под ним мелким капсом.
+class _DateBadge extends StatelessWidget {
+  const _DateBadge({required this.date, required this.isToday});
+
+  final DateTime date;
+  final bool isToday;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final foreground =
+        isToday ? colorScheme.onPrimary : colorScheme.onSurfaceVariant;
+
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        color: isToday
+            ? colorScheme.primary
+            : colorScheme.surfaceContainerHighest,
+        borderRadius: AppShapes.circular(AppShapes.large),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            DateFormat('d').format(date),
+            style: AppTypography.emphasizedTitleMedium(
+              theme.textTheme.titleMedium!.copyWith(
+                color: isToday ? colorScheme.onPrimary : colorScheme.onSurface,
+                height: 1.05,
+              ),
+            ),
+          ),
+          Text(
+            DateFormat('MMM', 'ru').format(date).replaceAll('.', ''),
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: foreground,
+              fontSize: 9,
+              height: 1.1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// «1 пара», «2 пары», «5 пар».
+String _lessonsWord(int count) {
+  final mod10 = count % 10;
+  final mod100 = count % 100;
+  if (mod10 == 1 && mod100 != 11) return 'пара';
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'пары';
+  return 'пар';
 }
 
 /// Week schedule widget

@@ -143,10 +143,14 @@ class FakeConnectivity implements ConnectivityService {
 }
 
 class FakeNotifications implements NotificationService {
+  @override
+  void Function(String? payload)? onTap;
+
   final List<int> shownIds = [];
 
   @override
-  Future<void> show(int id, String title, String body) async {
+  Future<void> show(int id, String title, String body,
+      {String? payload}) async {
     shownIds.add(id);
   }
 

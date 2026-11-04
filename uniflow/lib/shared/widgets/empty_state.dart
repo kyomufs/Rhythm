@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:uniflow/core/theme/spacing.dart';
+import 'package:uniflow/core/theme/typography.dart';
 
 /// Пустое состояние экрана: иконка, заголовок, пояснение и одно действие.
 ///
@@ -30,27 +31,40 @@ class EmptyState extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              size: 80,
-              color: colorScheme.primary.withValues(alpha: 0.3),
+            // M3E: иконка живёт в тональном «пятне», а не в пустоте —
+            // экран без данных не выглядит сломанным.
+            Container(
+              width: 112,
+              height: 112,
+              decoration: BoxDecoration(
+                color: colorScheme.primaryContainer,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 52,
+                color: colorScheme.onPrimaryContainer,
+              ),
             ),
             const SizedBox(height: AppSpacing.lg),
             Text(
               title,
               textAlign: TextAlign.center,
-              style: theme.textTheme.headlineSmall
-                  ?.copyWith(fontWeight: FontWeight.w600),
+              style: AppTypography.emphasizedHeadlineSmall(
+                theme.textTheme.headlineSmall!,
+              ),
             ),
-            const SizedBox(height: AppSpacing.xs),
+            const SizedBox(height: AppSpacing.sm),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(color: colorScheme.onSurfaceVariant),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                height: 1.35,
+              ),
             ),
             if (action != null) ...[
-              const SizedBox(height: AppSpacing.xl),
+              const SizedBox(height: AppSpacing.lg),
               action!,
             ],
           ],

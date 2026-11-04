@@ -112,14 +112,17 @@ class MotionScheme {
 /// Контроллер обязан быть `unbounded`: ограниченный срезает перелёт, а
 /// перелёт — весь смысл spatial-пружины.
 extension SpringDrive on AnimationController {
+  /// [from] по умолчанию — текущее значение контроллера. Иначе пружина
+  /// всегда стартует из нуля: индикатор переключения сначала прыгает в
+  /// начало шкалы и только потом едет к цели.
   TickerFuture animateWithSpring(
     SpringDescription spring, {
-    double from = 0,
+    double? from,
     double to = 1,
     double velocity = 0,
   }) {
     return animateWith(
-      SpringSimulation(spring, from, to, velocity),
+      SpringSimulation(spring, from ?? value, to, velocity),
     );
   }
 }

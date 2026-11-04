@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uniflow/core/api/tulsu_api.dart';
 import 'package:uniflow/core/demo/demo_marks.dart';
@@ -71,11 +73,20 @@ class PerformanceNotifier extends StateNotifier<PerformanceState> {
   final UpdateCoordinator _updates;
   final bool _demo;
 
+  /// Автообновление при входе: завершается `true`, если оценки реально
+  /// подтянулись из API. По этому флагу оболочка показывает плашку без
+  /// действий пользователя.
+  final Completer<bool> _bootRefresh = Completer<bool>();
+  Future<bool> get bootRefresh => _bootRefresh.future;
+
   PerformanceNotifier(this._api, this._storage, this._updates,
       {bool demo = false})
       : _demo = demo,
         super(const PerformanceState()) {
-    loadMarks();
+    loadMarks().then(
+      (result) => _bootRefresh.complete(result.isSuccess && !_demo),
+      onError: (_) => _bootRefresh.complete(false),
+    );
   }
 
   /// Загружает оценки через единый путь обновления: проверка доступности API
@@ -85,7 +96,7 @@ class PerformanceNotifier extends StateNotifier<PerformanceState> {
     if (_demo) {
       state = state.copyWith(marks: buildDemoMarks(), clearError: true);
       _autoSelectSemester();
-      return const UpdateResult(UpdateOutcome.updated, 'Оценки обновлены');
+      return const UpdateResult(UpdateOutcome.updated, marksUpdatedText);
     }
 
     final studentId = _storage.getStudentId();
@@ -123,7 +134,7 @@ class PerformanceNotifier extends StateNotifier<PerformanceState> {
             studentId: studentId, group: group, marks: marks);
         state = state.copyWith(marks: marks, isLoading: false);
         _autoSelectSemester();
-        return const UpdateResult(UpdateOutcome.updated, 'Оценки обновлены');
+        return const UpdateResult(UpdateOutcome.updated, marksUpdatedText);
       } catch (e) {
         if (!mounted) {
           return const UpdateResult(

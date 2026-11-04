@@ -21,7 +21,29 @@ class LessonGroupResolver {
   final TulsuApiClient _api;
   final Map<String, List<ScheduleItem>> _rooms = {};
 
-  static const int _roomCacheLimit = 12;
+  static const int _roomCacheLimit = 24;
+
+  /// Группы пары из уже загруженного расписания аудитории.
+  ///
+  /// `null` — расписание этой аудитории ещё не запрашивали, `[]` — запросили,
+  /// но пары там нет. Карточка берёт значение синхронно на первом кадре,
+  /// поэтому прогретые пары открываются без мигания блока «Группы».
+  List<GroupInfo>? cachedGroups({
+    required String date,
+    required String time,
+    required String subject,
+    required String classroom,
+  }) {
+    if (classroom.isEmpty) return null;
+    final items = _rooms[classroom];
+    if (items == null) return null;
+    for (final item in items) {
+      if (item.date == date && item.time == time && item.subject == subject) {
+        return item.groups;
+      }
+    }
+    return const [];
+  }
 
   /// Группы пары; пустой список — добрать не удалось (нет аудитории, нет
   /// сети, пара не нашлась в расписании аудитории).
@@ -33,13 +55,28 @@ class LessonGroupResolver {
   }) async {
     if (classroom.isEmpty) return const [];
 
-    final items = await _roomSchedule(classroom);
-    for (final item in items) {
-      if (item.date == date && item.time == time && item.subject == subject) {
-        return item.groups;
-      }
-    }
-    return const [];
+    final cached = cachedGroups(
+      date: date,
+      time: time,
+      subject: subject,
+      classroom: classroom,
+    );
+    if (cached != null) return cached;
+
+    await _roomSchedule(classroom);
+    return cachedGroups(
+          date: date,
+          time: time,
+          subject: subject,
+          classroom: classroom,
+        ) ??
+        const [];
+  }
+
+  /// Тянет расписание аудитории в кэш (для фонового прогрева).
+  Future<void> prefetch(String classroom) async {
+    if (classroom.isEmpty) return;
+    await _roomSchedule(classroom);
   }
 
   Future<List<ScheduleItem>> _roomSchedule(String classroom) async {

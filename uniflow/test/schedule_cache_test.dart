@@ -115,6 +115,9 @@ class _OfflineConnectivity implements ConnectivityService {
 
 class _SilentNotifications implements NotificationService {
   @override
+  void Function(String? payload)? onTap;
+
+  @override
   Future<void> init() async {}
 
   @override
@@ -124,7 +127,8 @@ class _SilentNotifications implements NotificationService {
   Future<bool> areNotificationsEnabled() async => true;
 
   @override
-  Future<void> show(int id, String title, String body) async {}
+  Future<void> show(int id, String title, String body,
+      {String? payload}) async {}
 }
 
 Future<void> _flush() async {

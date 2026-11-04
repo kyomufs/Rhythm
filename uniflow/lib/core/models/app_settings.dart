@@ -30,12 +30,41 @@ class AppSettings {
   /// (live lesson countdown, sample change journal).
   final bool demoMode;
 
+  /// Период фоновой проверки расписания в минутах. 0 — проверка выключена.
+  final int backgroundCheckMinutes;
+
   const AppSettings({
     this.seedColorValue = 0xFF6750A4,
     this.themeMode = 'system',
     this.showGroupsInSchedule = true,
     this.demoMode = false,
+    this.backgroundCheckMinutes = defaultBackgroundCheckMinutes,
   });
+
+  /// 30 минут — компромисс: расписание меняется редко, а каждый опрос — это
+  /// полный запрос недели на группу.
+  static const int defaultBackgroundCheckMinutes = 30;
+
+  /// Допустимые периоды: подписи задают порядок в настройках.
+  static const List<int> backgroundCheckPresets = [0, 15, 30, 60, 180];
+
+  /// Подпись для периода. [minutes] вне пресетов показывается как есть.
+  static String backgroundCheckLabel(int minutes) {
+    switch (minutes) {
+      case 0:
+        return 'Выкл';
+      case 15:
+        return '15 мин';
+      case 30:
+        return '30 мин';
+      case 60:
+        return '1 час';
+      case 180:
+        return '3 часа';
+      default:
+        return '$minutes мин';
+    }
+  }
 
   Color get seedColor => Color(seedColorValue);
 
@@ -55,12 +84,15 @@ class AppSettings {
     String? themeMode,
     bool? showGroupsInSchedule,
     bool? demoMode,
+    int? backgroundCheckMinutes,
   }) {
     return AppSettings(
       seedColorValue: seedColorValue ?? this.seedColorValue,
       themeMode: themeMode ?? this.themeMode,
       showGroupsInSchedule: showGroupsInSchedule ?? this.showGroupsInSchedule,
       demoMode: demoMode ?? this.demoMode,
+      backgroundCheckMinutes:
+          backgroundCheckMinutes ?? this.backgroundCheckMinutes,
     );
   }
 
@@ -69,6 +101,7 @@ class AppSettings {
         'themeMode': themeMode,
         'showGroupsInSchedule': showGroupsInSchedule,
         'demoMode': demoMode,
+        'backgroundCheckMinutes': backgroundCheckMinutes,
       };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) {
@@ -77,6 +110,8 @@ class AppSettings {
       themeMode: json['themeMode'] as String? ?? 'system',
       showGroupsInSchedule: json['showGroupsInSchedule'] as bool? ?? true,
       demoMode: json['demoMode'] as bool? ?? false,
+      backgroundCheckMinutes: json['backgroundCheckMinutes'] as int? ??
+          defaultBackgroundCheckMinutes,
     );
   }
 }

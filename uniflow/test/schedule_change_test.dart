@@ -127,13 +127,19 @@ class FakeConnectivity implements ConnectivityService {
 }
 
 class FakeNotifications implements NotificationService {
+  @override
+  void Function(String? payload)? onTap;
+
   final List<int> shownIds = [];
   final List<String> titles = [];
+  final List<String?> payloads = [];
 
   @override
-  Future<void> show(int id, String title, String body) async {
+  Future<void> show(int id, String title, String body,
+      {String? payload}) async {
     shownIds.add(id);
     titles.add(title);
+    payloads.add(payload);
   }
 
   @override
@@ -228,10 +234,70 @@ void main() {
     expect(notifications.shownIds, [2],
         reason: 'schedule-change notification id is 2');
     expect(notifications.titles, ['Расписание изменилось']);
+    expect(notifications.payloads, [changesNotificationPayload],
+        reason: 'payload ведёт тап по уведомлению в журнал изменений');
     expect(notifier.state.schedule.items.single.subject, 'Геометрия',
         reason: 'fresh data must be shown immediately');
     expect(storage.fingerprint, isNot(equals('')),
         reason: 'baseline moves forward after the alert');
+  });
+
+  test('фоновая проверка ловит изменение и возвращает true', () async {
+    final storage = FakeStorage();
+    final notifications = FakeNotifications();
+    final service = FakeScheduleService([_item('Алгебра')]);
+    final connectivity = FakeConnectivity();
+    final notifier = ScheduleScreenNotifier(
+      service,
+      storage,
+      connectivity,
+      notifications,
+      UpdateCoordinator(connectivity),
+    );
+    await _flush();
+    expect(notifications.shownIds, isEmpty);
+
+    // Университет поменял пару, а приложение всё это время открыто.
+    service.data = [_item('Геометрия')];
+    final reported = await notifier.pollForChanges();
+
+    expect(reported, isTrue, reason: 'таймер сообщает об изменении');
+    expect(notifications.shownIds, [2]);
+    expect(notifications.payloads, [changesNotificationPayload]);
+  });
+
+  test('фоновая проверка молчит в демо-режиме и без группы', () async {
+    final storage = FakeStorage();
+    final notifications = FakeNotifications();
+    final connectivity = FakeConnectivity();
+    final service = FakeScheduleService([_item('Алгебра')]);
+
+    final demo = ScheduleScreenNotifier(
+      service,
+      storage,
+      connectivity,
+      notifications,
+      UpdateCoordinator(connectivity),
+      demo: true,
+    );
+    await _flush();
+
+    expect(await demo.pollForChanges(), isFalse);
+    expect(service.getScheduleCalls, 0,
+        reason: 'демо-расписание не запрашивается в фоне');
+
+    // Без выбранной группы опрашивать нечего.
+    storage.myGroupValue = '';
+    final noGroup = ScheduleScreenNotifier(
+      FakeScheduleService([_item('Алгебра')]),
+      storage,
+      connectivity,
+      notifications,
+      UpdateCoordinator(connectivity),
+    );
+    await _flush();
+    expect(await noGroup.pollForChanges(), isFalse);
+    expect(notifications.shownIds, isEmpty);
   });
 
   test('changed schedule marks modified, new and cancelled lessons', () async {
@@ -280,8 +346,7 @@ void main() {
     expect(notifications.shownIds, isEmpty);
   });
 
-  test('teacher-only change is reported as a field-level modification',
-      () async {
+  test('teacher-only change is reported as a field-level modification',      () async {
     final storage = FakeStorage();
     final notifications = FakeNotifications();
 
@@ -484,7 +549,7 @@ void main() {
     // настоящий путь, когда данные уже свежие.
     final result = await notifier.refresh();
     expect(result.outcome, UpdateOutcome.updated);
-    expect(result.message, 'Расписание обновлено');
+    expect(result.message, scheduleUpdatedText);
     expect(service.getScheduleCalls, 0);
     expect(notifier.state.changeRecords, isEmpty);
     expect(notifications.shownIds, isEmpty);
