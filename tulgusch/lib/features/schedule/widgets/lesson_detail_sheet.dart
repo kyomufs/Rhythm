@@ -48,10 +48,49 @@ class LessonDetailSheet extends ConsumerStatefulWidget {
 
 class _LessonDetailSheetState extends ConsumerState<LessonDetailSheet> {
   Timer? _resetCopied;
+
+  /// Свой контроллер: по нему видно, дошли ли до верха. Свернуть карточку
+  /// можно потянув вниз в любом месте, пока содержимое не прокручено.
+  final ScrollController _scroll = ScrollController();
+
+  Offset? _dragFrom;
+  bool _dismissArmed = false;
+
+  /// Порог сворачивания: короче — это обычный тап или мелкий скролл.
+  static const _dismissDistance = 72.0;
+
+  void _onPointerDown(PointerDownEvent event) {
+    _dragFrom = event.position;
+    _dismissArmed = !_scroll.hasClients || _scroll.offset <= 0.5;
+  }
+
+  void _onPointerMove(PointerMoveEvent event) {
+    final from = _dragFrom;
+    if (from == null || !_dismissArmed) return;
+    // Прокрученный текст листается как обычно: свернуть можно только с верха,
+    // иначе жест вниз в середине карточки закрывал бы её вместо скролла.
+    if (_scroll.hasClients && _scroll.offset > 0.5) {
+      _dismissArmed = false;
+      return;
+    }
+    final delta = event.position - from;
+    if (delta.dy < _dismissDistance || delta.dy < delta.dx.abs()) return;
+    _dismissArmed = false;
+    _dragFrom = null;
+    HapticFeedback.lightImpact();
+    Navigator.of(context).maybePop();
+  }
+
+  void _onPointerEnd(PointerEvent event) {
+    _dragFrom = null;
+    _dismissArmed = false;
+  }
+
   bool _copied = false;
 
   @override
   void dispose() {
+    _scroll.dispose();
     _resetCopied?.cancel();
     super.dispose();
   }
@@ -179,16 +218,21 @@ class _LessonDetailSheetState extends ConsumerState<LessonDetailSheet> {
     final hasTeacher = lesson.teacher.isNotEmpty;
 
     return _SheetReveal(
+      onPointerDown: _onPointerDown,
+      onPointerMove: _onPointerMove,
+      onPointerEnd: _onPointerEnd,
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxHeight: MediaQuery.sizeOf(context).height * 0.88,
         ),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+          controller: _scroll,
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const _SheetGrabber(),
               // ── Hero: тип пары, день и живой прогресс на одной поверхности.
               // Пока пара идёт, блок становится главным элементом экрана:
               // волна прогресса внутри hero-плашки. ──
@@ -490,7 +534,18 @@ class _LiveProgress extends ConsumerWidget {
 class _SheetReveal extends StatefulWidget {
   final Widget child;
 
-  const _SheetReveal({required this.child});
+  /// Жест вниз по содержимому: раскрытие слушает сам лист, а не только его
+  /// верхняя кромка — иначе до ручки приходится тянуться.
+  final void Function(PointerDownEvent)? onPointerDown;
+  final void Function(PointerMoveEvent)? onPointerMove;
+  final void Function(PointerEvent)? onPointerEnd;
+
+  const _SheetReveal({
+    required this.child,
+    this.onPointerDown,
+    this.onPointerMove,
+    this.onPointerEnd,
+  });
 
   @override
   State<_SheetReveal> createState() => _SheetRevealState();
@@ -526,21 +581,52 @@ class _SheetRevealState extends State<_SheetReveal>
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        final t = _controller.value;
-        // Прозрачность клампится: перелёт по альфе читается как мигание.
-        final opacity = t.clamp(0.0, 1.0);
-        return Opacity(
-          opacity: opacity,
-          child: Transform.translate(
-            offset: Offset(0, 16 * (1 - t)),
-            child: child,
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: widget.onPointerDown,
+      onPointerMove: widget.onPointerMove,
+      onPointerUp: widget.onPointerEnd,
+      onPointerCancel: widget.onPointerEnd,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          final t = _controller.value;
+          // Прозрачность клампится: перелёт по альфе читается как мигание.
+          final opacity = t.clamp(0.0, 1.0);
+          return Opacity(
+            opacity: opacity,
+            child: Transform.translate(
+              offset: Offset(0, 16 * (1 - t)),
+              child: child,
+            ),
+          );
+        },
+        child: widget.child,
+      ),
+    );
+  }
+}
+
+/// Маркер-«ручка» сверху листа: без него непонятно, что карточку можно
+/// утянуть вниз.
+class _SheetGrabber extends StatelessWidget {
+  const _SheetGrabber();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Center(
+        child: Container(
+          width: 32,
+          height: 4,
+          decoration: BoxDecoration(
+            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+            borderRadius: AppShapes.circular(AppShapes.extraSmall),
           ),
-        );
-      },
-      child: widget.child,
+        ),
+      ),
     );
   }
 }

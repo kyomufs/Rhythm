@@ -124,6 +124,25 @@ void main() {
     expect(tester.getRect(find.text('Дисциплина')).left, lessThan(before));
   });
 
+  testWidgets('заголовки переносятся, а не обрезаются многоточием',
+      (tester) async {
+    await tester.pumpWidget(_app([
+      _mark('Математический анализ', mark: '5', markTitle: 'Отлично'),
+    ]));
+    await tester.pumpAndSettle();
+
+    for (final title in ['Дисциплина', 'Преподаватель', 'Аттестация']) {
+      final text = tester.widget<Text>(find.text(title));
+      expect(text.maxLines, isNull,
+          reason: '«$title» должен переноситься, а не резаться строкой');
+      expect(text.overflow, isNull,
+          reason: 'у «$title» не должно быть ellipsis');
+    }
+    // Оценка в чипе тоже переносится: длинное значение не обрезается.
+    final mark = tester.widget<Text>(find.text('5'));
+    expect(mark.maxLines, isNull);
+  });
+
   testWidgets('масштаб меняется кнопками ± и сбрасывается', (tester) async {
     await tester.pumpWidget(_app([
       _mark('Математический анализ',

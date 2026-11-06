@@ -808,15 +808,36 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
     }
 
     return _updates.run(() async {
+      // Версия, которую пользователь видел до нажатия «Обновить»: свежие
+      // данные сверяются именно с ней, а не с самими собой.
+      final previousFingerprint = _storage.getScheduleFingerprint();
       // Bypass the local cache so the user actually gets fresh data.
       final note = await loadSchedule(group, forceRefresh: true);
-      // The user has just seen this data — use it as the new baseline.
       if (state.schedule.error == null && state.schedule.items.isNotEmpty) {
-        await _storage
-            .setScheduleFingerprint(_fingerprint(state.schedule.items));
-        // Fresh data reviewed → drop the session batch. The journal and
-        // the unseen flag are cleared only from the «Изменения» screen.
-        state = state.copyWith(clearChanges: true);
+        final items = state.schedule.items;
+        final newFingerprint = _fingerprint(items);
+        // The user has just seen this data — use it as the new baseline.
+        await _storage.setScheduleFingerprint(newFingerprint);
+        // Ручное обновление идёт тем же путём, что и фоновое: разница между
+        // старой копией и свежим ответом попадает в журнал «Изменения».
+        // Раньше отпечаток просто перезаписывался, и правки вуза, пришедшие
+        // между опросами, терялись молча.
+        final records = previousFingerprint == null ||
+                previousFingerprint == newFingerprint
+            ? const <ChangeRecord>[]
+            : _diffSchedule(previousFingerprint, items);
+        if (records.isEmpty) {
+          // Fresh data reviewed → drop the session batch. The journal and
+          // the unseen flag are cleared only from the «Изменения» screen.
+          state = state.copyWith(clearChanges: true);
+        } else {
+          state = state.copyWith(
+            changeRecords: records,
+            changeJournal: pruneJournal([...records, ...state.changeJournal]),
+            hasUnseenChanges: true,
+          );
+          await _persistJournal();
+        }
         // Снимки избранного и группы пар догружаются фоном: они не должны
         // задерживать уведомление об успехе.
         unawaited(prefetchFavorites());

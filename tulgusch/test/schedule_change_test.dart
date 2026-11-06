@@ -234,6 +234,42 @@ void main() {
         reason: 'baseline moves forward after the alert');
   });
 
+  test('ручное обновление сверяет старую копию и кладёт диффы в журнал',
+      () async {
+    final storage = FakeStorage();
+    final notifications = FakeNotifications();
+    final service = FakeScheduleService([_item('Алгебра')]);
+    final connectivity = FakeConnectivity();
+    final notifier = ScheduleScreenNotifier(
+      service,
+      storage,
+      connectivity,
+      notifications,
+      UpdateCoordinator(connectivity),
+    );
+    await _flush();
+
+    // Университет перенёс пару в другую аудиторию.
+    service.data = [_item('Алгебра', classroom: '102')];
+    final result = await notifier.refresh();
+
+    expect(result.outcome, UpdateOutcome.updated);
+    expect(notifier.state.changeNotes.values, contains('Аудитория: 101 → 102'),
+        reason: 'диффы ручного обновления идут в те же изменения');
+    expect(notifier.state.changeJournal, isNotEmpty);
+    expect(storage.changeLog, isNotEmpty,
+        reason: 'журнал сохраняется, чтобы пережить перезапуск');
+    expect(notifier.state.hasUnseenChanges, isTrue);
+    expect(notifications.shownIds, isEmpty,
+        reason: 'пользователь уже в приложении — уведомление не нужно');
+
+    // Повторное обновление без правок не плодит записи.
+    await notifier.refresh();
+    expect(notifier.state.changeJournal.length, 1);
+    expect(notifier.state.changeRecords, isEmpty,
+        reason: 'сессионная пачка сбрасывается, когда изменений нет');
+  });
+
   test('фоновая проверка ловит изменение и возвращает true', () async {
     final storage = FakeStorage();
     final notifications = FakeNotifications();

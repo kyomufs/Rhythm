@@ -285,13 +285,15 @@ class _HeaderRow extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    // Высота фиксирована: в Column с Expanded шапка получает бесконечную
-    // высоту, и stretch-строка внутри неё падает на раскладке.
-    return SizedBox(
-      height: 36 * zoom,
-      child: ColoredBox(
-        color: colorScheme.surfaceContainerHigh,
-        child: Row(
+    // Высота — минимум, а не константа: заголовок переносится по словам,
+    // и на узком столбце или крупном масштабе шапка растёт вместе с текстом.
+    // IntrinsicHeight нужен, потому что stretch-строка сама высоту не задаёт.
+    return ConstrainedBox(
+      constraints: BoxConstraints(minHeight: 36 * zoom),
+      child: IntrinsicHeight(
+        child: ColoredBox(
+          color: colorScheme.surfaceContainerHigh,
+          child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             for (var i = 0; i < columns.length; i++)
@@ -301,16 +303,18 @@ class _HeaderRow extends StatelessWidget {
                 child: Stack(
                   children: [
                     Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 8 * zoom,
-                        vertical: 8 * zoom,
+                      // Справа — место под захват ширины: перенесённый
+                      // заголовок не должен уезжать под линию.
+                      padding: EdgeInsets.only(
+                        left: 8 * zoom,
+                        right: (i < columns.length - 1 ? 16 : 8) * zoom,
+                        top: 8 * zoom,
+                        bottom: 8 * zoom,
                       ),
                       child: Align(
                         alignment: columns[i].col.alignment,
                         child: Text(
                           columns[i].title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                             fontWeight: FontWeight.w700,
@@ -336,6 +340,7 @@ class _HeaderRow extends StatelessWidget {
                 ),
               ),
           ],
+          ),
         ),
       ),
     );
@@ -473,7 +478,6 @@ class _TableRow extends StatelessWidget {
           ),
           child: Text(
             item.mark.isEmpty ? '—' : item.mark,
-            maxLines: 1,
             style: small?.copyWith(
               color: markColor,
               fontWeight: FontWeight.w700,

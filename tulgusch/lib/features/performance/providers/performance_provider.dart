@@ -42,9 +42,10 @@ class PerformanceState {
     if (selectedSemester == 0 && marks.isNotEmpty) {
       final terms = availableSemesters;
       if (terms.isNotEmpty) {
-        // 0 — «последний семестр», а не первый: по умолчанию студент
-        // открывает текущий семестр, а не самый старый.
-        return marks.where((m) => m.termNumber == terms.last).toList();
+        // 0 — «семестр по умолчанию»: это первый семестр в списке. Раньше
+        // открывался последний, и таблица стартовала с самого свежего
+        // семестра, хотя читают обычно с начала.
+        return marks.where((m) => m.termNumber == terms.first).toList();
       }
       return marks;
     }
@@ -198,7 +199,7 @@ class PerformanceNotifier extends StateNotifier<PerformanceState> {
 
   void _autoSelectSemester() {
     if (state.availableSemesters.isNotEmpty) {
-      state = state.copyWith(selectedSemester: state.availableSemesters.last);
+      state = state.copyWith(selectedSemester: state.availableSemesters.first);
     }
   }
 

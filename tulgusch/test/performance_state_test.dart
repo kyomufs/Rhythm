@@ -1,6 +1,6 @@
 // Поведение экрана успеваемости без сети и без данных: пустой ответ вуза
-// не должен стирать сохранённые оценки, а по умолчанию открывается
-// последний семестр, а не первый.
+// не должен стирать сохранённые оценки, а по умолчанию открывается первый
+// семестр — с него начинают читать таблицу.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tulgusch/app.dart';
 import 'package:tulgusch/core/api/schedule_api.dart';
@@ -133,9 +133,9 @@ void main() {
     expect(storage.cached!.single.discipline, 'Свежее');
   });
 
-  test('по умолчанию открыт последний семестр', () async {
+  test('по умолчанию открыт первый семестр', () async {
     final storage = _Storage(cached: [
-      _mark('Старый курс', term: '1'),
+      _mark('Первый курс', term: '1'),
       _mark('Текущий курс', term: '6'),
     ]);
     final api = _Api(const []);
@@ -143,8 +143,8 @@ void main() {
     final notifier = _notifier(api, storage);
     await _flush();
 
-    expect(notifier.state.selectedSemester, 6);
-    expect(notifier.state.semesterMarks.single.discipline, 'Текущий курс');
+    expect(notifier.state.selectedSemester, 1);
+    expect(notifier.state.semesterMarks.single.discipline, 'Первый курс');
   });
 
   test('переходы между вкладками не выходят за пределы оболочки', () {

@@ -518,6 +518,27 @@ void main() {
     });
   });
 
+  testWidgets('карточку пары можно свернуть жестом из середины',
+      (tester) async {
+    await tester.pumpWidget(_app(items: [
+      _item(subject: 'Физическая культура', date: _now),
+    ]));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(LessonTile).first);
+    await tester.pumpAndSettle();
+    expect(find.byType(LessonDetailSheet), findsOneWidget);
+
+    // Тянем вниз не за верхнюю кромку, а по середине карточки: содержимое
+    // не прокручено, поэтому жест сворачивает лист, а не листает его.
+    final sheet = find.byType(LessonDetailSheet);
+    await tester.drag(sheet, const Offset(0, 160));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LessonDetailSheet), findsNothing,
+        reason: 'лист закрывается протяжкой вниз в любом месте');
+  });
+
   testWidgets('кнопка обновления сначала спрашивает подтверждение',
       (tester) async {
     await tester.pumpWidget(_app(items: [
