@@ -1,6 +1,6 @@
 <div align="center">
 
-# UniFlow
+# Ритм
 
 **Cross-platform schedule companion for Tula State University students**
 
@@ -90,6 +90,40 @@ cd uniflow && flutter run
 ```bash
 flutter build apk --release     # build/app/outputs/flutter-apk/app-release.apk
 flutter build ios --release     # requires macOS + Xcode
+```
+
+### Ключ подписи Android
+
+Android принимает обновление только от того же ключа, которым подписан
+установленный APK. В релизном workflow ключ берётся из секретов репозитория;
+без него APK подписывается debug-сертификатом, который в каждом прогоне CI
+новый — и установка падает с «конфликтует с другим пакетом».
+
+Ключ создаётся один раз (пароль и alias — свои, дальше они же в секретах):
+
+```bash
+keytool -genkeypair -v -keystore upload-keystore.jks -storetype JKS \
+  -keyalg RSA -keysize 2048 -validity 10000 -alias uniflow
+base64 -w0 upload-keystore.jks > keystore.b64   # содержимое → в секрет
+```
+
+Секреты в **Settings → Secrets and variables → Actions**:
+
+| Секрет | Значение |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | вывод `base64 -w0 upload-keystore.jks` |
+| `ANDROID_KEYSTORE_PASSWORD` | пароль хранилища |
+| `ANDROID_KEY_ALIAS` | `uniflow` |
+| `ANDROID_KEY_PASSWORD` | пароль ключа |
+
+Локально те же четыре значения кладутся в `uniflow/android/key.properties`
+(файл в `.gitignore`):
+
+```properties
+storeFile=upload-keystore.jks
+storePassword=…
+keyAlias=uniflow
+keyPassword=…
 ```
 
 ## CI/CD

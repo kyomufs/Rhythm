@@ -41,29 +41,57 @@ class AppSettings {
     this.backgroundCheckMinutes = defaultBackgroundCheckMinutes,
   });
 
-  /// 30 минут — компромисс: расписание меняется редко, а каждый опрос — это
-  /// полный запрос недели на группу.
-  static const int defaultBackgroundCheckMinutes = 30;
+  /// Час — самый частый вариант из пресетов: расписание меняется редко, а
+  /// каждый опрос — это полный запрос недели на группу.
+  static const int defaultBackgroundCheckMinutes = 60;
 
   /// Допустимые периоды: подписи задают порядок в настройках.
-  static const List<int> backgroundCheckPresets = [0, 15, 30, 60, 180];
+  static const List<int> backgroundCheckPresets = [0, 60, 180, 360, 720];
 
   /// Подпись для периода. [minutes] вне пресетов показывается как есть.
   static String backgroundCheckLabel(int minutes) {
     switch (minutes) {
       case 0:
         return 'Выкл';
-      case 15:
-        return '15 мин';
-      case 30:
-        return '30 мин';
       case 60:
         return '1 час';
       case 180:
         return '3 часа';
+      case 360:
+        return '6 часов';
+      case 720:
+        return '12 часов';
       default:
-        return '$minutes мин';
+        return minutes % 60 == 0 ? '${minutes ~/ 60} ч' : '$minutes мин';
     }
+  }
+
+  /// Описание периода для подзаголовка настройки: подпись кнопки —
+  /// «3 часа», а фраза должна читаться целиком.
+  static String backgroundCheckDescription(int minutes) {
+    switch (minutes) {
+      case 0:
+        return 'Проверка выключена';
+      case 60:
+        return 'Каждый час';
+      case 180:
+        return 'Каждые 3 часа';
+      case 360:
+        return 'Каждые 6 часов';
+      case 720:
+        return 'Каждые 12 часов';
+      default:
+        return 'Каждые ${backgroundCheckLabel(minutes)}';
+    }
+  }
+
+  /// Приводит сохранённый период к текущему набору пресетов.
+  ///
+  /// Старые установки хранили 15 и 30 минут; этих периодов больше нет, и без
+  /// нормализации группа кнопок осталась бы без выбранного сегмента.
+  static int normalizeBackgroundCheckMinutes(int minutes) {
+    if (backgroundCheckPresets.contains(minutes)) return minutes;
+    return defaultBackgroundCheckMinutes;
   }
 
   Color get seedColor => Color(seedColorValue);
@@ -110,8 +138,9 @@ class AppSettings {
       themeMode: json['themeMode'] as String? ?? 'system',
       showGroupsInSchedule: json['showGroupsInSchedule'] as bool? ?? true,
       demoMode: json['demoMode'] as bool? ?? false,
-      backgroundCheckMinutes: json['backgroundCheckMinutes'] as int? ??
-          defaultBackgroundCheckMinutes,
+      backgroundCheckMinutes: normalizeBackgroundCheckMinutes(
+        json['backgroundCheckMinutes'] as int? ?? defaultBackgroundCheckMinutes,
+      ),
     );
   }
 }

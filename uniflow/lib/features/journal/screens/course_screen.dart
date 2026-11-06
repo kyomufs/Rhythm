@@ -3,10 +3,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:intl/intl.dart';
 import 'package:uniflow/core/domain/journal.dart';
-import 'package:uniflow/core/models/schedule.dart';
 import 'package:uniflow/core/journal/journal_store.dart';
+import 'package:uniflow/core/models/schedule.dart';
+import 'package:uniflow/core/theme/shapes.dart';
 import 'package:uniflow/core/theme/spacing.dart';
+import 'package:uniflow/core/theme/typography.dart';
+import 'package:uniflow/features/journal/widgets/course_style.dart';
+import 'package:uniflow/features/journal/widgets/journal_editors.dart';
 import 'package:uniflow/features/journal/widgets/score_scroller.dart';
+import 'package:uniflow/shared/widgets/expressive_button_group.dart';
+import 'package:uniflow/shared/widgets/morph_chip.dart';
+import 'package:uniflow/shared/widgets/wavy_progress.dart';
 
 /// Дисциплина: сводка, посещение, события и шкала.
 class CourseScreen extends ConsumerStatefulWidget {
@@ -18,12 +25,42 @@ class CourseScreen extends ConsumerStatefulWidget {
   ConsumerState<CourseScreen> createState() => _CourseScreenState();
 }
 
+enum _CourseTab { summary, attendance, events, scale }
+
 class _CourseScreenState extends ConsumerState<CourseScreen> {
+  var _tab = _CourseTab.summary;
+
+  Future<void> _edit(Course course) async {
+    final term = ref
+        .read(journalProvider)
+        .data
+        .terms
+        .where((t) => t.id == course.termId)
+        .firstOrNull;
+    if (term == null) return;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => CourseEditorDialog(term: term, course: course),
+    );
+  }
+
+  Future<void> _delete(Course course) async {
+    final confirmed = await confirmDelete(
+      context,
+      title: 'Удалить дисциплину?',
+      message: '«${course.title}» вместе с парами, событиями и баллами '
+          'исчезнет из журнала.',
+    );
+    if (!confirmed || !mounted) return;
+    ref.read(journalProvider.notifier).deleteCourse(course.id);
+    Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final data = ref.watch(journalProvider).data;
-    final course =
-        data.courses.where((c) => c.id == widget.courseId).firstOrNull;
+    final course = data.courses.where((c) => c.id == widget.courseId).firstOrNull;
     if (course == null) {
       return Scaffold(
         appBar: AppBar(),
@@ -31,35 +68,110 @@ class _CourseScreenState extends ConsumerState<CourseScreen> {
       );
     }
 
-    return DefaultTabController(
-      length: 4,
-      child: Scaffold(
-        appBar: AppBar(
-          title:
-              Text(course.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-          bottom: const TabBar(
-            isScrollable: true,
-            tabAlignment: TabAlignment.start,
-            tabs: [
-              Tab(text: 'Сводка'),
-              Tab(text: 'Посещение'),
-              Tab(text: 'События'),
-              Tab(text: 'Шкала'),
-            ],
-          ),
-        ),
-        body: TabBarView(
+    return Scaffold(
+      appBar: AppBar(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            _SummaryTab(course: course),
-            _AttendanceTab(course: course),
-            _EventsTab(course: course),
-            _ScaleTab(course: course),
+            Text(
+              course.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTypography.emphasizedTitleLarge(
+                theme.textTheme.titleLarge!,
+              ),
+            ),
+            Text(
+              [
+                courseKindLabel(course.kind),
+                if (course.teacher != null && course.teacher!.isNotEmpty)
+                  course.teacher!,
+              ].join(' · '),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
           ],
         ),
+        actions: [
+          PopupMenuButton<String>(
+            tooltip: 'Дисциплина',
+            onSelected: (value) {
+              if (value == 'edit') _edit(course);
+              if (value == 'delete') _delete(course);
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'edit', child: Text('Изменить')),
+              PopupMenuItem(value: 'delete', child: Text('Удалить')),
+            ],
+          ),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(52),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+                AppSpacing.sm, 0, AppSpacing.sm, AppSpacing.xs),
+            child: ExpressiveButtonGroup<_CourseTab>(
+              values: _CourseTab.values,
+              selected: _tab,
+              labelOf: (tab) => switch (tab) {
+                _CourseTab.summary => 'Сводка',
+                _CourseTab.attendance => 'Пары',
+                _CourseTab.events => 'События',
+                _CourseTab.scale => 'Шкала',
+              },
+              iconOf: (tab) => switch (tab) {
+                _CourseTab.summary => Icons.insights_outlined,
+                _CourseTab.attendance => Icons.event_available_outlined,
+                _CourseTab.events => Icons.task_alt,
+                _CourseTab.scale => Icons.tune,
+              },
+              onChanged: (tab) => setState(() => _tab = tab),
+            ),
+          ),
+        ),
+      ),
+      floatingActionButton: switch (_tab) {
+        _CourseTab.attendance
+            when data.recordsOf(course.id).isEmpty =>
+          null,
+        _CourseTab.events when data.assessmentsOf(course.id).isEmpty => null,
+        _CourseTab.attendance => FloatingActionButton.extended(
+            onPressed: () => showModalBottomSheet<void>(
+              context: context,
+              isScrollControlled: true,
+              builder: (_) => _NewRecordSheet(course: course),
+            ),
+            icon: const Icon(Icons.add),
+            label: const Text('Пара'),
+          ),
+        _CourseTab.events => FloatingActionButton.extended(
+            onPressed: () => showDialog<void>(
+              context: context,
+              builder: (_) => _AssessmentDialog(course: course),
+            ),
+            icon: const Icon(Icons.add),
+            label: const Text('Событие'),
+          ),
+        _ => null,
+      },
+      body: IndexedStack(
+        index: _tab.index,
+        children: [
+          _SummaryTab(course: course),
+          _AttendanceTab(course: course),
+          _EventsTab(course: course),
+          _ScaleTab(course: course),
+        ],
       ),
     );
   }
 }
+
+// ── Сводка ─────────────────────────────────────────────────────
 
 class _SummaryTab extends ConsumerWidget {
   const _SummaryTab({required this.course});
@@ -69,183 +181,346 @@ class _SummaryTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final stats = ref.watch(courseStatsProvider(course.id));
-    final percent = (stats.percent * 100).round();
+    final accent = courseAccent(scheme, course.colorIndex);
+    final passLeft = stats.pointsToPass;
 
     return ListView(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.lg),
       children: [
-        Row(
-          children: [
-            SizedBox(
-              width: 96,
-              height: 96,
-              child: Stack(
-                alignment: Alignment.center,
+        Container(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            color: scheme.primaryContainer,
+            borderRadius: BorderRadius.circular(AppShapes.extraLarge),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  SizedBox(
-                    width: 96,
-                    height: 96,
-                    child: CircularProgressIndicator(
-                      value: (stats.percent).clamp(0.0, 1.0),
-                      strokeWidth: 8,
-                      backgroundColor:
-                          theme.colorScheme.surfaceContainerHighest,
+                  Text(
+                    '${(stats.percent * 100).round()}',
+                    style: AppTypography.emphasizedHeadlineLarge(
+                      theme.textTheme.headlineLarge!,
+                    ).copyWith(color: scheme.onPrimaryContainer, height: 1),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 5, left: 2),
+                    child: Text(
+                      '%',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: scheme.onPrimaryContainer
+                            .withValues(alpha: 0.8),
+                      ),
                     ),
                   ),
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('$percent%',
-                          style: theme.textTheme.titleLarge
-                              ?.copyWith(fontWeight: FontWeight.w700)),
-                      Text('прогресс', style: theme.textTheme.labelSmall),
-                    ],
+                  const Spacer(),
+                  if (stats.total > 0)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.sm, vertical: AppSpacing.xxs),
+                      decoration: BoxDecoration(
+                        color:
+                            scheme.onPrimaryContainer.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(AppShapes.small),
+                      ),
+                      child: Text(
+                        'прогноз ${stats.predictedGrade}',
+                        style: AppTypography.emphasizedLabelLarge(
+                          theme.textTheme.labelLarge!,
+                        ).copyWith(color: scheme.onPrimaryContainer),
+                      ),
+                    ),
+                ],
+              ),
+              const Gap(AppSpacing.xs),
+              WavyProgressIndicator(
+                value: stats.percent.clamp(0.0, 1.0),
+                color: scheme.onPrimaryContainer,
+                trackColor: scheme.onPrimaryContainer.withValues(alpha: 0.22),
+              ),
+              const Gap(AppSpacing.sm),
+              Row(
+                children: [
+                  Text(
+                    '${_num(stats.total)} из ${_num(stats.totalMax)} баллов',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: scheme.onPrimaryContainer.withValues(alpha: 0.9),
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    passLeft == null
+                        ? 'порог ${_num(stats.scale.passThreshold)} набран'
+                        : 'до порога ${_num(passLeft)}',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: scheme.onPrimaryContainer.withValues(alpha: 0.9),
+                    ),
                   ),
                 ],
               ),
-            ),
-            const Gap(AppSpacing.lg),
+            ],
+          ),
+        ),
+        const Gap(AppSpacing.sm),
+        Row(
+          children: [
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _StatRow(
-                    label: 'В семестре',
-                    value: '${_num(stats.current)} / ${_num(stats.currentMax)}',
-                  ),
-                  _StatRow(
-                    label: 'Экзамен',
-                    value: '${_num(stats.exam)} / ${_num(stats.examMax)}',
-                  ),
-                  _StatRow(
-                    label: 'Прогноз',
-                    value: '${stats.predictedGrade}',
-                    emphasize: true,
-                  ),
-                  _StatRow(
-                    label: 'Посещение',
-                    value: '${stats.attendancePercent}%',
-                  ),
-                ],
+              child: _MetricTile(
+                label: 'В семестре',
+                value: _num(stats.current),
+                hint: 'из ${_num(stats.currentMax)}',
+                icon: Icons.timelapse,
+              ),
+            ),
+            const Gap(AppSpacing.xs),
+            Expanded(
+              child: _MetricTile(
+                label: 'Экзамен',
+                value: _num(stats.exam),
+                hint: 'из ${_num(stats.examMax)}',
+                icon: Icons.school_outlined,
+              ),
+            ),
+          ],
+        ),
+        const Gap(AppSpacing.xs),
+        Row(
+          children: [
+            Expanded(
+              child: _MetricTile(
+                label: 'Посещение',
+                value: '${stats.attendancePercent}%',
+                hint: '${stats.visited} из ${stats.lessons} пар',
+                icon: Icons.groups_outlined,
+              ),
+            ),
+            const Gap(AppSpacing.xs),
+            Expanded(
+              child: _MetricTile(
+                label: stats.overdue > 0 ? 'Просрочено' : 'Ближайший дедлайн',
+                value: stats.overdue > 0
+                    ? '${stats.overdue}'
+                    : stats.nextDeadline == null
+                        ? '—'
+                        : DateFormat('d MMM', 'ru')
+                            .format(stats.nextDeadline!),
+                hint: stats.overdue > 0
+                    ? 'событий'
+                    : stats.nextDeadline == null
+                        ? 'нет событий'
+                        : 'событие',
+                icon: stats.overdue > 0
+                    ? Icons.error_outline
+                    : Icons.flag_outlined,
+                danger: stats.overdue > 0,
               ),
             ),
           ],
         ),
         const Gap(AppSpacing.lg),
-        Text('Категории', style: theme.textTheme.titleSmall),
-        const Gap(AppSpacing.xs),
-        for (final progress in stats.categories) ...[
-          Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        progress.category.name +
-                            (progress.category.isExam ? ' · экзамен' : ''),
-                        style: theme.textTheme.bodyMedium,
-                      ),
-                    ),
-                    Text(
-                      '${_num(progress.earned)} / ${_num(progress.max)}',
-                      style: theme.textTheme.labelLarge,
-                    ),
-                  ],
-                ),
-                const Gap(4),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: progress.percent.clamp(0.0, 1.0),
-                    minHeight: 8,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-        const Gap(AppSpacing.sm),
-        Card(
-          elevation: 0,
-          color: theme.colorScheme.surfaceContainerLow,
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.sm),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('До зачёта',
-                    style: theme.textTheme.labelLarge
-                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                const Gap(4),
-                Text(
-                  stats.pointsToPass == null
-                      ? 'Порог ${_num(stats.scale.passThreshold)} набран'
-                      : 'Не хватает ${_num(stats.pointsToPass!)} из ${_num(stats.totalMax)}',
-                  style: theme.textTheme.bodyMedium,
-                ),
-                if (stats.nextDeadline != null) ...[
-                  const Gap(AppSpacing.xs),
-                  Text(
-                    'Ближайший дедлайн: '
-                    '${DateFormat('d MMMM', 'ru').format(stats.nextDeadline!)}',
-                    style: theme.textTheme.bodySmall,
-                  ),
-                ],
-                if (stats.overdue > 0) ...[
-                  const Gap(AppSpacing.xxs),
-                  Text(
-                    'Просрочено событий: ${stats.overdue}',
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: theme.colorScheme.error),
-                  ),
-                ],
-              ],
-            ),
-          ),
+        _SectionTitle(
+          title: 'Категории',
+          trailing: stats.categories.isEmpty
+              ? null
+              : '${_num(stats.total)} / ${_num(stats.totalMax)}',
         ),
+        const Gap(AppSpacing.xs),
+        if (stats.categories.isEmpty)
+          Text(
+            'Шкала пуста — добавьте категории на вкладке «Шкала»',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          )
+        else
+          Container(
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(AppShapes.largeIncreased),
+            ),
+            child: Column(
+              children: [
+                for (final (index, progress) in stats.categories.indexed) ...[
+                  if (index > 0)
+                    Divider(
+                      height: 1,
+                      indent: AppSpacing.md,
+                      endIndent: AppSpacing.md,
+                      color: scheme.outlineVariant.withValues(alpha: 0.4),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                progress.category.name,
+                                style: AppTypography.emphasizedBodyMedium(
+                                  theme.textTheme.bodyMedium!,
+                                ),
+                              ),
+                            ),
+                            if (progress.category.isExam)
+                              const Padding(
+                                padding:
+                                    EdgeInsets.only(right: AppSpacing.xs),
+                                child: _Tag(label: 'экзамен'),
+                              ),
+                            Text(
+                              '${_num(progress.earned)} / ${_num(progress.max)}',
+                              style: theme.textTheme.labelLarge,
+                            ),
+                          ],
+                        ),
+                        const Gap(AppSpacing.xs),
+                        WavyProgressIndicator(
+                          value: progress.percent.clamp(0.0, 1.0),
+                          color: accent,
+                          trackColor: scheme.surfaceContainerHighest,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
       ],
     );
   }
 }
 
-class _StatRow extends StatelessWidget {
-  const _StatRow({
+class _MetricTile extends StatelessWidget {
+  const _MetricTile({
     required this.label,
     required this.value,
-    this.emphasize = false,
+    required this.hint,
+    required this.icon,
+    this.danger = false,
   });
 
   final String label;
   final String value;
-  final bool emphasize;
+  final String hint;
+  final IconData icon;
+  final bool danger;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
+    final scheme = theme.colorScheme;
+    final color = danger ? scheme.error : scheme.onSurfaceVariant;
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(AppShapes.large),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Text(label,
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          Row(
+            children: [
+              Icon(icon, size: 16, color: color),
+              const Gap(AppSpacing.xxs),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelMedium?.copyWith(color: color),
+                ),
+              ),
+            ],
           ),
-          Text(
-            value,
-            style: emphasize
-                ? theme.textTheme.titleSmall
-                : theme.textTheme.bodyMedium,
+          const Gap(AppSpacing.xs),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                value,
+                style: AppTypography.emphasizedTitleLarge(
+                  theme.textTheme.titleLarge!,
+                ).copyWith(color: danger ? scheme.error : scheme.onSurface),
+              ),
+              const Gap(4),
+              Flexible(
+                child: Text(
+                  hint,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall
+                      ?.copyWith(color: scheme.onSurfaceVariant),
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 }
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({required this.title, this.trailing});
+
+  final String title;
+  final String? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Text(
+          title,
+          style: AppTypography.emphasizedTitleMedium(theme.textTheme.titleMedium!),
+        ),
+        const Spacer(),
+        if (trailing != null)
+          Text(
+            trailing!,
+            style: theme.textTheme.labelLarge
+                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          ),
+      ],
+    );
+  }
+}
+
+class _Tag extends StatelessWidget {
+  const _Tag({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(AppShapes.small),
+      ),
+      child: Text(
+        label,
+        style: theme.textTheme.labelSmall
+            ?.copyWith(color: theme.colorScheme.onSecondaryContainer),
+      ),
+    );
+  }
+}
+
+// ── Пары ───────────────────────────────────────────────────────
 
 class _AttendanceTab extends ConsumerWidget {
   const _AttendanceTab({required this.course});
@@ -255,54 +530,182 @@ class _AttendanceTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final records = ref.watch(journalProvider).data.recordsOf(course.id);
-    final df = DateFormat('d MMM, EEE', 'ru');
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
 
-    return Scaffold(
-      body: records.isEmpty
-          ? const Center(
-              child: Text('Пар пока нет — отметки появятся из расписания'),
-            )
-          : ListView.separated(
-              padding: const EdgeInsets.only(bottom: 88),
-              itemCount: records.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                final record = records[index];
-                return ListTile(
-                  title:
-                      Text('${df.format(record.date)} · ${record.slot} пара'),
-                  subtitle: Text(
-                    [
-                      lessonTypeShortLabel(record.type),
-                      attendanceLabel(record.attendance),
-                      if (record.reason != null && record.reason!.isNotEmpty)
-                        record.reason!,
-                      if (record.comment != null && record.comment!.isNotEmpty)
-                        record.comment!,
-                    ].join(' · '),
-                  ),
-                  trailing: record.points == null
-                      ? null
-                      : Text('${_num(record.points!)} б.',
-                          style: Theme.of(context).textTheme.labelLarge),
-                  onTap: () => showModalBottomSheet<void>(
-                    context: context,
-                    showDragHandle: true,
-                    isScrollControlled: true,
-                    builder: (_) => _RecordSheet(record: record),
-                  ),
-                );
-              },
-            ),
-      floatingActionButton: FloatingActionButton(
-        tooltip: 'Отметить пару',
-        onPressed: () => showModalBottomSheet<void>(
+    if (records.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 96,
+                height: 96,
+                decoration: BoxDecoration(
+                  color: scheme.primaryContainer,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.event_available_outlined,
+                    size: 44, color: scheme.onPrimaryContainer),
+              ),
+              const Gap(AppSpacing.md),
+              Text(
+                'Пар пока нет',
+                style: AppTypography.emphasizedTitleLarge(
+                  theme.textTheme.titleLarge!,
+                ),
+              ),
+              const Gap(AppSpacing.xxs),
+              Text(
+                'Отметьте пару вручную или заполните журнал\n'
+                'из расписания',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(color: scheme.onSurfaceVariant),
+              ),
+              const Gap(AppSpacing.md),
+              FilledButton.icon(
+                onPressed: () => showModalBottomSheet<void>(
+                  context: context,
+                  isScrollControlled: true,
+                  builder: (_) => _NewRecordSheet(course: course),
+                ),
+                icon: const Icon(Icons.add),
+                label: const Text('Отметить пару'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md, AppSpacing.md, AppSpacing.md, 96),
+      itemCount: records.length,
+      separatorBuilder: (_, __) => const Gap(AppSpacing.xs),
+      itemBuilder: (context, index) {
+        final record = records[index];
+        return _RecordTile(record: record);
+      },
+    );
+  }
+}
+
+class _RecordTile extends StatelessWidget {
+  const _RecordTile({required this.record});
+
+  final LessonRecord record;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final df = DateFormat('d', 'ru');
+    final month = DateFormat('MMM', 'ru').format(record.date);
+    final visited = attendanceCountsAsVisited(record.attendance);
+
+    return Material(
+      color: scheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(AppShapes.large),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => showModalBottomSheet<void>(
           context: context,
           showDragHandle: true,
           isScrollControlled: true,
-          builder: (_) => _NewRecordSheet(course: course),
+          builder: (_) => _RecordSheet(record: record),
         ),
-        child: const Icon(Icons.add),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.sm),
+          child: Row(
+            children: [
+              Container(
+                width: 52,
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                decoration: BoxDecoration(
+                  color: visited
+                      ? scheme.secondaryContainer
+                      : scheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(AppShapes.medium),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      df.format(record.date),
+                      style: AppTypography.emphasizedTitleLarge(
+                        theme.textTheme.titleLarge!,
+                      ).copyWith(
+                        color: visited
+                            ? scheme.onSecondaryContainer
+                            : scheme.onSurfaceVariant,
+                        height: 1,
+                      ),
+                    ),
+                    Text(
+                      month,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: visited
+                            ? scheme.onSecondaryContainer
+                            : scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Gap(AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${record.slot} пара · '
+                      '${lessonTypeShortLabel(record.type)}',
+                      style: AppTypography.emphasizedBodyMedium(
+                        theme.textTheme.bodyMedium!,
+                      ),
+                    ),
+                    const Gap(2),
+                    Text(
+                      [
+                        attendanceLabel(record.attendance),
+                        if (record.reason != null && record.reason!.isNotEmpty)
+                          record.reason!,
+                        if (record.comment != null &&
+                            record.comment!.isNotEmpty)
+                          record.comment!,
+                      ].join(' · '),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (record.points != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.xs, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: scheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(AppShapes.small),
+                  ),
+                  child: Text(
+                    '${_num(record.points!)} б.',
+                    style: AppTypography.emphasizedLabelLarge(
+                      theme.textTheme.labelLarge!,
+                    ).copyWith(color: scheme.onPrimaryContainer),
+                  ),
+                )
+              else
+                Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -315,6 +718,7 @@ class _RecordSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final notifier = ref.read(journalProvider.notifier);
     final scale = ref
         .watch(journalProvider)
@@ -339,29 +743,27 @@ class _RecordSheet extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('${DateFormat('d MMMM', 'ru').format(record.date)} · '
-                '${record.slot} пара'),
-            const Gap(AppSpacing.sm),
-            SegmentedButton<Attendance>(
-              segments: const [
-                ButtonSegment(
-                    value: Attendance.present,
-                    label: Text('Был'),
-                    icon: Icon(Icons.check)),
-                ButtonSegment(
-                    value: Attendance.absent,
-                    label: Text('Не был'),
-                    icon: Icon(Icons.close)),
-              ],
-              selected: {
-                record.attendance == Attendance.present
-                    ? Attendance.present
-                    : Attendance.absent,
+            Text(
+              '${DateFormat('d MMMM, EEEE', 'ru').format(record.date)} · '
+              '${record.slot} пара',
+              style: AppTypography.emphasizedTitleMedium(
+                theme.textTheme.titleMedium!,
+              ),
+            ),
+            const Gap(AppSpacing.md),
+            ExpressiveButtonGroup<Attendance>(
+              values: Attendance.values,
+              selected: record.attendance,
+              labelOf: (value) => switch (value) {
+                Attendance.present => 'Был',
+                Attendance.absent => 'Не был',
+                Attendance.excused => 'Уваж.',
+                Attendance.late => 'Опоздал',
               },
-              onSelectionChanged: (values) => notifier.setAttendance(
+              onChanged: (value) => notifier.setAttendance(
                 record.id,
-                values.first,
-                reason: values.first == Attendance.absent ? 'не указана' : null,
+                value,
+                reason: value == record.attendance ? record.reason : null,
               ),
             ),
             const Gap(AppSpacing.md),
@@ -375,14 +777,32 @@ class _RecordSheet extends ConsumerWidget {
             const Gap(AppSpacing.sm),
             Row(
               children: [
-                TextButton(
+                TextButton.icon(
                   onPressed: () => showDialog<void>(
                     context: context,
                     builder: (_) => _CommentDialog(record: record),
                   ),
-                  child: const Text('Комментарий'),
+                  icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                  label: const Text('Комментарий'),
                 ),
                 const Spacer(),
+                TextButton(
+                  onPressed: () async {
+                    final confirmed = await confirmDelete(
+                      context,
+                      title: 'Удалить пару?',
+                      message: 'Отметка и баллы за эту пару исчезнут.',
+                    );
+                    if (!confirmed || !context.mounted) return;
+                    ref.read(journalProvider.notifier).deleteLesson(record.id);
+                    Navigator.of(context).pop();
+                  },
+                  style: TextButton.styleFrom(
+                    foregroundColor: theme.colorScheme.error,
+                  ),
+                  child: const Text('Удалить'),
+                ),
+                const Gap(AppSpacing.xs),
                 FilledButton(
                   onPressed: () => Navigator.of(context).pop(),
                   child: const Text('Готово'),
@@ -460,19 +880,29 @@ class _NewRecordSheetState extends ConsumerState<_NewRecordSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
+        padding: EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          AppSpacing.xs,
+          AppSpacing.md,
+          AppSpacing.md + MediaQuery.viewInsetsOf(context).bottom,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.event),
-              title: Text(DateFormat('d MMMM y', 'ru').format(_date)),
-              trailing: const Icon(Icons.edit_calendar),
+            Text(
+              'Отметить пару',
+              style: AppTypography.emphasizedTitleLarge(
+                theme.textTheme.titleLarge!,
+              ),
+            ),
+            const Gap(AppSpacing.sm),
+            InkWell(
+              borderRadius: BorderRadius.circular(AppShapes.medium),
               onTap: () async {
                 final picked = await showDatePicker(
                   context: context,
@@ -482,11 +912,27 @@ class _NewRecordSheetState extends ConsumerState<_NewRecordSheet> {
                 );
                 if (picked != null) setState(() => _date = picked);
               },
+              child: Container(
+                padding: const EdgeInsets.all(AppSpacing.sm),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(AppShapes.medium),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.event_outlined, size: 20),
+                    const Gap(AppSpacing.xs),
+                    Text(DateFormat('d MMMM y', 'ru').format(_date)),
+                    const Spacer(),
+                    const Icon(Icons.edit_calendar, size: 18),
+                  ],
+                ),
+              ),
             ),
+            const Gap(AppSpacing.sm),
             Row(
               children: [
-                Text('Пара', style: Theme.of(context).textTheme.labelLarge),
-                const Gap(AppSpacing.sm),
+                Text('Пара', style: theme.textTheme.labelLarge),
                 Expanded(
                   child: Slider(
                     value: _slot.toDouble(),
@@ -497,21 +943,29 @@ class _NewRecordSheetState extends ConsumerState<_NewRecordSheet> {
                     onChanged: (value) => setState(() => _slot = value.round()),
                   ),
                 ),
+                Text('$_slot', style: theme.textTheme.titleSmall),
               ],
             ),
-            Wrap(
-              spacing: AppSpacing.xs,
+            const Gap(AppSpacing.xs),
+            Row(
               children: [
-                for (final type in const [
+                for (final (index, type) in const [
                   LessonType.lecture,
                   LessonType.practice,
                   LessonType.lab,
                   LessonType.seminar,
-                ])
-                  ChoiceChip(
-                    label: Text(lessonTypeShortLabel(type)),
-                    selected: _type == type,
-                    onSelected: (_) => setState(() => _type = type),
+                ].indexed)
+                  Flexible(
+                    child: Padding(
+                      padding: EdgeInsets.only(right: index == 3 ? 0 : 2),
+                      child: MorphChip(
+                        label: lessonTypeShortLabel(type),
+                        selected: _type == type,
+                        isFirst: index == 0,
+                        isLast: index == 3,
+                        onTap: () => setState(() => _type = type),
+                      ),
+                    ),
                   ),
               ],
             ),
@@ -537,6 +991,8 @@ class _NewRecordSheetState extends ConsumerState<_NewRecordSheet> {
   }
 }
 
+// ── События ────────────────────────────────────────────────────
+
 class _EventsTab extends ConsumerWidget {
   const _EventsTab({required this.course});
 
@@ -546,54 +1002,148 @@ class _EventsTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final assessments =
         ref.watch(journalProvider).data.assessmentsOf(course.id);
-    final df = DateFormat('d MMM', 'ru');
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final df = DateFormat('d MMM', 'ru');
 
-    return Scaffold(
-      body: assessments.isEmpty
-          ? const Center(
-              child: Text('Событий нет: добавьте контрольную или зачёт'))
-          : ListView.separated(
-              padding: const EdgeInsets.only(bottom: 88),
-              itemCount: assessments.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                final item = assessments[index];
-                final graded = item.isGraded;
-                return ListTile(
-                  leading: Icon(
-                    graded ? Icons.check_circle_outline : Icons.schedule,
-                    color: item.isOverdue ? theme.colorScheme.error : null,
+    if (assessments.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 96,
+                height: 96,
+                decoration: BoxDecoration(
+                  color: scheme.secondaryContainer,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.task_alt,
+                    size: 44, color: scheme.onSecondaryContainer),
+              ),
+              const Gap(AppSpacing.md),
+              Text(
+                'Событий нет',
+                style: AppTypography.emphasizedTitleLarge(
+                  theme.textTheme.titleLarge!,
+                ),
+              ),
+              const Gap(AppSpacing.xxs),
+              Text(
+                'Добавьте контрольную, зачёт или экзамен —\n'
+                'дедлайн появится в сводке',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(color: scheme.onSurfaceVariant),
+              ),
+              const Gap(AppSpacing.md),
+              FilledButton.icon(
+                onPressed: () => showDialog<void>(
+                  context: context,
+                  builder: (_) => _AssessmentDialog(course: course),
+                ),
+                icon: const Icon(Icons.add),
+                label: const Text('Добавить событие'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md, AppSpacing.md, AppSpacing.md, 96),
+      itemCount: assessments.length,
+      separatorBuilder: (_, __) => const Gap(AppSpacing.xs),
+      itemBuilder: (context, index) {
+        final item = assessments[index];
+        final graded = item.isGraded;
+        final overdue = item.isOverdue;
+        return Material(
+          color: scheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(AppShapes.large),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () => showDialog<void>(
+              context: context,
+              builder: (_) =>
+                  _AssessmentDialog(course: course, assessment: item),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.sm),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: graded
+                          ? scheme.primaryContainer
+                          : overdue
+                              ? scheme.errorContainer
+                              : scheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(AppShapes.medium),
+                    ),
+                    child: Icon(
+                      graded
+                          ? Icons.check
+                          : overdue
+                              ? Icons.priority_high
+                              : Icons.schedule,
+                      color: graded
+                          ? scheme.onPrimaryContainer
+                          : overdue
+                              ? scheme.onErrorContainer
+                              : scheme.onSurfaceVariant,
+                    ),
                   ),
-                  title: Text(item.title),
-                  subtitle: Text([
-                    if (item.dueDate != null) 'до ${df.format(item.dueDate!)}',
-                    course.scale.categoryById(item.categoryId)?.name ?? '—',
-                  ].join(' · ')),
-                  trailing: Text(
+                  const Gap(AppSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypography.emphasizedBodyMedium(
+                            theme.textTheme.bodyMedium!,
+                          ),
+                        ),
+                        const Gap(2),
+                        Text(
+                          [
+                            if (item.dueDate != null)
+                              'до ${df.format(item.dueDate!)}',
+                            course.scale.categoryById(item.categoryId)?.name ??
+                                '—',
+                          ].join(' · '),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: overdue
+                                ? scheme.error
+                                : scheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
                     graded
                         ? '${_num(item.earnedPoints!)} / ${_num(item.maxPoints)}'
                         : '— / ${_num(item.maxPoints)}',
-                    style: theme.textTheme.labelLarge,
-                  ),
-                  onTap: () => showDialog<void>(
-                    context: context,
-                    builder: (_) => _AssessmentDialog(
-                      course: course,
-                      assessment: item,
+                    style: AppTypography.emphasizedLabelLarge(
+                      theme.textTheme.labelLarge!,
                     ),
                   ),
-                );
-              },
+                ],
+              ),
             ),
-      floatingActionButton: FloatingActionButton(
-        tooltip: 'Добавить событие',
-        onPressed: () => showDialog<void>(
-          context: context,
-          builder: (_) => _AssessmentDialog(course: course),
-        ),
-        child: const Icon(Icons.add),
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -631,66 +1181,82 @@ class _AssessmentDialogState extends ConsumerState<_AssessmentDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text(widget.assessment == null ? 'Новое событие' : 'Событие'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _title,
-              autofocus: widget.assessment == null,
-              decoration: const InputDecoration(labelText: 'Название'),
-            ),
-            const Gap(AppSpacing.sm),
-            DropdownButtonFormField<String>(
-              initialValue: _categoryId,
-              decoration: const InputDecoration(labelText: 'Категория'),
-              items: [
-                for (final category in widget.course.scale.categories)
-                  DropdownMenuItem(
-                      value: category.id, child: Text(category.name)),
-              ],
-              onChanged: (value) =>
-                  setState(() => _categoryId = value ?? _categoryId),
-            ),
-            const Gap(AppSpacing.sm),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _max,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Максимум'),
+      content: SizedBox(
+        width: 380,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _title,
+                autofocus: widget.assessment == null,
+                decoration: const InputDecoration(labelText: 'Название'),
+              ),
+              const Gap(AppSpacing.sm),
+              DropdownButtonFormField<String>(
+                initialValue: _categoryId,
+                decoration: const InputDecoration(labelText: 'Категория'),
+                items: [
+                  for (final category in widget.course.scale.categories)
+                    DropdownMenuItem(
+                        value: category.id, child: Text(category.name)),
+                ],
+                onChanged: (value) =>
+                    setState(() => _categoryId = value ?? _categoryId),
+              ),
+              const Gap(AppSpacing.sm),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _max,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Максимум'),
+                    ),
+                  ),
+                  const Gap(AppSpacing.sm),
+                  Expanded(
+                    child: TextField(
+                      controller: _earned,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Получено'),
+                    ),
+                  ),
+                ],
+              ),
+              const Gap(AppSpacing.sm),
+              InkWell(
+                borderRadius: BorderRadius.circular(AppShapes.medium),
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: _due ?? DateTime.now(),
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime(2100),
+                  );
+                  if (picked != null) setState(() => _due = picked);
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(AppSpacing.sm),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(AppShapes.medium),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.flag_outlined, size: 20),
+                      const Gap(AppSpacing.xs),
+                      Text(_due == null
+                          ? 'Без дедлайна'
+                          : DateFormat('d MMMM y', 'ru').format(_due!)),
+                      const Spacer(),
+                      const Icon(Icons.edit_calendar, size: 18),
+                    ],
                   ),
                 ),
-                const Gap(AppSpacing.sm),
-                Expanded(
-                  child: TextField(
-                    controller: _earned,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Получено'),
-                  ),
-                ),
-              ],
-            ),
-            const Gap(AppSpacing.sm),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.flag_outlined),
-              title: Text(_due == null
-                  ? 'Без дедлайна'
-                  : DateFormat('d MMMM y', 'ru').format(_due!)),
-              trailing: const Icon(Icons.edit_calendar),
-              onTap: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: _due ?? DateTime.now(),
-                  firstDate: DateTime(2020),
-                  lastDate: DateTime(2100),
-                );
-                if (picked != null) setState(() => _due = picked);
-              },
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
       actions: [
@@ -737,6 +1303,8 @@ class _AssessmentDialogState extends ConsumerState<_AssessmentDialog> {
   }
 }
 
+// ── Шкала ──────────────────────────────────────────────────────
+
 class _ScaleTab extends ConsumerStatefulWidget {
   const _ScaleTab({required this.course});
 
@@ -752,86 +1320,86 @@ class _ScaleTabState extends ConsumerState<_ScaleTab> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final sum = _scale.totalMax;
+    final inconsistent = (sum - 100).abs() > 0.01;
 
     return ListView(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.lg),
       children: [
-        DropdownButtonFormField<int>(
-          initialValue: null,
-          hint: const Text('Пресет шкалы'),
-          decoration: const InputDecoration(labelText: 'Пресет'),
-          items: [
-            for (var i = 0; i < gradeScalePresets.length; i++)
-              DropdownMenuItem(
-                value: i,
-                child: Text(gradeScalePresets[i].label),
+        const _SectionTitle(title: 'Пресет'),
+        const Gap(AppSpacing.xs),
+        Row(
+          children: [
+            for (final (index, preset) in gradeScalePresets.indexed)
+              Flexible(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                      right: index == gradeScalePresets.length - 1 ? 0 : 2),
+                  child: MorphChip(
+                    label: preset.label,
+                    selected: _matchesPreset(preset),
+                    isFirst: index == 0,
+                    isLast: index == gradeScalePresets.length - 1,
+                    onTap: () => setState(() => _scale = preset.build()),
+                  ),
+                ),
               ),
           ],
-          onChanged: (value) {
-            if (value == null) return;
-            setState(() => _scale = gradeScalePresets[value].build());
-          },
         ),
-        const Gap(AppSpacing.sm),
-        if ((sum - 100).abs() > 0.01)
+        if (inconsistent) ...[
+          const Gap(AppSpacing.xs),
           Text(
-            'Сумма категорий $sum — не 100. Это разрешено, но проверьте веса.',
-            style: theme.textTheme.bodySmall
-                ?.copyWith(color: theme.colorScheme.error),
+            'Сумма категорий ${_num(sum)} — не 100. Так можно, но проверьте веса.',
+            style: theme.textTheme.bodySmall?.copyWith(color: scheme.error),
           ),
-        for (final category in _scale.categories)
-          Card(
-            elevation: 0,
-            color: theme.colorScheme.surfaceContainerLow,
-            child: ListTile(
-              onTap: () => _editCategory(category),
-              title: Text(category.name),
-              subtitle:
-                  Text(category.isExam ? 'Экзамен' : 'В течение семестра'),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    tooltip: 'Меньше',
-                    onPressed: category.maxPoints <= 5
-                        ? null
-                        : () => setState(() {
-                              _scale = _replaceCategory(
-                                category.copyWith(
-                                    maxPoints: category.maxPoints - 5),
-                              );
-                            }),
-                    icon: const Icon(Icons.remove_circle_outline),
+        ],
+        const Gap(AppSpacing.lg),
+        _SectionTitle(title: 'Категории', trailing: '${_num(sum)} б.'),
+        const Gap(AppSpacing.xs),
+        Container(
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(AppShapes.largeIncreased),
+          ),
+          child: Column(
+            children: [
+              for (final (index, category) in _scale.categories.indexed) ...[
+                if (index > 0)
+                  Divider(
+                    height: 1,
+                    indent: AppSpacing.md,
+                    endIndent: AppSpacing.md,
+                    color: scheme.outlineVariant.withValues(alpha: 0.4),
                   ),
-                  Text(_num(category.maxPoints)),
-                  IconButton(
-                    tooltip: 'Больше',
-                    onPressed: () => setState(() {
-                      _scale = _replaceCategory(
+                _CategoryRow(
+                  category: category,
+                  onTap: () => _editCategory(category),
+                  onLess: category.maxPoints <= 5
+                      ? null
+                      : () => setState(() => _scale = _replaceCategory(
+                            category.copyWith(maxPoints: category.maxPoints - 5),
+                          )),
+                  onMore: () => setState(() => _scale = _replaceCategory(
                         category.copyWith(maxPoints: category.maxPoints + 5),
-                      );
-                    }),
-                    icon: const Icon(Icons.add_circle_outline),
-                  ),
-                  IconButton(
-                    tooltip: 'Удалить категорию',
-                    onPressed: _scale.categories.length <= 1
-                        ? null
-                        : () => setState(() {
-                              _scale = _scale.copyWith(
-                                categories: [
-                                  for (final item in _scale.categories)
-                                    if (item.id != category.id) item,
-                                ],
-                              );
-                            }),
-                    icon: const Icon(Icons.delete_outline),
-                  ),
-                ],
-              ),
-            ),
+                      )),
+                  onDelete: _scale.categories.length <= 1
+                      ? null
+                      : () => setState(() {
+                            _scale = _scale.copyWith(
+                              categories: [
+                                for (final item in _scale.categories)
+                                  if (item.id != category.id) item,
+                              ],
+                            );
+                          }),
+                ),
+              ],
+            ],
           ),
+        ),
+        const Gap(AppSpacing.xs),
         Align(
           alignment: Alignment.centerLeft,
           child: TextButton.icon(
@@ -840,14 +1408,10 @@ class _ScaleTabState extends ConsumerState<_ScaleTab> {
             label: const Text('Добавить категорию'),
           ),
         ),
-        const Gap(AppSpacing.xs),
-        Row(
-          children: [
-            Text('Порог зачёта', style: theme.textTheme.labelLarge),
-            const Spacer(),
-            Text('${_scale.passThreshold.round()}',
-                style: theme.textTheme.titleSmall),
-          ],
+        const Gap(AppSpacing.lg),
+        _SectionTitle(
+          title: 'Порог зачёта',
+          trailing: '${_scale.passThreshold.round()} б.',
         ),
         Slider(
           value: _scale.passThreshold,
@@ -873,6 +1437,18 @@ class _ScaleTabState extends ConsumerState<_ScaleTab> {
         ),
       ],
     );
+  }
+
+  bool _matchesPreset(GradeScalePreset preset) {
+    final built = preset.build();
+    if (built.categories.length != _scale.categories.length) return false;
+    for (var i = 0; i < built.categories.length; i++) {
+      if (built.categories[i].name != _scale.categories[i].name ||
+          built.categories[i].maxPoints != _scale.categories[i].maxPoints) {
+        return false;
+      }
+    }
+    return true;
   }
 
   Future<void> _addCategory() async {
@@ -929,42 +1505,47 @@ class _ScaleTabState extends ConsumerState<_ScaleTab> {
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setLocal) => AlertDialog(
           title: Text(name.isEmpty ? 'Новая категория' : 'Категория'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextField(
-                controller: nameController,
-                autofocus: true,
-                decoration: const InputDecoration(labelText: 'Название'),
-              ),
-              const Gap(AppSpacing.sm),
-              TextField(
-                controller: maxController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Максимум баллов',
-                  suffixText: 'б.',
-                ),
-              ),
-              const Gap(AppSpacing.sm),
-              Wrap(
-                spacing: AppSpacing.xs,
-                runSpacing: AppSpacing.xxs,
+          content: SizedBox(
+            width: 360,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  for (final option in _categoryKinds)
-                    ChoiceChip(
-                      label: Text(option.label),
-                      selected:
-                          exam == option.isExam && lessonType == option.type,
-                      onSelected: (_) => setLocal(() {
-                        exam = option.isExam;
-                        lessonType = option.type;
-                      }),
+                  TextField(
+                    controller: nameController,
+                    autofocus: true,
+                    decoration: const InputDecoration(labelText: 'Название'),
+                  ),
+                  const Gap(AppSpacing.sm),
+                  TextField(
+                    controller: maxController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Максимум баллов',
+                      suffixText: 'б.',
                     ),
+                  ),
+                  const Gap(AppSpacing.sm),
+                  Wrap(
+                    spacing: AppSpacing.xs,
+                    runSpacing: AppSpacing.xxs,
+                    children: [
+                      for (final option in _categoryKinds)
+                        ChoiceChip(
+                          label: Text(option.label),
+                          selected:
+                              exam == option.isExam && lessonType == option.type,
+                          onSelected: (_) => setLocal(() {
+                            exam = option.isExam;
+                            lessonType = option.type;
+                          }),
+                        ),
+                    ],
+                  ),
                 ],
               ),
-            ],
+            ),
           ),
           actions: [
             TextButton(
@@ -1002,6 +1583,101 @@ class _ScaleTabState extends ConsumerState<_ScaleTab> {
   }
 }
 
+class _CategoryRow extends StatelessWidget {
+  const _CategoryRow({
+    required this.category,
+    required this.onTap,
+    required this.onLess,
+    required this.onMore,
+    required this.onDelete,
+  });
+
+  final GradeCategory category;
+  final VoidCallback onTap;
+  final VoidCallback? onLess;
+  final VoidCallback onMore;
+  final VoidCallback? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+            AppSpacing.md, AppSpacing.xs, AppSpacing.xs, AppSpacing.xs),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    category.name,
+                    style: AppTypography.emphasizedBodyMedium(
+                      theme.textTheme.bodyMedium!,
+                    ),
+                  ),
+                  Text(
+                    [
+                      category.isExam
+                          ? 'Экзамен'
+                          : _categoryKindLabel(category.lessonType),
+                      '${_num(category.maxPoints)} б.',
+                    ].join(' · '),
+                    style: theme.textTheme.labelSmall
+                        ?.copyWith(color: scheme.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              tooltip: 'Меньше',
+              visualDensity: VisualDensity.compact,
+              onPressed: onLess,
+              icon: const Icon(Icons.remove_circle_outline, size: 20),
+            ),
+            SizedBox(
+              width: 34,
+              child: Text(
+                _num(category.maxPoints),
+                textAlign: TextAlign.center,
+                style: AppTypography.emphasizedLabelLarge(
+                  theme.textTheme.labelLarge!,
+                ),
+              ),
+            ),
+            IconButton(
+              tooltip: 'Больше',
+              visualDensity: VisualDensity.compact,
+              onPressed: onMore,
+              icon: const Icon(Icons.add_circle_outline, size: 20),
+            ),
+            IconButton(
+              tooltip: 'Удалить категорию',
+              visualDensity: VisualDensity.compact,
+              onPressed: onDelete,
+              icon: const Icon(Icons.delete_outline, size: 20),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _categoryKindLabel(LessonType? type) {
+  if (type == null) return 'События';
+  return switch (type) {
+    LessonType.lecture => 'Лекции',
+    LessonType.practice => 'Практики',
+    LessonType.lab => 'Лабораторные',
+    LessonType.seminar => 'Семинары',
+    LessonType.unknown => 'Любые пары',
+  };
+}
+
 class _CategoryKind {
   const _CategoryKind(this.label, this.type, this.isExam);
 
@@ -1019,5 +1695,5 @@ const _categoryKinds = [
 ];
 
 String _num(double value) => value == value.roundToDouble()
-    ? value.round().toString()
+    ? '${value.round()}'
     : value.toStringAsFixed(1);

@@ -2,5 +2,5 @@
 <resources>
     <!-- Фирменный цвет фона заставки. Один и тот же на всех платформах:
          Android (все версии) и iOS рисуют белый глиф на нём. -->
-    <color name="splash_background">#6750A4</color>
+    <color name="splash_background">#7B64C4</color>
 </resources>

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:intl/intl.dart';
 import 'package:uniflow/core/models/note_models.dart';
+import 'package:uniflow/core/theme/shapes.dart';
+import 'package:uniflow/shared/widgets/expressive_button_group.dart';
 
 /// Лист задачи: одно и то же поле для создания и редактирования.
 class TaskSheet extends StatefulWidget {
@@ -68,15 +70,6 @@ class _TaskSheetState extends State<TaskSheet> {
     super.dispose();
   }
 
-  /// Compact density + tighter side padding so full Russian labels
-  /// ("К выполнению", "Средний") fit three segments on a phone width.
-  ButtonStyle _segmentButtonStyle() => ButtonStyle(
-        visualDensity: VisualDensity.compact,
-        padding: WidgetStateProperty.all(
-          const EdgeInsets.symmetric(horizontal: 8),
-        ),
-      );
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -118,98 +111,56 @@ class _TaskSheetState extends State<TaskSheet> {
             ),
             const Gap(16),
 
-            // Status — full-width segmented buttons (easier to tap than
-            // tiny chips). Labels lead: segments share the row width, so
-            // a FittedBox scales long Russian words down instead of
-            // clipping them ("К вы | В выпо" bug).
+            // Статус — связная группа M3E: выбранная кнопка перетекает
+            // из таблетки в квадрат, соседи остаются на месте.
             Text('Статус',
                 style: theme.textTheme.titleSmall
                     ?.copyWith(fontWeight: FontWeight.w600)),
             const Gap(8),
-            SegmentedButton<TaskStatus>(
-              segments: [
-                ButtonSegment(
-                  value: TaskStatus.todo,
-                  label: _SegmentLabel(taskStatusDisplayName(TaskStatus.todo)),
-                ),
-                ButtonSegment(
-                  value: TaskStatus.inProgress,
-                  label: _SegmentLabel(
-                      taskStatusDisplayName(TaskStatus.inProgress)),
-                ),
-                ButtonSegment(
-                  value: TaskStatus.done,
-                  label: _SegmentLabel(taskStatusDisplayName(TaskStatus.done)),
-                ),
-              ],
-              selected: {_status},
-              showSelectedIcon: false,
-              style: _segmentButtonStyle(),
-              onSelectionChanged: (s) => setState(() => _status = s.first),
+            ExpressiveButtonGroup<TaskStatus>(
+              values: TaskStatus.values,
+              selected: _status,
+              // В шторке три сегмента делят 360dp: «К выполнению» не влезает
+              // и режется многоточием, поэтому здесь короткие подписи.
+              labelOf: (status) => switch (status) {
+                TaskStatus.todo => 'Новая',
+                TaskStatus.inProgress => 'В работе',
+                TaskStatus.done => 'Готово',
+              },
+              onChanged: (status) => setState(() => _status = status),
             ),
             const Gap(16),
 
-            // Priority — segmented buttons with semantic colors
+            // Приоритет — та же связная группа; значок стрелки задаёт
+            // направление, поэтому цвет внутри группы не нужен.
             Text('Приоритет',
                 style: theme.textTheme.titleSmall
                     ?.copyWith(fontWeight: FontWeight.w600)),
             const Gap(8),
-            SegmentedButton<TaskPriority>(
-              segments: [
-                ButtonSegment(
-                  value: TaskPriority.low,
-                  label:
-                      _SegmentLabel(taskPriorityDisplayName(TaskPriority.low)),
-                ),
-                ButtonSegment(
-                  value: TaskPriority.medium,
-                  label: _SegmentLabel(
-                      taskPriorityDisplayName(TaskPriority.medium)),
-                ),
-                ButtonSegment(
-                  value: TaskPriority.high,
-                  label:
-                      _SegmentLabel(taskPriorityDisplayName(TaskPriority.high)),
-                ),
-              ],
-              selected: {_priority},
-              showSelectedIcon: false,
-              style: _segmentButtonStyle().copyWith(
-                foregroundColor: WidgetStateProperty.resolveWith((states) {
-                  if (!states.contains(WidgetState.selected)) return null;
-                  final scheme = Theme.of(context).colorScheme;
-                  switch (_priority) {
-                    case TaskPriority.low:
-                      return scheme.onSecondaryContainer;
-                    case TaskPriority.medium:
-                      return scheme.onSurface;
-                    case TaskPriority.high:
-                      return scheme.onErrorContainer;
-                  }
-                }),
-                backgroundColor: WidgetStateProperty.resolveWith((states) {
-                  if (!states.contains(WidgetState.selected)) return null;
-                  final scheme = Theme.of(context).colorScheme;
-                  switch (_priority) {
-                    case TaskPriority.low:
-                      return scheme.secondaryContainer;
-                    case TaskPriority.medium:
-                      return scheme.surfaceContainerHighest;
-                    case TaskPriority.high:
-                      return scheme.errorContainer;
-                  }
-                }),
-              ),
-              onSelectionChanged: (p) => setState(() => _priority = p.first),
+            ExpressiveButtonGroup<TaskPriority>(
+              values: TaskPriority.values,
+              selected: _priority,
+              labelOf: taskPriorityDisplayName,
+              iconOf: (priority) {
+                switch (priority) {
+                  case TaskPriority.low:
+                    return Icons.arrow_downward;
+                  case TaskPriority.medium:
+                    return Icons.remove;
+                  case TaskPriority.high:
+                    return Icons.priority_high;
+                }
+              },
+              onChanged: (priority) => setState(() => _priority = priority),
             ),
             const Gap(16),
 
             // Subfolder selector — MD3 tap-to-open style
             Material(
               color: colorScheme.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: AppShapes.circular(AppShapes.medium),
               child: InkWell(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: AppShapes.circular(AppShapes.medium),
                 onTap: () {
                   final candidates = widget.folder.subfolders
                       .where((sf) => !sf.isHidden || sf.id == _subfolderId)
@@ -398,30 +349,6 @@ class _TaskSheetState extends State<TaskSheet> {
           },
         );
       },
-    );
-  }
-}
-// ============================================================
-// Segment label — scales instead of clipping
-// ============================================================
-
-/// Segment label that scales the text down when the segment is narrower
-/// than the full word, instead of clipping it mid-letter.
-class _SegmentLabel extends StatelessWidget {
-  final String text;
-
-  const _SegmentLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return FittedBox(
-      fit: BoxFit.scaleDown,
-      child: Text(
-        text,
-        maxLines: 1,
-        overflow: TextOverflow.clip,
-        style: Theme.of(context).textTheme.labelLarge,
-      ),
     );
   }
 }

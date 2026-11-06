@@ -126,6 +126,10 @@ class AppTypography {
   }
 
   /// Ролевые emphasized-геттеры для мест, где нужен конкретный акцент.
+  static TextStyle emphasizedHeadlineLarge(TextStyle base) => base.copyWith(
+      fontWeight: _emphHeadline.$2, letterSpacing: _emphHeadline.$1);
+  static TextStyle emphasizedHeadlineMedium(TextStyle base) => base.copyWith(
+      fontWeight: _emphHeadline.$2, letterSpacing: _emphHeadline.$1);
   static TextStyle emphasizedHeadlineSmall(TextStyle base) => base.copyWith(
       fontWeight: _emphHeadline.$2, letterSpacing: _emphHeadline.$1);
   static TextStyle emphasizedTitleLarge(TextStyle base) => base.copyWith(

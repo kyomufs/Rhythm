@@ -141,8 +141,8 @@ ThemeData buildAppTheme({
       shape: RoundedRectangleBorder(
         borderRadius: AppShapes.cardRadius,
         side: BorderSide(
-          color: colorScheme.outlineVariant
-              .withValues(alpha: isDark ? 0.2 : 0.4),
+          color:
+              colorScheme.outlineVariant.withValues(alpha: isDark ? 0.2 : 0.4),
         ),
       ),
       margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
@@ -181,7 +181,8 @@ ThemeData buildAppTheme({
         // M3E: активная подпись — secondary, а не onSurfaceVariant.
         return textTheme.labelMedium?.copyWith(
           fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-          color: selected ? colorScheme.secondary : colorScheme.onSurfaceVariant,
+          color:
+              selected ? colorScheme.secondary : colorScheme.onSurfaceVariant,
         );
       }),
       iconTheme: WidgetStateProperty.resolveWith((states) {
@@ -254,26 +255,41 @@ ThemeData buildAppTheme({
   );
 }
 
-/// Derived provider that builds light ThemeData from AppSettings
+/// Кэш сгенерированных схем.
+///
+/// `ColorScheme.fromSeed` — самый дорогой шаг сборки темы: квантизация seed и
+/// пересчёт всей палитры в HCT. Набор seed-цветов фиксирован палитрой, поэтому
+/// схему достаточно посчитать один раз на пару «цвет + яркость»: повторный
+/// выбор того же акцента и переключение светлая/тёмная больше не пересчитывают
+/// палитру.
+final Map<(int, Brightness), ColorScheme> _schemeCache = {};
+
+ColorScheme _schemeOf(int seedColorValue, Brightness brightness) =>
+    _schemeCache.putIfAbsent(
+      (seedColorValue, brightness),
+      () => ColorScheme.fromSeed(
+        seedColor: Color(seedColorValue),
+        brightness: brightness,
+      ),
+    );
+
+/// Derived provider that builds light ThemeData from AppSettings.
+///
+/// Следит только за seed-цветом: смена `themeMode` не должна пересобирать
+/// обе ThemeData — MaterialApp и так рисует одну из них.
 final themeDataProvider = Provider<ThemeData>((ref) {
-  final settings = ref.watch(appSettingsProvider);
+  final seed = ref.watch(appSettingsProvider.select((s) => s.seedColorValue));
   return buildAppTheme(
-    colorScheme: ColorScheme.fromSeed(
-      seedColor: settings.seedColor,
-      brightness: Brightness.light,
-    ),
+    colorScheme: _schemeOf(seed, Brightness.light),
     brightness: Brightness.light,
   );
 });
 
 /// Derived provider that builds dark ThemeData from AppSettings
 final themeDataProviderDark = Provider<ThemeData>((ref) {
-  final settings = ref.watch(appSettingsProvider);
+  final seed = ref.watch(appSettingsProvider.select((s) => s.seedColorValue));
   return buildAppTheme(
-    colorScheme: ColorScheme.fromSeed(
-      seedColor: settings.seedColor,
-      brightness: Brightness.dark,
-    ),
+    colorScheme: _schemeOf(seed, Brightness.dark),
     brightness: Brightness.dark,
   );
 });

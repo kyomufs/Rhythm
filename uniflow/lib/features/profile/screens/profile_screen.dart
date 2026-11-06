@@ -30,7 +30,7 @@ class ProfileScreen extends ConsumerWidget {
     final studentId = storage.getStudentId();
     final subgroup = storage.getMySubgroup();
     final version = ref.watch(appVersionProvider).valueOrNull;
-    final versionLabel = version == null ? 'О приложении' : 'UniFlow v$version';
+    final versionLabel = version == null ? 'О приложении' : 'Ритм v$version';
 
     return Scaffold(
       appBar: AppBar(
@@ -88,7 +88,7 @@ class ProfileScreen extends ConsumerWidget {
   ) {
     showAboutDialog(
       context: context,
-      applicationName: 'UniFlow',
+      applicationName: 'Ритм',
       applicationVersion: version ?? '',
       applicationIcon: Icon(
         Icons.school,
@@ -97,8 +97,8 @@ class ProfileScreen extends ConsumerWidget {
       ),
       children: [
         const Text(
-          'Приложение для просмотра расписания '
-          'Тульского государственного университета.',
+          'Расписание, журнал успеваемости и дедлайны. '
+          'Поддерживается ТулГУ и ручные источники.',
         ),
         const Gap(16),
         const ListTile(
@@ -145,7 +145,7 @@ class _IdentityCard extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final hasSubgroup = subgroup != null && subgroup!.isNotEmpty;
-    final monogram = (group != null && group!.isNotEmpty) ? group! : 'UniFlow';
+    final monogram = (group != null && group!.isNotEmpty) ? group! : 'Ритм';
 
     return Material(
       color: colorScheme.primaryContainer,

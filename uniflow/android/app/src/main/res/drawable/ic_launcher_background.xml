@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Brand gradient matching the Flutter icon generator (#6750A4 -> #3B46CD). -->
+<!-- Brand gradient matching assets/branding/app_icon.svg (#7B64C4 -> #5A4497). -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
     <gradient
-        android:startColor="#6750A4"
-        android:endColor="#3B46CD"
+        android:startColor="#7B64C4"
+        android:endColor="#5A4497"
         android:angle="315" />
 </shape>

@@ -34,6 +34,30 @@ jobs:
       - name: Run tests
         run: flutter test
 
+      # Без постоянного ключа APK подписывается debug-сертификатом, который
+      # генерируется заново на каждой машине: тогда следующая версия не
+      # ставится поверх предыдущей. Секреты задаются один раз в настройках
+      # репозитория (см. README, «Ключ подписи Android»).
+      - name: Restore release keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ANDROID_KEYSTORE_BASE64}" ]; then
+            echo "::error::Секрет ANDROID_KEYSTORE_BASE64 не задан: APK уйдёт с debug-подписью и не установится поверх предыдущей версии."
+            exit 1
+          fi
+          printf '%s' "${ANDROID_KEYSTORE_BASE64}" | base64 -d > android/upload-keystore.jks
+          {
+            printf 'storeFile=upload-keystore.jks\n'
+            printf 'storePassword=%s\n' "${ANDROID_KEYSTORE_PASSWORD}"
+            printf 'keyAlias=%s\n' "${ANDROID_KEY_ALIAS}"
+            printf 'keyPassword=%s\n' "${ANDROID_KEY_PASSWORD}"
+          } > android/key.properties
+
       - name: Build Android (release APK)
         run: flutter build apk --release
 

@@ -140,6 +140,174 @@ class JournalNotifier extends StateNotifier<JournalState> {
     return course;
   }
 
+  /// Переносит расписание в журнал: семестр по датам занятий, дисциплины по
+  /// названиям, пары — записями без отметок. Ручные данные и уже
+  /// существующие записи не затрагиваются, повторный импорт не создаёт дублей.
+  ///
+  /// Возвращает, сколько объектов появилось: по этим числам экран решает,
+  /// показать «добавлено» или «всё уже на месте».
+  ({int courses, int lessons}) importSchedule(List<ScheduleItem> items) {
+    final parsed = <({
+      DateTime date,
+      int slot,
+      LessonType type,
+      String subject,
+      String teacher
+    })>[];
+    for (final item in items) {
+      final subject = item.subject.trim();
+      if (subject.isEmpty) continue;
+      final slot = lessonSlotFromTime(item.time);
+      if (slot <= 0) continue;
+      DateTime date;
+      try {
+        date = item.parsedDate;
+      } on Object {
+        continue;
+      }
+      if (date.year < 2000) continue;
+      parsed.add((
+        date: DateTime(date.year, date.month, date.day),
+        slot: slot,
+        type: lessonTypeFromSchedule(item.type) ?? LessonType.unknown,
+        subject: subject,
+        teacher: item.teacher.trim(),
+      ));
+    }
+    if (parsed.isEmpty) return (courses: 0, lessons: 0);
+
+    parsed.sort((a, b) => a.date.compareTo(b.date));
+    final data = state.data;
+    var terms = data.terms;
+    final courses = [...data.courses];
+    final records = [...data.records];
+
+    // Дисциплины сопоставляются без учёта регистра: в API название может
+    // прийти с другим регистром, а дисциплина — та же. Ключ включает
+    // семестр: «Математика» осенью и весной — разные ведомости.
+    final byKey = <String, Course>{
+      for (final course in courses)
+        '${course.termId}|${course.title.toLowerCase()}': course,
+    };
+    var createdCourses = 0;
+    var createdLessons = 0;
+
+    // Расписание может прийти сразу за весь учебный год: сентябрь и май
+    // относятся к разным семестрам, поэтому пары раскладываются по сезонам.
+    final groups = <String, List<({
+      DateTime date,
+      int slot,
+      LessonType type,
+      String subject,
+      String teacher
+    })>>{};
+    for (final lesson in parsed) {
+      groups.putIfAbsent(_seasonKey(lesson.date), () => []).add(lesson);
+    }
+    final ordered = groups.values.toList()
+      ..sort((a, b) => a.first.date.compareTo(b.first.date));
+
+    for (final group in ordered) {
+      final resolved = _termForRange(terms, group.first.date, group.last.date);
+      terms = resolved.terms;
+      final term = resolved.term;
+
+      for (final lesson in group) {
+        final key = '${term.id}|${lesson.subject.toLowerCase()}';
+        var course = byKey[key];
+        if (course == null) {
+          course = Course(
+            id:
+                'course-${DateTime.now().microsecondsSinceEpoch}-$createdCourses',
+            termId: term.id,
+            title: lesson.subject,
+            teacher: lesson.teacher.isEmpty ? null : lesson.teacher,
+            kind: CourseKind.exam,
+            colorIndex: courses.length,
+            scale: defaultGradeScale(),
+          );
+          byKey[key] = course;
+          courses.add(course);
+          createdCourses++;
+        }
+        final exists = records.any((r) =>
+            r.courseId == course!.id &&
+            r.slot == lesson.slot &&
+            r.date.year == lesson.date.year &&
+            r.date.month == lesson.date.month &&
+            r.date.day == lesson.date.day);
+        if (exists) continue;
+        records.add(LessonRecord(
+          id:
+              'lesson-${lesson.date.millisecondsSinceEpoch}-${lesson.slot}-${records.length}',
+          courseId: course.id,
+          date: lesson.date,
+          slot: lesson.slot,
+          type: lesson.type,
+        ));
+        createdLessons++;
+      }
+    }
+
+    _write(JournalData(
+      terms: terms,
+      courses: courses,
+      records: records,
+      assessments: data.assessments,
+    ));
+    return (courses: createdCourses, lessons: createdLessons);
+  }
+
+  /// Учебный сезон пары: осень (сентябрь–январь) и весна (февраль–июль)
+  /// одного учебного года. Нужен, чтобы импорт за весь год не склеивал
+  /// два семестра в один.
+  String _seasonKey(DateTime date) {
+    final year = date.month >= 8 ? date.year : date.year - 1;
+    final autumn = date.month >= 8 || date.month <= 1;
+    return '$year-${autumn ? 'autumn' : 'spring'}';
+  }
+
+  /// Семестр, в который попадает диапазон занятий. Если такого нет, он
+  /// строится по фактическим датам: учебный год начинается в августе.
+  /// Найденный семестр расширяется, а не дублируется: импорт по одной паре
+  /// не должен плодить по семестру на каждую новую дату.
+  ({Term term, List<Term> terms}) _termForRange(
+    List<Term> terms,
+    DateTime first,
+    DateTime last,
+  ) {
+    for (final term in terms) {
+      final matches = term.contains(first) ||
+          term.contains(last) ||
+          _seasonKey(term.start) == _seasonKey(first);
+      if (!matches) continue;
+      final start = first.isBefore(term.start) ? first : term.start;
+      final end = last.isAfter(term.end) ? last : term.end;
+      if (start == term.start && end == term.end) {
+        return (term: term, terms: terms);
+      }
+      final updated = term.copyWith(start: start, end: end);
+      return (
+        term: updated,
+        terms: [
+          for (final item in terms) item.id == term.id ? updated : item,
+        ],
+      );
+    }
+    final year = first.month >= 8 ? first.year : first.year - 1;
+    final title = first.month >= 8
+        ? 'Осенний семестр $year/${(year + 1) % 100}'
+        : 'Весенний семестр $year/${(year + 1) % 100}';
+    final term = Term(
+      id: 'term-${first.microsecondsSinceEpoch}-$year',
+      sourceId: sourceId,
+      title: title,
+      start: DateTime(first.year, first.month, first.day),
+      end: DateTime(last.year, last.month, last.day),
+    );
+    return (term: term, terms: [...terms, term]);
+  }
+
   // ── Пары ─────────────────────────────────────────────────
 
   LessonRecord lessonFor({
@@ -175,6 +343,12 @@ class JournalNotifier extends StateNotifier<JournalState> {
                 item.id == record.id ? record : item,
             ]
           : [...state.data.records, record],
+    ));
+  }
+
+  void deleteLesson(String lessonId) {
+    _write(state.data.copyWith(
+      records: state.data.records.where((r) => r.id != lessonId).toList(),
     ));
   }
 

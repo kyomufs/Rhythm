@@ -9,6 +9,7 @@ import 'package:uniflow/features/schedule/providers/schedule_provider.dart';
 import 'package:uniflow/features/schedule/widgets/day_schedule.dart';
 import 'package:uniflow/features/schedule/widgets/lesson_detail_sheet.dart';
 import 'package:uniflow/features/schedule/widgets/week_navigator.dart';
+import 'package:uniflow/shared/widgets/empty_state.dart';
 import 'package:uniflow/shared/widgets/loading_indicator.dart';
 
 /// Read-only schedule preview for any search value (group, teacher, auditorium).
@@ -140,9 +141,9 @@ class _SchedulePreviewScreenState extends ConsumerState<SchedulePreviewScreen> {
       body: _isLoading
           ? const LoadingIndicator(message: 'Загрузка расписания...')
           : _error != null
-              ? _buildError(colorScheme, theme)
+              ? _buildError()
               : _items.isEmpty
-                  ? _buildEmpty(colorScheme, theme)
+                  ? _buildEmpty()
                   : _buildContent(),
     );
   }
@@ -198,43 +199,24 @@ class _SchedulePreviewScreenState extends ConsumerState<SchedulePreviewScreen> {
     );
   }
 
-  Widget _buildError(ColorScheme colorScheme, ThemeData theme) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.error_outline,
-              size: 64, color: colorScheme.error.withValues(alpha: 0.5)),
-          const Gap(16),
-          Text('Ошибка загрузки', style: theme.textTheme.titleMedium),
-          const Gap(8),
-          Text(_error!,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyLarge
-                  ?.copyWith(color: colorScheme.onSurfaceVariant)),
-          const Gap(16),
-          FilledButton.tonal(
-            onPressed: _loadSchedule,
-            child: const Text('Повторить'),
-          ),
-        ],
+  Widget _buildError() {
+    return EmptyState(
+      icon: Icons.cloud_off_outlined,
+      title: 'Ошибка загрузки',
+      message: _error!,
+      action: FilledButton.tonalIcon(
+        onPressed: _loadSchedule,
+        icon: const Icon(Icons.refresh),
+        label: const Text('Повторить'),
       ),
     );
   }
 
-  Widget _buildEmpty(ColorScheme colorScheme, ThemeData theme) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.event_busy,
-              size: 64, color: colorScheme.primary.withValues(alpha: 0.3)),
-          const Gap(16),
-          Text('Нет занятий на эту неделю',
-              style: theme.textTheme.bodyLarge
-                  ?.copyWith(color: colorScheme.onSurfaceVariant)),
-        ],
-      ),
+  Widget _buildEmpty() {
+    return const EmptyState(
+      icon: Icons.event_busy_outlined,
+      title: 'Нет занятий',
+      message: 'На эту неделю пар в расписании нет',
     );
   }
 }

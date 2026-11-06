@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,12 +13,13 @@ void main() async {
   // Phones are portrait-only; tablets (shortest side >= 600dp) keep
   // all orientations. View metrics are read before the first frame.
   final views = WidgetsBinding.instance.platformDispatcher.views;
+  Future<void>? orientation;
   if (views.isNotEmpty) {
     final view = views.first;
     final shortestSide = view.physicalSize.shortestSide / view.devicePixelRatio;
     if (shortestSide < 600) {
-      await SystemChrome.setPreferredOrientations(
-          [DeviceOrientation.portraitUp]);
+      orientation =
+          SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     }
   }
 
@@ -29,15 +32,17 @@ void main() async {
     statusBarColor: Colors.transparent,
   ));
 
-  // Initialize locale data for intl (Russian date formatting)
-  await initializeDateFormatting('ru');
-
-  // Initialize storage
   final storageService = StorageService();
-  await storageService.init();
 
-  // Clear old cache
-  await storageService.clearOldCache();
+  // Три независимые инициализации — локальное хранилище, таблицы дат для
+  // ru-локали и ориентация — раньше шли тремя последовательными await, и
+  // сплэш висел на их сумме. Первому кадру нужны все три, поэтому запускаем
+  // их вместе и ждём самую долгую.
+  await Future.wait<void>([
+    if (orientation != null) orientation,
+    initializeDateFormatting('ru'),
+    storageService.init(),
+  ]);
 
   final onboardingDone = storageService.isOnboardingCompleted();
 
@@ -49,4 +54,8 @@ void main() async {
       child: UniFlowApp(startScreen: onboardingDone),
     ),
   );
+
+  // Чистка протухшего кэша расписания не нужна первому кадру: раньше она
+  // стояла перед runApp и задерживала запуск на проход по всем снапшотам.
+  unawaited(storageService.clearOldCache());
 }

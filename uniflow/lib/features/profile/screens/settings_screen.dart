@@ -6,11 +6,12 @@ import 'package:uniflow/core/services/notification_service.dart';
 import 'package:uniflow/core/services/storage_service.dart';
 import 'package:uniflow/core/theme/color_utils.dart';
 import 'package:uniflow/core/theme/motion.dart';
+import 'package:uniflow/core/theme/shapes.dart';
 import 'package:uniflow/core/theme/theme_provider.dart';
 import 'package:uniflow/core/theme/typography.dart';
 import 'package:uniflow/features/profile/screens/onboarding_screen.dart';
 import 'package:uniflow/features/profile/screens/student_profile_screen.dart';
-import 'package:uniflow/shared/widgets/app_segmented_selector.dart';
+import 'package:uniflow/shared/widgets/expressive_button_group.dart';
 
 /// Settings screen for app customization
 class SettingsScreen extends ConsumerWidget {
@@ -55,20 +56,22 @@ class SettingsScreen extends ConsumerWidget {
           _SectionCard(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
             children: [
-              AppSegmentedSelector<String>(
+              ExpressiveButtonGroup<String>(
                 values: const ['system', 'light', 'dark'],
                 selected: settings.themeMode,
                 labelOf: (mode) => switch (mode) {
                   'light' => 'Светлая',
                   'dark' => 'Тёмная',
-                  _ => 'Системная',
+                  // «Системная» втрое шире соседних подписей и в группе из
+                  // трёх кнопок не влезает: на 360dp обрезается в «Систе…».
+                  _ => 'Система',
                 },
                 iconOf: (mode) => switch (mode) {
                   'light' => Icons.light_mode,
                   'dark' => Icons.dark_mode,
                   _ => Icons.brightness_auto,
                 },
-                onSelected: notifier.updateThemeMode,
+                onChanged: notifier.updateThemeMode,
               ),
             ],
           ),
@@ -176,17 +179,21 @@ class SettingsScreen extends ConsumerWidget {
                 subtitle: Text(
                   settings.backgroundCheckMinutes == 0
                       ? 'Выключена — изменения придут только при обновлении'
-                      : 'Каждые ${AppSettings.backgroundCheckLabel(settings.backgroundCheckMinutes).toLowerCase()}'
+                      : '${AppSettings.backgroundCheckDescription(settings.backgroundCheckMinutes)}'
                           '. При изменениях придёт уведомление',
                 ),
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                child: AppSegmentedSelector<int>(
+                child: ExpressiveButtonGroup<int>(
                   values: AppSettings.backgroundCheckPresets,
                   selected: settings.backgroundCheckMinutes,
                   labelOf: AppSettings.backgroundCheckLabel,
-                  onSelected: notifier.updateBackgroundCheckMinutes,
+                  // Пять сегментов в одной строке: самые длинные подписи
+                  // («12 часов») в обычном размере на 360dp не влезают,
+                  // поэтому берём XS и сжимаем подпись по ширине сегмента.
+                  size: ExpressiveButtonSize.extraSmall,
+                  onChanged: notifier.updateBackgroundCheckMinutes,
                 ),
               ),
             ],
@@ -354,9 +361,11 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      elevation: 0,
+    // Material, а не Container: ListTile рисует фон и рябь на ближайшем
+    // Material, и промежуточный DecoratedBox их бы спрятал.
+    return Material(
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      borderRadius: AppShapes.circular(AppShapes.largeIncreased),
       clipBehavior: Clip.antiAlias,
       child: Padding(padding: padding, child: Column(children: children)),
     );
@@ -377,4 +386,3 @@ class _TileDivider extends StatelessWidget {
     );
   }
 }
-

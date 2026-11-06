@@ -4,7 +4,12 @@ import 'package:gap/gap.dart';
 import 'package:intl/intl.dart';
 import 'package:uniflow/core/models/note_models.dart';
 import 'package:uniflow/features/notes/providers/notes_provider.dart';
+import 'package:uniflow/core/theme/motion.dart';
+import 'package:uniflow/core/theme/shapes.dart';
+import 'package:uniflow/core/theme/typography.dart';
 import 'package:uniflow/features/notes/widgets/task_sheet.dart';
+import 'package:uniflow/shared/widgets/empty_state.dart';
+import 'package:uniflow/shared/widgets/wavy_progress.dart';
 
 /// Вкладка «Задачи»: скрытые подпапки отфильтрованы, остальные идут секциями.
 class TasksTab extends StatelessWidget {
@@ -19,40 +24,19 @@ class TasksTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     // Hidden subfolders are managed via ⋮ → «Подпапки» and stay out of
     // the way here; their tasks still count in the subject overview.
     final subfolders = folder.subfolders.where((sf) => !sf.isHidden).toList();
 
     if (subfolders.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.folder_open,
-              size: 48,
-              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-            ),
-            const Gap(12),
-            Text(
-              folder.subfolders.isEmpty
-                  ? 'Нет подпапок'
-                  : 'Все подпапки скрыты',
-              style: theme.textTheme.bodyLarge?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const Gap(4),
-            Text(
-              'Управляйте ими: меню ⋮ → «Подпапки»',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
+      return EmptyState(
+        icon: folder.subfolders.isEmpty
+            ? Icons.create_new_folder_outlined
+            : Icons.visibility_off_outlined,
+        title: folder.subfolders.isEmpty
+            ? 'Нет подпапок'
+            : 'Все подпапки скрыты',
+        message: 'Управляйте ими: меню ⋮ → «Подпапки»',
       );
     }
 
@@ -92,70 +76,92 @@ class _SubfolderSection extends StatelessWidget {
     final total = subfolder.tasks.length;
     final done = subfolder.completedCount;
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: 0,
-      color: colorScheme.surfaceContainerLow,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: colorScheme.outlineVariant),
-      ),
       clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: AppShapes.circular(AppShapes.largeIncreased),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+        ),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header: tinted pill with icon, name and progress counter
+          // Шапка подпапки: тон предмета, счётчик и волна прогресса.
           Container(
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.10),
-            ),
+            decoration: BoxDecoration(color: color.withValues(alpha: 0.07)),
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-            child: Row(
+            child: Column(
               children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    subfolder.isDefault
-                        ? Icons.folder_outlined
-                        : Icons.create_new_folder_outlined,
-                    size: 18,
-                    color: color,
-                  ),
-                ),
-                const Gap(10),
-                Expanded(
-                  child: Text(
-                    subfolder.name,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (total > 0)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      '$done/$total',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: done == total
-                            ? colorScheme.tertiary
-                            : colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w700,
+                Row(
+                  children: [
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.16),
+                        borderRadius: AppShapes.circular(AppShapes.medium),
+                      ),
+                      child: Icon(
+                        subfolder.isDefault
+                            ? Icons.folder_outlined
+                            : Icons.create_new_folder_outlined,
+                        size: 18,
+                        color: color,
                       ),
                     ),
+                    const Gap(10),
+                    Expanded(
+                      child: Text(
+                        subfolder.name,
+                        style: AppTypography.emphasizedTitleSmall(
+                          theme.textTheme.titleSmall!,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (total > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: done == total
+                              ? colorScheme.tertiaryContainer
+                              : colorScheme.surfaceContainerHighest,
+                          borderRadius: AppShapes.circular(AppShapes.small),
+                        ),
+                        child: Text(
+                          '$done/$total',
+                          style: AppTypography.emphasizedLabelSmall(
+                            theme.textTheme.labelSmall!.copyWith(
+                              color: done == total
+                                  ? colorScheme.onTertiaryContainer
+                                  : colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                if (total > 0) ...[
+                  const Gap(8),
+                  // Прогресс подпапки раньше был только числом; волна
+                  // показывает его не читая цифры.
+                  WavyProgressIndicator(
+                    value: done / total,
+                    color: done == total ? colorScheme.tertiary : color,
+                    trackColor: color.withValues(alpha: 0.15),
+                    height: 4,
+                    strokeWidth: 2,
+                    wavelength: 10,
+                    amplitude: 1.2,
                   ),
+                ],
               ],
             ),
           ),
@@ -241,7 +247,7 @@ class _TaskTile extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: AppShapes.circular(AppShapes.medium),
           onTap: () {
             final folder = ProviderScope.containerOf(context)
                 .read(notesProvider.notifier)
@@ -267,8 +273,10 @@ class _TaskTile extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Row(
               children: [
-                // Status checkbox
+                // Статус: зона нажатия 34×34, хотя иконка 24 — иначе
+                // переключение мимо иконки открывает карточку.
                 GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                   onTap: () {
                     final newStatus = isDone
                         ? TaskStatus.todo
@@ -280,18 +288,28 @@ class _TaskTile extends StatelessWidget {
                         .updateTaskStatus(
                             folderId, subfolderId, task.id, newStatus);
                   },
-                  child: Icon(
-                    isDone
-                        ? Icons.check_circle
-                        : task.status == TaskStatus.inProgress
-                            ? Icons.play_circle_outline
-                            : Icons.radio_button_unchecked,
-                    color: isDone
-                        ? colorScheme.tertiary
-                        : task.status == TaskStatus.inProgress
-                            ? colorScheme.primary
-                            : colorScheme.onSurfaceVariant,
-                    size: 24,
+                  child: SizedBox(
+                    width: 34,
+                    height: 34,
+                    child: Center(
+                      child: AnimatedSwitcher(
+                        duration: springDuration(MotionTokens.fastEffects),
+                        child: Icon(
+                          isDone
+                              ? Icons.check_circle
+                              : task.status == TaskStatus.inProgress
+                                  ? Icons.play_circle_outline
+                                  : Icons.radio_button_unchecked,
+                          key: ValueKey(task.status),
+                          color: isDone
+                              ? colorScheme.tertiary
+                              : task.status == TaskStatus.inProgress
+                                  ? colorScheme.primary
+                                  : colorScheme.onSurfaceVariant,
+                          size: 24,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
                 const Gap(10),
@@ -300,23 +318,23 @@ class _TaskTile extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              task.title,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                decoration:
-                                    isDone ? TextDecoration.lineThrough : null,
-                                color: isDone
-                                    ? colorScheme.onSurfaceVariant
-                                    : colorScheme.onSurface,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
+                      AnimatedDefaultTextStyle(
+                        duration: springDuration(MotionTokens.fastEffects),
+                        style: theme.textTheme.bodyMedium!.copyWith(
+                          fontWeight: FontWeight.w500,
+                          decoration: isDone
+                              ? TextDecoration.lineThrough
+                              : TextDecoration.none,
+                          decorationColor: colorScheme.onSurfaceVariant,
+                          color: isDone
+                              ? colorScheme.onSurfaceVariant
+                              : colorScheme.onSurface,
+                        ),
+                        child: Text(
+                          task.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                       const Gap(4),
                       Row(
@@ -340,7 +358,7 @@ class _TaskTile extends StatelessWidget {
                                 color: isOverdue
                                     ? colorScheme.error.withValues(alpha: 0.12)
                                     : colorScheme.surfaceContainerHighest,
-                                borderRadius: BorderRadius.circular(4),
+                                borderRadius: AppShapes.circular(AppShapes.extraSmall),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -375,7 +393,7 @@ class _TaskTile extends StatelessWidget {
                                   horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
                                 color: colorScheme.tertiaryContainer,
-                                borderRadius: BorderRadius.circular(4),
+                                borderRadius: AppShapes.circular(AppShapes.extraSmall),
                               ),
                               child: Text(
                                 task.grade!,

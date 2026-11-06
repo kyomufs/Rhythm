@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:uniflow/core/services/update_service.dart';
+import 'package:uniflow/shared/widgets/wavy_progress.dart';
 
 /// Shows the app-update flow dialog: "update available" → download with
 /// a progress bar → system install prompt.
@@ -90,7 +91,7 @@ class _UpdateDialogState extends State<_UpdateDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              LinearProgressIndicator(value: _progress),
+              WavyProgressIndicator(value: _progress, height: 8, strokeWidth: 3),
               const Gap(10),
               Text(
                 'Скачивание… ${(_progress * 100).round()}%',

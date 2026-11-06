@@ -119,7 +119,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Математика'), findsOneWidget);
-    expect(find.text('23/60 в семестре'), findsOneWidget);
+    expect(find.text('23 / 100'), findsWidgets);
+    expect(find.text('баллов в семестре'), findsOneWidget);
     expect(find.text('1/1 пар'), findsOneWidget);
     expect(find.text('1 просрочено'), findsNothing);
     expect(find.text('Осенний семестр'), findsOneWidget);
@@ -129,7 +130,7 @@ void main() {
     await tester.pumpWidget(_app(const JournalData()));
     await tester.pumpAndSettle();
 
-    expect(find.text('Пока нет дисциплин'), findsOneWidget);
+    expect(find.text('Журнал ещё пуст'), findsOneWidget);
     expect(find.text('Начать семестр'), findsOneWidget);
   });
 

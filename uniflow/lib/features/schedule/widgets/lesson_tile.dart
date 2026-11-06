@@ -6,6 +6,7 @@ import 'package:uniflow/core/providers/clock_provider.dart';
 import 'package:uniflow/core/theme/app_theme.dart';
 import 'package:uniflow/core/theme/shapes.dart';
 import 'package:uniflow/shared/widgets/press_scale.dart';
+import 'package:uniflow/shared/widgets/wavy_progress.dart';
 
 /// Lesson tile widget for displaying a single lesson.
 ///
@@ -22,12 +23,17 @@ class LessonTile extends ConsumerWidget {
   final bool showDate;
   final bool isCompact;
 
+  /// Радиус скругления плитки. Задаётся снаружи, чтобы вложенность
+  /// считалась от контейнера: `radius родителя - отступ` (правило M3E).
+  final double radius;
+
   const LessonTile({
     super.key,
     required this.item,
     this.onTap,
     this.showDate = false,
     this.isCompact = false,
+    this.radius = AppShapes.extraLarge - 4,
   });
 
   @override
@@ -59,7 +65,7 @@ class LessonTile extends ConsumerWidget {
 
     return PressScale(
       onTap: onTap,
-      borderRadius: AppShapes.circular(AppShapes.extraLarge - 4),
+      borderRadius: AppShapes.circular(radius),
       child: Container(
         padding: EdgeInsets.symmetric(
           horizontal: isCompact ? 12 : 16,
@@ -69,7 +75,7 @@ class LessonTile extends ConsumerWidget {
             ? BoxDecoration(
                 color: colorScheme.primary.withValues(alpha: 0.07),
                 border: Border.all(color: colorScheme.primary, width: 1.5),
-                borderRadius: AppShapes.circular(AppShapes.extraLarge - 4),
+                borderRadius: AppShapes.circular(radius),
               )
             : null,
         child: IntrinsicHeight(
@@ -115,21 +121,47 @@ class LessonTile extends ConsumerWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          // Time badge
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: lessonColor.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              item.time,
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                color: lessonColor,
-                                fontWeight: FontWeight.w700,
+                          // Группа «время + счётчик» ужимается целиком: в
+                          // узкой карточке она не выталкивает аудиторию за
+                          // границу ряда.
+                          Flexible(
+                            flex: 3,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  // Time badge
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          lessonColor.withValues(alpha: 0.12),
+                                      borderRadius: AppShapes.circular(
+                                        AppShapes.small,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      item.time,
+                                      style:
+                                          theme.textTheme.labelMedium?.copyWith(
+                                        color: lessonColor,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                  // Обратный отсчёт до начала — прямо в
+                                  // строке времени: в свёрнутой карточке это
+                                  // факт, а не второй блок контента.
+                                  if (isUpcomingToday) ...[
+                                    const Gap(6),
+                                    _UpcomingPill(lesson: item),
+                                  ],
+                                ],
                               ),
                             ),
                           ),
@@ -138,40 +170,46 @@ class LessonTile extends ConsumerWidget {
                           if (item.classroom.isNotEmpty) ...[
                             const SizedBox(width: 8),
                             Flexible(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: colorScheme.surfaceContainerHighest,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                // Длинный номер аудитории в узкой паре
-                                // ужимается целиком, а не ломает ряд.
-                                child: FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  alignment: Alignment.centerRight,
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.location_on_outlined,
-                                        size: 13,
-                                        color: colorScheme.onSurfaceVariant,
-                                      ),
-                                      const Gap(4),
-                                      Text(
-                                        item.classroom,
-                                        maxLines: 1,
-                                        softWrap: false,
-                                        style: theme.textTheme.labelMedium
-                                            ?.copyWith(
-                                          color: colorScheme.onSurface,
-                                          fontWeight: FontWeight.w600,
+                              flex: 2,
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerRight,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.surfaceContainerHighest,
+                                    borderRadius:
+                                        AppShapes.circular(AppShapes.small),
+                                  ),
+                                  // Длинный номер аудитории в узкой паре
+                                  // ужимается целиком, а не ломает ряд.
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerRight,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.location_on_outlined,
+                                          size: 13,
+                                          color: colorScheme.onSurfaceVariant,
                                         ),
-                                      ),
-                                    ],
+                                        const Gap(4),
+                                        Text(
+                                          item.classroom,
+                                          maxLines: 1,
+                                          softWrap: false,
+                                          style: theme.textTheme.labelMedium
+                                              ?.copyWith(
+                                            color: colorScheme.onSurface,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
@@ -217,11 +255,6 @@ class LessonTile extends ConsumerWidget {
                       if (isOngoing) ...[
                         const Gap(8),
                         _OngoingCountdown(lesson: item),
-                      ],
-                      // Countdown to today's upcoming lesson start
-                      if (isUpcomingToday) ...[
-                        const Gap(8),
-                        _UpcomingCountdown(lesson: item),
                       ],
                       // Groups (only for full-size tile)
                       if (!isCompact && item.groups.isNotEmpty) ...[
@@ -312,7 +345,7 @@ class _OngoingCountdown extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: colorScheme.primaryContainer,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: AppShapes.circular(AppShapes.medium),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -335,15 +368,16 @@ class _OngoingCountdown extends ConsumerWidget {
             ],
           ),
           const Gap(6),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(2),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 4,
-              backgroundColor:
-                  colorScheme.onPrimaryContainer.withValues(alpha: 0.15),
-              color: colorScheme.onPrimaryContainer,
-            ),
+          // Волнистый индикатор: прямая полоса в экспрессивной теме читается
+          // как служебный прогресс, а пара идёт прямо сейчас — это главный
+          // момент экрана.
+          WavyProgressIndicator(
+            value: progress,
+            color: colorScheme.onPrimaryContainer,
+            trackColor: colorScheme.onPrimaryContainer.withValues(alpha: 0.15),
+            height: 8,
+            strokeWidth: 3,
+            wavelength: 12,
           ),
         ],
       ),
@@ -351,41 +385,55 @@ class _OngoingCountdown extends ConsumerWidget {
   }
 }
 
-/// Tonal countdown block shown under the teacher while today's lesson
-/// hasn't started yet: clock icon + exact "До начала пары" countdown
-/// (secondary tonal colors — quieter than the ongoing primary card).
-class _UpcomingCountdown extends ConsumerWidget {
+/// Пилюля «через 12:30» в строке времени свёрнутой карточки.
+///
+/// Часы:минуты:секунды вместо фразы «До начала пары — 12 мин 30 с»: тикающие
+/// секунды — единственный живой элемент недельного списка, но двухстрочная
+/// плашка во всю ширину отнимала у предмета целую строку. Свои часы — чтобы
+/// перерисовывалась только пилюля, а не вся карточка и соседние за ней.
+class _UpcomingPill extends ConsumerWidget {
   final ScheduleItem lesson;
 
-  const _UpcomingCountdown({required this.lesson});
+  const _UpcomingPill({required this.lesson});
+
+  /// Компактный формат: `12:30`, от часа — `1:05:20`.
+  String _left(Duration remaining) {
+    final total = remaining.isNegative ? Duration.zero : remaining;
+    final hours = total.inHours;
+    final minutes = total.inMinutes.remainder(60);
+    final seconds = total.inSeconds.remainder(60);
+    String two(int value) => value.toString().padLeft(2, '0');
+    if (hours > 0) return '$hours:${two(minutes)}:${two(seconds)}';
+    return '$minutes:${two(seconds)}';
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final now = ref.watch(clockProvider);
-    final left = lesson.timeUntilStartAt(now);
 
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: colorScheme.secondaryContainer,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: AppShapes.circular(AppShapes.extraLarge),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.watch_later_outlined,
-              size: 15, color: colorScheme.onSecondaryContainer),
-          const Gap(6),
-          Expanded(
-            child: Text(
-              'До начала пары — ${formatCountdown(left)}',
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: colorScheme.onSecondaryContainer,
-                fontWeight: FontWeight.w700,
-                fontFeatures: const [FontFeature.tabularFigures()],
-              ),
+          Icon(
+            Icons.play_arrow_rounded,
+            size: 13,
+            color: colorScheme.onSecondaryContainer,
+          ),
+          const Gap(2),
+          Text(
+            _left(lesson.timeUntilStartAt(now)),
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: colorScheme.onSecondaryContainer,
+              fontWeight: FontWeight.w700,
+              fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
         ],

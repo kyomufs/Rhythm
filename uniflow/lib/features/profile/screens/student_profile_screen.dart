@@ -4,6 +4,8 @@ import 'package:gap/gap.dart';
 import 'package:uniflow/core/models/schedule.dart';
 import 'package:uniflow/core/services/schedule_service.dart';
 import 'package:uniflow/core/services/storage_service.dart';
+import 'package:uniflow/core/theme/shapes.dart';
+import 'package:uniflow/core/theme/typography.dart';
 import 'package:uniflow/features/profile/providers/profile_providers.dart';
 import 'package:uniflow/features/schedule/providers/schedule_provider.dart';
 import 'package:uniflow/shared/widgets/loading_indicator.dart';
@@ -132,10 +134,13 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
           ),
           const Gap(24),
 
-          FilledButton.icon(
-            onPressed: _save,
-            icon: const Icon(Icons.check),
-            label: const Text('Сохранить'),
+          SizedBox(
+            height: 56,
+            child: FilledButton.icon(
+              onPressed: _save,
+              icon: const Icon(Icons.check_circle_outline),
+              label: const Text('Сохранить'),
+            ),
           ),
         ],
       ),
@@ -157,7 +162,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
   }
 }
 
-/// Labeled card wrapping one editable profile field.
+/// Карточка одного поля профиля: подпись, поле и подсказка под ним.
 class _FieldCard extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -176,37 +181,39 @@ class _FieldCard extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(icon, size: 18, color: colorScheme.primary),
-                const Gap(8),
-                Text(
-                  title,
-                  style: theme.textTheme.titleSmall
-                      ?.copyWith(fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-            const Gap(8),
-            child,
-            if (hint != null) ...[
-              const Gap(6),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: AppShapes.circular(AppShapes.largeIncreased),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 18, color: colorScheme.primary),
+              const Gap(8),
               Text(
-                hint!,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
+                title,
+                style: AppTypography.emphasizedTitleSmall(
+                  theme.textTheme.titleSmall!,
                 ),
               ),
             ],
+          ),
+          const Gap(10),
+          child,
+          if (hint != null) ...[
+            const Gap(6),
+            Text(
+              hint!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
           ],
-        ),
+        ],
       ),
     );
   }

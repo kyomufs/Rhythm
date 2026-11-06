@@ -128,7 +128,8 @@ void main() {
 
     testWidgets('shows exact time until the start', (tester) async {
       await pumpTile(tester, DateTime(2026, 11, 2, 7, 12, 26));
-      expect(find.text('До начала пары — 47 мин 34 с'), findsOneWidget);
+      // Компактная пилюля в строке времени: минуты:секунды без слов.
+      expect(find.text('47:34'), findsOneWidget);
       // Unmount to dispose the clock and its pending tick timer.
       await tester.pumpWidget(const SizedBox());
     });

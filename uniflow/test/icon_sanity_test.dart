@@ -1,5 +1,5 @@
 // Sanity check for generated icons: samples pixels of the new design
-// (brand gradient + white university glyph).
+// (brand gradient + white wave glyph).
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -47,16 +47,18 @@ void main() {
         'ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png';
     final topLeft = await pixel(path, 8, 8);
     final bottomRight = await pixel(path, 1015, 1015);
-    stdout.writeln('topLeft=$topLeft (expect ~123,103,176)');
-    stdout.writeln('bottomRight=$bottomRight (expect ~59,70,205)');
+    stdout.writeln('topLeft=$topLeft (expect ~123,100,196)');
+    stdout.writeln('bottomRight=$bottomRight (expect ~90,68,151)');
 
-    // Gradient start (with highlight) top-left and end bottom-right.
-    expect(topLeft.r, inInclusiveRange(90, 160));
-    expect(topLeft.g, inInclusiveRange(70, 140));
-    expect(bottomRight.b, inInclusiveRange(190, 215));
-    expect(bottomRight.r, inInclusiveRange(45, 75));
+    // Gradient start top-left and end bottom-right.
+    expect(topLeft.r, inInclusiveRange(110, 140));
+    expect(topLeft.g, inInclusiveRange(88, 112));
+    expect(topLeft.b, inInclusiveRange(184, 210));
+    expect(bottomRight.r, inInclusiveRange(78, 102));
+    expect(bottomRight.g, inInclusiveRange(56, 80));
+    expect(bottomRight.b, inInclusiveRange(138, 164));
 
-    // The white university glyph must be present in quantity.
+    // The white wave glyph must be present in quantity.
     final white = await countWhite(path);
     stdout.writeln('white samples: $white (grid stride8, expect > 100)');
     expect(white, greaterThan(100));

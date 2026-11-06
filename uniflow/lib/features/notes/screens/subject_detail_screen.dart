@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:uniflow/core/models/note_models.dart';
+import 'package:uniflow/core/theme/motion.dart';
 import 'package:uniflow/features/notes/providers/notes_provider.dart';
 import 'package:uniflow/features/notes/widgets/overview_tab.dart';
 import 'package:uniflow/features/notes/widgets/task_list.dart';
 import 'package:uniflow/features/notes/widgets/task_sheet.dart';
+import 'package:uniflow/shared/widgets/expressive_button_group.dart';
 
 /// Subject detail screen — overview + subfolder tabs
 class SubjectDetailScreen extends ConsumerStatefulWidget {
@@ -18,19 +20,15 @@ class SubjectDetailScreen extends ConsumerStatefulWidget {
       _SubjectDetailScreenState();
 }
 
-class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-  }
+class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
+  /// 0 — обзор, 1 — задачи. Страницы листаются, группа кнопок задаёт
+  /// выбранную: два способа переключения живут на одном состоянии.
+  int _tab = 0;
+  late final PageController _pageController = PageController();
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _pageController.dispose();
     super.dispose();
   }
 
@@ -60,23 +58,44 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen>
             onPressed: () => _showActionsSheet(context, ref, folder),
           ),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'Обзор'),
-            Tab(text: 'Задачи'),
-          ],
-        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddTaskSheet(context, ref, folder),
         child: const Icon(Icons.add_task),
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          OverviewTab(folder: folder, color: color),
-          TasksTab(folder: folder, color: color),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+            child: ExpressiveButtonGroup<int>(
+              values: const [0, 1],
+              selected: _tab,
+              labelOf: (tab) => tab == 0 ? 'Обзор' : 'Задачи',
+              iconOf: (tab) =>
+                  tab == 0 ? Icons.dashboard_outlined : Icons.checklist,
+              onChanged: (tab) {
+                if (tab == _tab) return;
+                setState(() => _tab = tab);
+                // Страница едет spatial-пружиной: пролистывание и нажатие
+                // выглядят одинаково, источник переключения не важен.
+                _pageController.animateToPage(
+                  tab,
+                  duration: springDuration(MotionTokens.defaultSpatial),
+                  curve: Curves.easeOutCubic,
+                );
+              },
+            ),
+          ),
+          Expanded(
+            child: PageView(
+              controller: _pageController,
+              onPageChanged: (tab) => setState(() => _tab = tab),
+              children: [
+                OverviewTab(folder: folder, color: color),
+                TasksTab(folder: folder, color: color),
+              ],
+            ),
+          ),
         ],
       ),
     );

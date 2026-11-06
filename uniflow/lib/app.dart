@@ -43,7 +43,7 @@ class UniFlowApp extends ConsumerWidget {
     final darkTheme = ref.watch(themeDataProviderDark);
 
     return MaterialApp(
-      title: 'UniFlow',
+      title: 'Ритм',
       debugShowCheckedModeBanner: false,
       theme: lightTheme,
       darkTheme: darkTheme,
@@ -160,7 +160,7 @@ class _MainShellState extends ConsumerState<MainShell> {
       await service.show(
         1,
         'Уведомления включены',
-        'UniFlow сообщит об изменениях расписания и оценок',
+        'Ритм сообщит об изменениях расписания и оценок',
       );
     }
   }

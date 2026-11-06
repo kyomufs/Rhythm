@@ -171,7 +171,7 @@ class _DayBlockHeader extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: AppShapes.circular(AppShapes.medium),
       ),
       child: Row(
         children: [
@@ -181,7 +181,7 @@ class _DayBlockHeader extends StatelessWidget {
             alignment: Alignment.center,
             decoration: BoxDecoration(
               color: colorScheme.primary,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: AppShapes.circular(AppShapes.small),
             ),
             child: Text(
               dayNumber,
@@ -204,7 +204,7 @@ class _DayBlockHeader extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
               color: colorScheme.surface,
-              borderRadius: BorderRadius.circular(999),
+              borderRadius: AppShapes.circular(AppShapes.extraExtraLarge),
             ),
             child: Text(
               '$count изм.',
@@ -264,7 +264,7 @@ class _ChangeCard extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: background,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppShapes.circular(AppShapes.large),
         border: Border.all(color: accent.withValues(alpha: 0.4)),
       ),
       child: Column(
@@ -279,7 +279,7 @@ class _ChangeCard extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
                   color: accent.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(999),
+                  borderRadius: AppShapes.circular(AppShapes.extraExtraLarge),
                 ),
                 child: Text(
                   kindLabel,

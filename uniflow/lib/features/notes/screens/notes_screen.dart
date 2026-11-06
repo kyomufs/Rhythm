@@ -3,9 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:uniflow/core/models/note_models.dart';
 import 'package:uniflow/core/theme/color_utils.dart';
+import 'package:uniflow/core/theme/shapes.dart';
+import 'package:uniflow/core/theme/typography.dart';
 import 'package:uniflow/features/notes/providers/notes_provider.dart';
 import 'package:uniflow/features/notes/screens/subject_detail_screen.dart';
 import 'package:uniflow/features/schedule/providers/schedule_provider.dart';
+import 'package:uniflow/shared/widgets/empty_state.dart';
+import 'package:uniflow/shared/widgets/expressive_button_group.dart';
+import 'package:uniflow/shared/widgets/wavy_progress.dart';
 
 /// Notes main screen — list of subject folders
 class NotesScreen extends ConsumerWidget {
@@ -34,54 +39,14 @@ class NotesScreen extends ConsumerWidget {
   }
 
   Widget _buildEmptyState(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 140,
-              height: 140,
-              decoration: BoxDecoration(
-                color: colorScheme.primaryContainer.withValues(alpha: 0.3),
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: Icon(
-                  Icons.school_outlined,
-                  size: 72,
-                  color: colorScheme.primary.withValues(alpha: 0.6),
-                ),
-              ),
-            ),
-            const Gap(32),
-            Text(
-              'Нет предметов',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const Gap(12),
-            Text(
-              'Добавьте предметы для отслеживания\nзадач и прогресса по курсам',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyLarge?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-                height: 1.5,
-              ),
-            ),
-            const Gap(32),
-            FilledButton.icon(
-              onPressed: () => _showAddSubjectSheet(context, ref),
-              icon: const Icon(Icons.add),
-              label: const Text('Добавить предмет'),
-            ),
-          ],
-        ),
+    return EmptyState(
+      icon: Icons.school_outlined,
+      title: 'Нет предметов',
+      message: 'Добавьте предметы, чтобы отслеживать задачи и прогресс',
+      action: FilledButton.icon(
+        onPressed: () => _showAddSubjectSheet(context, ref),
+        icon: const Icon(Icons.add),
+        label: const Text('Добавить предмет'),
       ),
     );
   }
@@ -145,11 +110,13 @@ class NotesScreen extends ConsumerWidget {
                 padding: const EdgeInsets.only(right: 20),
                 decoration: BoxDecoration(
                   color: colorScheme.error,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: AppShapes.circular(AppShapes.extraLarge),
                 ),
                 child: Icon(Icons.delete, color: colorScheme.onError),
               ),
-              child: Card(
+              child: Material(
+                color: colorScheme.surfaceContainerLow,
+                borderRadius: AppShapes.circular(AppShapes.extraLarge),
                 clipBehavior: Clip.antiAlias,
                 child: InkWell(
                   onTap: () {
@@ -160,36 +127,39 @@ class NotesScreen extends ConsumerWidget {
                       ),
                     );
                   },
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
+                  child: Container(
+                    // Цветная полоса слева — единственное место, где тон
+                    // предмета касается края карточки; остальное нейтрально.
+                    decoration: BoxDecoration(
+                      border: Border(
+                        left: BorderSide(color: color, width: 4),
+                      ),
+                    ),
+                    padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
                     child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Color indicator
                         Container(
                           width: 48,
                           height: 48,
                           decoration: BoxDecoration(
-                            color: color.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(12),
+                            color: color.withValues(alpha: 0.12),
+                            borderRadius:
+                                AppShapes.circular(AppShapes.large),
                           ),
                           child: Center(
-                            child: Icon(
-                              Icons.school,
-                              color: color,
-                              size: 24,
-                            ),
+                            child: Icon(Icons.school, color: color, size: 24),
                           ),
                         ),
                         const Gap(12),
-                        // Content
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 folder.name,
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w600,
+                                style: AppTypography.emphasizedTitleMedium(
+                                  theme.textTheme.titleMedium!,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -206,65 +176,89 @@ class NotesScreen extends ConsumerWidget {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ],
-                              const Gap(4),
-                              // Subfolder chips (hidden ones stay out)
-                              if (folder.subfolders.any((sf) => !sf.isHidden))
+                              // Подпапки остаются пилюлями: их число и состав
+                              // видно сразу, без захода внутрь.
+                              if (folder.subfolders.any((sf) => !sf.isHidden)) ...[
+                                const Gap(8),
                                 Wrap(
                                   spacing: 6,
                                   runSpacing: 4,
                                   children: folder.subfolders
                                       .where((sf) => !sf.isHidden)
                                       .map((sf) {
+                                    final isComplete =
+                                        sf.tasks.isNotEmpty &&
+                                            sf.completedCount == sf.tasks.length;
                                     return Container(
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 8,
-                                        vertical: 2,
+                                        vertical: 3,
                                       ),
                                       decoration: BoxDecoration(
-                                        color:
-                                            colorScheme.surfaceContainerHighest,
-                                        borderRadius: BorderRadius.circular(6),
+                                        color: isComplete
+                                            ? colorScheme.tertiaryContainer
+                                            : colorScheme
+                                                .surfaceContainerHighest,
+                                        borderRadius:
+                                            AppShapes.circular(AppShapes.small),
                                       ),
                                       child: Text(
                                         '${sf.name} ${sf.completedCount}/${sf.tasks.length}',
-                                        style: theme.textTheme.labelSmall,
+                                        style: theme.textTheme.labelSmall
+                                            ?.copyWith(
+                                          color: isComplete
+                                              ? colorScheme
+                                                  .onTertiaryContainer
+                                              : colorScheme.onSurfaceVariant,
+                                        ),
                                       ),
                                     );
                                   }).toList(),
                                 ),
+                              ],
                             ],
                           ),
                         ),
-                        // Progress
+                        const Gap(8),
                         if (totalTasks > 0)
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               Text(
                                 '$completedTasks/$totalTasks',
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  color: completedTasks == totalTasks
-                                      ? colorScheme.tertiary
-                                      : colorScheme.onSurface,
-                                  fontWeight: FontWeight.w600,
+                                style: AppTypography.emphasizedLabelLarge(
+                                  theme.textTheme.labelLarge!.copyWith(
+                                    color: completedTasks == totalTasks
+                                        ? colorScheme.tertiary
+                                        : colorScheme.onSurface,
+                                  ),
                                 ),
                               ),
-                              const Gap(4),
+                              const Gap(6),
                               SizedBox(
-                                width: 48,
-                                child: LinearProgressIndicator(
+                                width: 56,
+                                child: WavyProgressIndicator(
                                   value: progress,
-                                  backgroundColor:
-                                      colorScheme.surfaceContainerHighest,
-                                  borderRadius: BorderRadius.circular(2),
+                                  color: completedTasks == totalTasks
+                                      ? colorScheme.tertiary
+                                      : color,
+                                  trackColor: colorScheme
+                                      .surfaceContainerHighest,
+                                  height: 6,
+                                  strokeWidth: 2,
+                                  wavelength: 10,
+                                  amplitude: 1.4,
                                 ),
                               ),
                             ],
                           )
                         else
-                          Icon(
-                            Icons.chevron_right,
-                            color: colorScheme.onSurfaceVariant,
+                          Padding(
+                            padding: const EdgeInsets.only(top: 12),
+                            child: Icon(
+                              Icons.chevron_right,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
                           ),
                       ],
                     ),
@@ -354,39 +348,18 @@ class _AddSubjectSheetState extends ConsumerState<_AddSubjectSheet> {
           ),
           const Gap(16),
 
-          // Toggle: manual or from schedule. FittedBox labels scale down
-          // instead of clipping on narrow dialogs (same rule as the task
-          // sheet's status/priority segments).
-          SegmentedButton<bool>(
-            segments: const [
-              ButtonSegment(
-                value: false,
-                label: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text('Вручную', maxLines: 1),
-                ),
-                icon: Icon(Icons.edit, size: 18),
-              ),
-              ButtonSegment(
-                value: true,
-                label: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text('Из расписания', maxLines: 1),
-                ),
-                icon: Icon(Icons.school, size: 18),
-              ),
-            ],
-            selected: {_fromSchedule},
-            showSelectedIcon: false,
-            style: ButtonStyle(
-              visualDensity: VisualDensity.compact,
-              padding: WidgetStateProperty.all(
-                const EdgeInsets.symmetric(horizontal: 8),
-              ),
-            ),
-            onSelectionChanged: (set) {
+          // Ручной ввод или подстановка из расписания — связная группа:
+          // выбранный сегмент морфится из таблетки в квадрат.
+          ExpressiveButtonGroup<bool>(
+            values: const [false, true],
+            selected: _fromSchedule,
+            labelOf: (fromSchedule) =>
+                fromSchedule ? 'Из расписания' : 'Вручную',
+            iconOf: (fromSchedule) =>
+                fromSchedule ? Icons.school_outlined : Icons.edit_outlined,
+            onChanged: (fromSchedule) {
               setState(() {
-                _fromSchedule = set.first;
+                _fromSchedule = fromSchedule;
                 if (_fromSchedule && widget.scheduleSubjects.isNotEmpty) {
                   _selectedSubjectFromSchedule = widget.scheduleSubjects.first;
                   _nameController.text = widget.scheduleSubjects.first;
@@ -417,9 +390,9 @@ class _AddSubjectSheetState extends ConsumerState<_AddSubjectSheet> {
             // MD3 style: tap to open subject picker bottom sheet
             Material(
               color: colorScheme.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: AppShapes.circular(AppShapes.medium),
               child: InkWell(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: AppShapes.circular(AppShapes.medium),
                 onTap: () =>
                     _showSubjectPicker(context, widget.scheduleSubjects),
                 child: Padding(
@@ -465,6 +438,9 @@ class _AddSubjectSheetState extends ConsumerState<_AddSubjectSheet> {
           else
             TextField(
               controller: _nameController,
+              // Кнопка «Добавить» активна только при непустом названии, значит
+              // форма обязана перерисовываться на каждый ввод.
+              onChanged: (_) => setState(() {}),
               decoration: const InputDecoration(
                 labelText: 'Название предмета',
                 hintText: 'Например, Математический анализ',
@@ -498,7 +474,11 @@ class _AddSubjectSheetState extends ConsumerState<_AddSubjectSheet> {
             ),
           ),
           const Gap(8),
-          Row(
+          // Десять кружков в строку не влезают в диалог на телефоне, поэтому
+          // переносим их по строкам, а не режем ширину.
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: List.generate(subjectColors.length, (i) {
               final isSelected = _selectedColor == i;
               return GestureDetector(
@@ -506,7 +486,6 @@ class _AddSubjectSheetState extends ConsumerState<_AddSubjectSheet> {
                 child: Container(
                   width: 36,
                   height: 36,
-                  margin: const EdgeInsets.only(right: 8),
                   decoration: BoxDecoration(
                     color: Color(subjectColors[i]),
                     shape: BoxShape.circle,

@@ -4,11 +4,13 @@ import 'package:uniflow/core/theme/shapes.dart';
 import 'package:uniflow/core/theme/typography.dart';
 import 'package:uniflow/core/utils/week_utils.dart';
 
-/// Навигатор недели: стрелки отдельно, карточка недели отдельно.
+/// Навигатор недели в форме разрезной кнопки: `< неделя >`.
 ///
-/// Общий для главного экрана расписания и для превью из поиска/избранного —
-/// раньше превью рисовало свою упрощённую полосу, и две «недели» в одном
-/// приложении выглядели по-разному.
+/// Стрелки — отдельные сегменты через 2dp шва, поэтому промахнуться мимо
+/// нужной недели сложнее, а центр остаётся одной большой кнопкой «открыть
+/// календарь». Общий для главного экрана расписания и для превью из
+/// поиска/избранного: раньше превью рисовало свою упрощённую полосу, и две
+/// «недели» в одном приложении выглядели по-разному.
 class WeekNavigatorBar extends StatelessWidget {
   final WeekInfo weekInfo;
   final bool isCurrentWeek;
@@ -27,25 +29,36 @@ class WeekNavigatorBar extends StatelessWidget {
     this.onOpenCalendar,
   });
 
+  /// Высота сегмента: M-размер кнопок, два ряда текста внутри.
+  static const double _height = 56;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
+    final fill = isCurrentWeek
+        ? colorScheme.primaryContainer
+        : colorScheme.surfaceContainerHigh;
     final onContainer =
         isCurrentWeek ? colorScheme.onPrimaryContainer : colorScheme.onSurface;
     final muted = isCurrentWeek
         ? colorScheme.onPrimaryContainer.withValues(alpha: 0.75)
         : colorScheme.onSurfaceVariant;
 
+    // Внешние углы — полные (таблетка), внутренние — 4dp из спеки split button
+    // для размера M; 2dp шва между сегментами.
+    const outer = Radius.circular(_height / 2);
+    const inner = Radius.circular(AppShapes.extraSmall);
+    const arrowWidth = _height;
+    const arrowShape = BorderRadius.horizontal(left: outer, right: inner);
+    const arrowShapeRight = BorderRadius.horizontal(left: inner, right: outer);
+    const centerShape = BorderRadius.all(inner);
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-      child: Material(
-        color: isCurrentWeek
-            ? colorScheme.primaryContainer
-            : colorScheme.surfaceContainerHigh,
-        borderRadius: AppShapes.circular(AppShapes.extraExtraLarge),
-        clipBehavior: Clip.antiAlias,
+      child: SizedBox(
+        height: _height,
         child: Row(
           children: [
             _WeekArrow(
@@ -53,53 +66,69 @@ class WeekNavigatorBar extends StatelessWidget {
               tooltip: 'Предыдущая неделя',
               onTap: onPrevWeek,
               color: onContainer,
+              background: fill,
+              borderRadius: arrowShape,
+              width: arrowWidth,
             ),
+            const Gap(2),
             Expanded(
-              child: InkWell(
-                onTap: onOpenCalendar,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          // На 320dp «Неделя 46» + чип не влезают: текст
-                          // сжимается, чип остаётся целиком.
-                          Flexible(
-                            child: Text(
-                              'Неделя ${weekInfo.weekNumber}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppTypography.emphasizedTitleSmall(
-                                theme.textTheme.titleSmall!
-                                    .copyWith(color: onContainer),
+              child: Material(
+                color: fill,
+                borderRadius: centerShape,
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: onOpenCalendar,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // На 320dp «Неделя 46» + чип не влезают: текст
+                            // сжимается, чип остаётся целиком.
+                            Flexible(
+                              child: Text(
+                                'Неделя ${weekInfo.weekNumber}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTypography.emphasizedTitleSmall(
+                                  theme.textTheme.titleSmall!
+                                      .copyWith(color: onContainer),
+                                ),
                               ),
                             ),
-                          ),
-                          const Gap(6),
-                          _ParityChip(
-                            isEven: weekInfo.isEven,
-                            onContainer: isCurrentWeek,
-                          ),
-                        ],
-                      ),
-                      const Gap(2),
-                      Text(
-                        weekInfo.dateRangeShort,
-                        style: theme.textTheme.labelMedium
-                            ?.copyWith(color: muted),
-                      ),
-                    ],
+                            const Gap(6),
+                            _ParityChip(
+                              isEven: weekInfo.isEven,
+                              onContainer: isCurrentWeek,
+                            ),
+                          ],
+                        ),
+                        const Gap(1),
+                        Text(
+                          weekInfo.dateRangeShort,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelMedium
+                              ?.copyWith(color: muted),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
+            const Gap(2),
             _WeekArrow(
               icon: Icons.chevron_right,
               tooltip: 'Следующая неделя',
               onTap: onNextWeek,
               color: onContainer,
+              background: fill,
+              borderRadius: arrowShapeRight,
+              width: arrowWidth,
             ),
           ],
         ),
@@ -108,31 +137,45 @@ class WeekNavigatorBar extends StatelessWidget {
   }
 }
 
-/// Стрелки живут отдельно от карточки недели: своя скруглённая кнопка на
-/// каждую, поэтому промахнуться мимо нужной недели сложнее.
-/// Стрелка внутри общей «таблетки»: своя зона нажатия 48dp, без
-/// собственной подложки — фоном служит сама таблетка.
+/// Стрелка — отдельный сегмент разрезной кнопки: своя подложка, свой радиус,
+/// своя зона нажатия 56×56. Фоном служит тот же контейнер, что и у центра,
+/// поэтому полоса читается единым компонентом.
 class _WeekArrow extends StatelessWidget {
   final IconData icon;
   final String tooltip;
   final VoidCallback onTap;
   final Color color;
+  final Color background;
+  final BorderRadius borderRadius;
+  final double width;
 
   const _WeekArrow({
     required this.icon,
     required this.tooltip,
     required this.onTap,
     required this.color,
+    required this.background,
+    required this.borderRadius,
+    required this.width,
   });
 
   @override
   Widget build(BuildContext context) {
-    return IconButton(
-      onPressed: onTap,
-      icon: Icon(icon),
-      tooltip: tooltip,
-      color: color,
-      visualDensity: VisualDensity.compact,
+    return SizedBox(
+      width: width,
+      height: width,
+      child: Material(
+        color: background,
+        borderRadius: borderRadius,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Tooltip(
+            message: tooltip,
+            child: Center(child: Icon(icon, color: color)),
+          ),
+        ),
+      ),
     );
   }
 }

@@ -1,5 +1,5 @@
 name: uniflow
-description: "UniFlow — Расписание ТулГУ"
+description: "Ритм — расписание, журнал и дедлайны"
 publish_to: 'none'
 version: 1.2.0+3
 
@@ -52,6 +52,7 @@ flutter:
   assets:
     # Монохромный герб ТулГУ для шапки расписания (щит с вырезанной «Т»).
     - assets/branding/tulsu_shield.png
+    - assets/branding/app_icon.png
 
   fonts:
     - family: Rubik

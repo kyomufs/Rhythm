@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:intl/intl.dart';
 import 'package:uniflow/core/models/note_models.dart';
+import 'package:uniflow/core/theme/motion.dart';
+import 'package:uniflow/core/theme/shapes.dart';
+import 'package:uniflow/core/theme/typography.dart';
 
 /// Вкладка «Обзор»: прогресс предмета, статистика и ближайшие дедлайны.
 class OverviewTab extends StatelessWidget {
@@ -29,35 +32,21 @@ class OverviewTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header card with teacher + progress ring
+          // ── Шапка: кольцо прогресса и преподаватель на одной тональной
+          // поверхности. Цвет предмета задаёт только акцент, фон остаётся
+          // из схемы. ──
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(16),
+              color: colorScheme.surfaceContainerLow,
+              borderRadius: AppShapes.circular(AppShapes.extraLarge),
             ),
             child: Row(
               children: [
-                // Progress ring
-                SizedBox(
-                  width: 64,
-                  height: 64,
-                  child: CustomPaint(
-                    painter: _ProgressRingPainter(
-                      progress: folder.completionPercent,
-                      color: color,
-                      backgroundColor: colorScheme.surfaceContainerHighest,
-                    ),
-                    child: Center(
-                      child: Text(
-                        '${(folder.completionPercent * 100).round()}%',
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: color,
-                        ),
-                      ),
-                    ),
-                  ),
+                _ProgressRing(
+                  progress: folder.completionPercent,
+                  color: color,
+                  trackColor: colorScheme.surfaceContainerHighest,
                 ),
                 const Gap(16),
                 Expanded(
@@ -66,8 +55,8 @@ class OverviewTab extends StatelessWidget {
                     children: [
                       Text(
                         folder.name,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
+                        style: AppTypography.emphasizedTitleMedium(
+                          theme.textTheme.titleMedium!,
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -75,13 +64,34 @@ class OverviewTab extends StatelessWidget {
                       if (folder.teacher != null &&
                           folder.teacher!.isNotEmpty) ...[
                         const Gap(4),
-                        Text(
-                          folder.teacher!,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.person_outline,
+                              size: 14,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                            const Gap(4),
+                            Expanded(
+                              child: Text(
+                                folder.teacher!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
+                      const Gap(6),
+                      Text(
+                        '$completedTasks из $totalTasks задач закрыто',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -90,97 +100,63 @@ class OverviewTab extends StatelessWidget {
           ),
           const Gap(16),
 
-          // Stats cards
-          Row(
-            children: [
-              Expanded(
-                child: _StatCard(
-                  label: 'Всего задач',
-                  value: '$totalTasks',
-                  icon: Icons.list_alt,
-                  color: colorScheme.primary,
+          // ── Статистика: одна панель на три ячейки вместо трёх карточек.
+          // Три отдельных Card на телефоне выглядят как три разных сущности,
+          // хотя это один показатель в трёх разрезах. ──
+          Container(
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerLow,
+              borderRadius: AppShapes.circular(AppShapes.largeIncreased),
+            ),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _StatCell(
+                    label: 'Всего',
+                    value: '$totalTasks',
+                    color: colorScheme.onSurface,
+                  ),
                 ),
-              ),
-              const Gap(8),
-              Expanded(
-                child: _StatCard(
-                  label: 'Выполнено',
-                  value: '$completedTasks',
-                  icon: Icons.check_circle_outline,
-                  color: colorScheme.tertiary,
+                _StatDivider(color: colorScheme.outlineVariant),
+                Expanded(
+                  child: _StatCell(
+                    label: 'Выполнено',
+                    value: '$completedTasks',
+                    color: colorScheme.tertiary,
+                  ),
                 ),
-              ),
-              const Gap(8),
-              Expanded(
-                child: _StatCard(
-                  label: 'В работе',
-                  value: '${totalTasks - completedTasks}',
-                  icon: Icons.pending_outlined,
-                  color: colorScheme.primary,
+                _StatDivider(color: colorScheme.outlineVariant),
+                Expanded(
+                  child: _StatCell(
+                    label: 'В работе',
+                    value: '${totalTasks - completedTasks}',
+                    color: colorScheme.primary,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-          const Gap(16),
+          const Gap(20),
 
-          // Upcoming deadlines
+          // ── Ближайшие дедлайны ──
           if (upcoming.isNotEmpty) ...[
             Text(
               'Ближайшие дедлайны',
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
+              style: AppTypography.emphasizedTitleSmall(
+                theme.textTheme.titleSmall!,
               ),
             ),
-            const Gap(8),
+            const Gap(10),
             ...upcoming.take(5).map((task) {
               final daysUntil = task.dueDate!.difference(DateTime.now()).inDays;
               final isUrgent = daysUntil <= 3;
-              return Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
-                  leading: Icon(
-                    task.status == TaskStatus.done
-                        ? Icons.check_circle
-                        : Icons.pending_outlined,
-                    color: task.status == TaskStatus.done
-                        ? colorScheme.tertiary
-                        : isUrgent
-                            ? colorScheme.error
-                            : colorScheme.primary,
-                  ),
-                  title: Text(
-                    task.title,
-                    style: TextStyle(
-                      decoration: task.status == TaskStatus.done
-                          ? TextDecoration.lineThrough
-                          : null,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  subtitle: Text(
-                    DateFormat('d MMMM', 'ru').format(task.dueDate!),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  trailing: isUrgent
-                      ? Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: colorScheme.error.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            daysUntil == 0 ? 'Сегодня' : '$daysUntil дн.',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: colorScheme.error,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        )
-                      : null,
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _DeadlineRow(
+                  task: task,
+                  daysUntil: daysUntil,
+                  isUrgent: isUrgent,
                 ),
               );
             }),
@@ -192,17 +168,25 @@ class OverviewTab extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 32),
                 child: Column(
                   children: [
-                    Icon(
-                      Icons.add_task,
-                      size: 48,
-                      color:
-                          colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainerHigh,
+                        borderRadius:
+                            AppShapes.circular(AppShapes.largeIncreased),
+                      ),
+                      child: Icon(
+                        Icons.add_task,
+                        size: 30,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                     ),
                     const Gap(12),
                     Text(
                       'Нет задач',
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
+                      style: AppTypography.emphasizedTitleSmall(
+                        theme.textTheme.titleSmall!,
                       ),
                     ),
                     const Gap(4),
@@ -222,56 +206,231 @@ class OverviewTab extends StatelessWidget {
   }
 }
 
-// ============================================================
-// Stat Card
-// ============================================================
-class _StatCard extends StatelessWidget {
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color color;
+/// Кольцо прогресса: дуга доезжает до значения на slow-spatial пружине.
+///
+/// Статичное кольцо сообщает число, но не показывает, что прогресс только что
+/// изменился, — а именно это здесь важно.
+class _ProgressRing extends StatefulWidget {
+  const _ProgressRing({
+    required this.progress,
+    required this.color,
+    required this.trackColor,
+  });
 
-  const _StatCard({
+  final double progress;
+  final Color color;
+  final Color trackColor;
+
+  @override
+  State<_ProgressRing> createState() => _ProgressRingState();
+}
+
+class _ProgressRingState extends State<_ProgressRing>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController.unbounded(
+    vsync: this,
+  );
+  bool _started = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) return;
+    _started = true;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _controller.value = widget.progress;
+    } else {
+      _controller.animateWithSpring(MotionTokens.slowSpatial, to: widget.progress);
+    }
+  }
+
+  @override
+  void didUpdateWidget(_ProgressRing oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.progress == widget.progress) return;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _controller.value = widget.progress;
+    } else {
+      _controller.animateWithSpring(
+        MotionTokens.defaultSpatial,
+        to: widget.progress,
+        velocity: _controller.velocity,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return SizedBox(
+      width: 72,
+      height: 72,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) {
+          // Перелёт пружины клампится: дуга, ушедшая за 100%, рисует петлю.
+          final progress = _controller.value.clamp(0.0, 1.0);
+          return CustomPaint(
+            painter: _ProgressRingPainter(
+              progress: progress,
+              color: widget.color,
+              backgroundColor: widget.trackColor,
+            ),
+            child: Center(
+              child: Text(
+                '${(progress * 100).round()}%',
+                style: AppTypography.emphasizedTitleSmall(
+                  theme.textTheme.titleSmall!.copyWith(color: widget.color),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Ячейка панели статистики.
+class _StatCell extends StatelessWidget {
+  const _StatCell({
     required this.label,
     required this.value,
-    required this.icon,
     required this.color,
   });
+
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          value,
+          style: AppTypography.emphasizedHeadlineSmall(
+            theme.textTheme.headlineSmall!.copyWith(color: color, height: 1.1),
+          ),
+        ),
+        const Gap(2),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatDivider extends StatelessWidget {
+  const _StatDivider({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1,
+      height: 28,
+      color: color.withValues(alpha: 0.6),
+    );
+  }
+}
+
+/// Строка дедлайна: статус точкой, название и срок; срочные — красным.
+class _DeadlineRow extends StatelessWidget {
+  const _DeadlineRow({
+    required this.task,
+    required this.daysUntil,
+    required this.isUrgent,
+  });
+
+  final StudyTask task;
+  final int daysUntil;
+  final bool isUrgent;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final isDone = task.status == TaskStatus.done;
+    final accent = isDone
+        ? colorScheme.tertiary
+        : isUrgent
+            ? colorScheme.error
+            : colorScheme.primary;
 
-    return Card(
-      child: SizedBox(
-        height: 96,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: color, size: 20),
-              const Gap(4),
-              Text(
-                value,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: color,
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: AppShapes.circular(AppShapes.large),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+          ),
+          const Gap(12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  task.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    decoration: isDone ? TextDecoration.lineThrough : null,
+                    color: isDone ? colorScheme.onSurfaceVariant : null,
+                  ),
+                ),
+                const Gap(1),
+                Text(
+                  DateFormat('d MMMM', 'ru').format(task.dueDate!),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (isUrgent) ...[
+            const Gap(8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: colorScheme.errorContainer,
+                borderRadius: AppShapes.circular(AppShapes.small),
+              ),
+              child: Text(
+                daysUntil == 0 ? 'Сегодня' : '$daysUntil дн.',
+                style: AppTypography.emphasizedLabelSmall(
+                  theme.textTheme.labelSmall!.copyWith(
+                    color: colorScheme.onErrorContainer,
+                  ),
                 ),
               ),
-              const Gap(2),
-              Text(
-                label,
-                style: theme.textTheme.labelSmall
-                    ?.copyWith(color: colorScheme.onSurfaceVariant),
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -294,27 +453,27 @@ class _ProgressRingPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2 - 4;
+    final radius = size.width / 2 - 5;
 
-    // Background circle
     final bgPaint = Paint()
       ..color = backgroundColor
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 6;
+      ..strokeWidth = 6
+      ..strokeCap = StrokeCap.round;
     canvas.drawCircle(center, radius, bgPaint);
 
-    // Progress arc
+    if (progress <= 0) return;
+
     final progressPaint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
       ..strokeWidth = 6
       ..strokeCap = StrokeCap.round;
 
-    final sweepAngle = 2 * math.pi * progress;
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
       -math.pi / 2,
-      sweepAngle,
+      2 * math.pi * progress,
       false,
       progressPaint,
     );
@@ -322,6 +481,8 @@ class _ProgressRingPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _ProgressRingPainter oldDelegate) {
-    return oldDelegate.progress != progress || oldDelegate.color != color;
+    return oldDelegate.progress != progress ||
+        oldDelegate.color != color ||
+        oldDelegate.backgroundColor != backgroundColor;
   }
 }

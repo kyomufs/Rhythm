@@ -74,12 +74,12 @@ void main() {
 
     expect(find.text('Фоновая проверка расписания'), findsOneWidget);
     expect(
-      find.text('Каждые 30 мин. При изменениях придёт уведомление'),
+      find.text('Каждый час. При изменениях придёт уведомление'),
       findsOneWidget,
     );
     for (final minutes in AppSettings.backgroundCheckPresets) {
-      expect(find.text(AppSettings.backgroundCheckLabel(minutes)),
-          findsOneWidget);
+      expect(
+          find.text(AppSettings.backgroundCheckLabel(minutes)), findsOneWidget);
     }
   });
 
@@ -101,12 +101,12 @@ void main() {
     expect(storage.saved?.backgroundCheckMinutes, 0,
         reason: '0 минут = проверка выключена');
 
-    await tester.tap(find.text('1 час'));
+    await tester.tap(find.text('12 часов'));
     await tester.pumpAndSettle();
 
-    expect(storage.saved?.backgroundCheckMinutes, 60);
+    expect(storage.saved?.backgroundCheckMinutes, 720);
     expect(
-      find.text('Каждые 1 час. При изменениях придёт уведомление'),
+      find.text('Каждые 12 часов. При изменениях придёт уведомление'),
       findsOneWidget,
     );
   });

@@ -37,6 +37,25 @@ jobs:
       - name: Run tests
         run: flutter test
 
+      # Тот же ключ, что у релиза, когда секреты заданы: иначе артефакт из
+      # main не встанет поверх установленного релиза (и наоборот).
+      - name: Restore release keystore
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          printf '%s' "${ANDROID_KEYSTORE_BASE64}" | base64 -d > android/upload-keystore.jks
+          {
+            printf 'storeFile=upload-keystore.jks\n'
+            printf 'storePassword=%s\n' "${ANDROID_KEYSTORE_PASSWORD}"
+            printf 'keyAlias=%s\n' "${ANDROID_KEY_ALIAS}"
+            printf 'keyPassword=%s\n' "${ANDROID_KEY_PASSWORD}"
+          } > android/key.properties
+
       - name: Build Android (release APK)
         run: flutter build apk --release
 

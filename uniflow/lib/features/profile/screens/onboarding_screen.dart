@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:uniflow/core/services/storage_service.dart';
 import 'package:uniflow/core/theme/motion.dart';
+import 'package:uniflow/core/theme/shapes.dart';
+import 'package:uniflow/core/theme/typography.dart';
 import 'package:uniflow/app.dart';
 import 'package:uniflow/features/profile/providers/profile_providers.dart';
 import 'package:uniflow/features/schedule/providers/schedule_provider.dart';
@@ -162,13 +164,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                         MotionScheme.of(context).defaultEffects,
                       ),
                       curve: Curves.easeOut,
-                      height: 4,
+                      height: isActive ? 6 : 4,
                       margin: const EdgeInsets.symmetric(horizontal: 2),
                       decoration: BoxDecoration(
                         color: isActive
                             ? colorScheme.primary
                             : colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(2),
+                        borderRadius: AppShapes.circular(3),
                       ),
                     ),
                   );
@@ -220,211 +222,270 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   Widget _buildWelcomePage(ColorScheme colorScheme) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.school,
-              size: 96,
-              color: colorScheme.primary,
-            ),
-            const Gap(32),
-            Text(
-              'Добро пожаловать\nв UniFlow!',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-            const Gap(16),
-            Text(
-              'Расписание занятий, заметки и задачи\nвсегда под рукой',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-            ),
-          ],
+    return _PageBody(
+      children: [
+        const _HeroSpot(icon: Icons.school, size: 124, iconSize: 58),
+        const Gap(32),
+        Text(
+          'Добро пожаловать\nв Ритм!',
+          textAlign: TextAlign.center,
+          style: AppTypography.emphasizedHeadlineMedium(
+            Theme.of(context).textTheme.headlineMedium!,
+          ),
         ),
-      ),
+        const Gap(16),
+        Text(
+          'Расписание занятий, заметки и задачи\nвсегда под рукой',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+        ),
+      ],
     );
   }
 
   Widget _buildGroupPage(ColorScheme colorScheme) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.group_add,
-              size: 72,
-              color: colorScheme.primary,
-            ),
-            const Gap(24),
-            Text(
-              'Какая у тебя группа?',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-            ),
-            const Gap(8),
-            Text(
-              'Укажи номер группы для просмотра расписания',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-            ),
-            const Gap(24),
-            TextField(
-              controller: _groupController,
-              focusNode: _groupFocus,
-              decoration: const InputDecoration(
-                labelText: 'Номер группы',
-                hintText: '111111',
-                prefixIcon: Icon(Icons.group_outlined),
-              ),
-              keyboardType: TextInputType.number,
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-          ],
+    return _PageBody(
+      children: [
+        const _HeroSpot(icon: Icons.group_add, size: 92, iconSize: 40),
+        const Gap(24),
+        Text(
+          'Какая у тебя группа?',
+          textAlign: TextAlign.center,
+          style: AppTypography.emphasizedHeadlineSmall(
+            Theme.of(context).textTheme.headlineSmall!,
+          ),
         ),
-      ),
+        const Gap(8),
+        Text(
+          'Укажи номер группы для просмотра расписания',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+        ),
+        const Gap(24),
+        TextField(
+          controller: _groupController,
+          focusNode: _groupFocus,
+          decoration: const InputDecoration(
+            labelText: 'Номер группы',
+            hintText: '111111',
+            prefixIcon: Icon(Icons.group_outlined),
+          ),
+          keyboardType: TextInputType.number,
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+      ],
     );
   }
 
   Widget _buildSubgroupPage(ColorScheme colorScheme) {
     final theme = Theme.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.subdirectory_arrow_right,
-                size: 80, color: colorScheme.secondary),
-            const Gap(24),
-            Text('Подгруппа',
-                style: theme.textTheme.headlineSmall
-                    ?.copyWith(fontWeight: FontWeight.w600)),
-            const Gap(12),
-            Text(
-              'Укажите номер подгруппы (например, 01).\n'
-              'Нужна для просмотра успеваемости.',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(color: colorScheme.onSurfaceVariant),
-            ),
-            const Gap(32),
-            TextField(
-              controller: _subgroupController,
-              focusNode: _subgroupFocus,
-              decoration: const InputDecoration(
-                labelText: 'Подгруппа',
-                hintText: '01',
-                prefixIcon: Icon(Icons.subdirectory_arrow_right),
-              ),
-              keyboardType: TextInputType.number,
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const Gap(16),
-            Text('Можно пропустить',
-                style: theme.textTheme.labelSmall
-                    ?.copyWith(color: colorScheme.onSurfaceVariant)),
-          ],
+    return _PageBody(
+      children: [
+        const _HeroSpot(
+          icon: Icons.subdirectory_arrow_right,
+          size: 92,
+          iconSize: 40,
+          tone: _SpotTone.secondary,
         ),
-      ),
+        const Gap(24),
+        Text(
+          'Подгруппа',
+          style: AppTypography.emphasizedHeadlineSmall(
+            theme.textTheme.headlineSmall!,
+          ),
+        ),
+        const Gap(12),
+        Text(
+          'Укажите номер подгруппы (например, 01).\n'
+          'Нужна для просмотра успеваемости.',
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodyMedium
+              ?.copyWith(color: colorScheme.onSurfaceVariant),
+        ),
+        const Gap(32),
+        TextField(
+          controller: _subgroupController,
+          focusNode: _subgroupFocus,
+          decoration: const InputDecoration(
+            labelText: 'Подгруппа',
+            hintText: '01',
+            prefixIcon: Icon(Icons.subdirectory_arrow_right),
+          ),
+          keyboardType: TextInputType.number,
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const Gap(16),
+        Text('Можно пропустить',
+            style: theme.textTheme.labelSmall
+                ?.copyWith(color: colorScheme.onSurfaceVariant)),
+      ],
     );
   }
 
   Widget _buildStudentIdPage(ColorScheme colorScheme) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.badge_outlined,
-              size: 72,
-              color: colorScheme.primary,
-            ),
-            const Gap(24),
-            Text(
-              'Номер зачётки',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-            ),
-            const Gap(8),
-            Text(
-              'Необязательно. Можно указать позже\nв настройках.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-            ),
-            const Gap(24),
-            TextField(
-              controller: _studentIdController,
-              focusNode: _studentIdFocus,
-              decoration: const InputDecoration(
-                labelText: 'Зачётная книжка',
-                hintText: '123456',
-                prefixIcon: Icon(Icons.badge_outlined),
-              ),
-              keyboardType: TextInputType.number,
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-          ],
+    return _PageBody(
+      children: [
+        const _HeroSpot(icon: Icons.badge_outlined, size: 92, iconSize: 40),
+        const Gap(24),
+        Text(
+          'Номер зачётки',
+          textAlign: TextAlign.center,
+          style: AppTypography.emphasizedHeadlineSmall(
+            Theme.of(context).textTheme.headlineSmall!,
+          ),
         ),
-      ),
+        const Gap(8),
+        Text(
+          'Необязательно. Можно указать позже\nв настройках.',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+        ),
+        const Gap(24),
+        TextField(
+          controller: _studentIdController,
+          focusNode: _studentIdFocus,
+          decoration: const InputDecoration(
+            labelText: 'Зачётная книжка',
+            hintText: '123456',
+            prefixIcon: Icon(Icons.badge_outlined),
+          ),
+          keyboardType: TextInputType.number,
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+      ],
     );
   }
 
   Widget _buildDonePage(ColorScheme colorScheme) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 96,
-              height: 96,
-              decoration: BoxDecoration(
-                color: colorScheme.primaryContainer,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.check,
-                size: 48,
-                color: colorScheme.onPrimaryContainer,
-              ),
-            ),
-            const Gap(32),
-            Text(
-              'Всё готово!',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-            const Gap(16),
-            Text(
-              'Группу и зачётку всегда можно\nпоменять в настройках.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-            ),
-          ],
+    return _PageBody(
+      children: [
+        const _HeroSpot(
+          icon: Icons.check_rounded,
+          size: 108,
+          iconSize: 54,
+          tone: _SpotTone.tertiary,
         ),
+        const Gap(32),
+        Text(
+          'Всё готово!',
+          style: AppTypography.emphasizedHeadlineMedium(
+            Theme.of(context).textTheme.headlineMedium!,
+          ),
+        ),
+        const Gap(16),
+        Text(
+          'Группу и зачётку всегда можно\nпоменять в настройках.',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Тело страницы онбординга.
+///
+/// Контент по-прежнему центрируется по вертикали, но живёт в прокручиваемой
+/// области: при поднятой клавиатуре Scaffold сжимает тело, и страница с
+/// заголовком, подсказкой и полем ввода не влезала — RenderFlex ломался
+/// полосой переполнения прямо над нижней кнопкой.
+class _PageBody extends StatelessWidget {
+  const _PageBody({required this.children});
+
+  final List<Widget> children;
+
+  static const _padding = EdgeInsets.symmetric(horizontal: 32, vertical: 24);
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final minHeight =
+            (constraints.maxHeight - _padding.vertical).clamp(0.0, 1e6);
+        return SingleChildScrollView(
+          padding: _padding,
+          // Тянуть страницу вниз — значит убрать клавиатуру: иначе поле
+          // ввода остаётся в фокусе и экран не вернуть целиком.
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: minHeight),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: children,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Тональное «пятно» с иконкой: появляется пружиной с перелётом.
+///
+/// Голые цветные иконки на пустом экране читались как заглушки; пятно даёт
+/// странице точку опоры, а масштаб при появлении — ощущение, что экран
+/// собрался, а не просто отрисовался.
+enum _SpotTone { primary, secondary, tertiary }
+
+class _HeroSpot extends StatelessWidget {
+  const _HeroSpot({
+    required this.icon,
+    required this.size,
+    required this.iconSize,
+    this.tone = _SpotTone.primary,
+  });
+
+  final IconData icon;
+  final double size;
+  final double iconSize;
+  final _SpotTone tone;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final (background, foreground) = switch (tone) {
+      _SpotTone.primary => (
+          colorScheme.primaryContainer,
+          colorScheme.onPrimaryContainer,
+        ),
+      _SpotTone.secondary => (
+          colorScheme.secondaryContainer,
+          colorScheme.onSecondaryContainer,
+        ),
+      _SpotTone.tertiary => (
+          colorScheme.tertiaryContainer,
+          colorScheme.onTertiaryContainer,
+        ),
+    };
+
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final spot = Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: AppShapes.circular(size / 2),
       ),
+      child: Icon(icon, size: iconSize, color: foreground),
+    );
+
+    if (reduceMotion) return spot;
+
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0.7, end: 1),
+      duration: springDuration(MotionTokens.slowSpatial),
+      curve: Curves.easeOutBack,
+      builder: (context, value, child) =>
+          Transform.scale(scale: value, child: child),
+      child: spot,
     );
   }
 }
