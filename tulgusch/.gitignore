@@ -48,6 +48,10 @@ app.*.map.json
 /android/build
 /android/captures
 /android/local.properties
+/android/key.properties
+/android/upload-keystore.jks
+*.jks
+*.keystore
 /android/**/GeneratedPluginRegistrant.java
 # Note: the Gradle wrapper (gradlew, wrapper jar/properties) is committed —
 # CI builds invoke gradlew directly.

@@ -2,7 +2,7 @@
   "name": "tulgusch",
   "subtitle": "Расписание ТулГУ",
   "description": "Официальный источник обновлений tulgusch (расписание, оценки и заметки ТулГУ). Добавляется в SideStore по ссылке sidestore://source?url=https://raw.githubusercontent.com/kyomufs/tulgusch/main/sidestore/source.json",
-  "website": "https://github.com/kyomufs/Rhythm",
+  "website": "https://github.com/kyomufs/tulgusch",
   "tintColor": "#6750A4",
   "apps": [
     {
@@ -11,23 +11,23 @@
       "developerName": "kyomufs",
       "subtitle": "Расписание, оценки и заметки ТулГУ",
       "localizedDescription": "Красивое и быстрое расписание ТулГУ: пары, изменения журнала, оценки и заметки. Работает офлайн, обновляется через GitHub-релизы.",
-      "iconURL": "https://raw.githubusercontent.com/kyomufs/Rhythm/main/tulgusch/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png",
+      "iconURL": "https://raw.githubusercontent.com/kyomufs/tulgusch/main/tulgusch/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png",
       "tintColor": "#6750A4",
       "category": "utilities",
       "version": "1.2.0",
       "versionDate": "2026-11-03",
-      "downloadURL": "https://github.com/kyomufs/Rhythm/releases/download/v1.2.0/Rhythm-v1.2.0.ipa",
+      "downloadURL": "https://github.com/kyomufs/tulgusch/releases/download/v1.2.0/tulgusch-v1.2.0.ipa",
       "versions": [
         {
           "version": "1.2.0",
           "date": "2026-11-03",
-          "downloadURL": "https://github.com/kyomufs/Rhythm/releases/download/v1.2.0/Rhythm-v1.2.0.ipa",
+          "downloadURL": "https://github.com/kyomufs/tulgusch/releases/download/v1.2.0/tulgusch-v1.2.0.ipa",
           "size": 9252850
         },
         {
           "version": "1.1.0",
           "date": "2026-09-24",
-          "downloadURL": "https://github.com/kyomufs/Rhythm/releases/download/v1.1.0/Rhythm-v1.1.0.ipa",
+          "downloadURL": "https://github.com/kyomufs/tulgusch/releases/download/v1.1.0/tulgusch-v1.1.0.ipa",
           "size": 9144305
         }
       ],

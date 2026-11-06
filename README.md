@@ -4,9 +4,9 @@
 
 **Cross-platform schedule companion for Tula State University students**
 
-[![Build Android APK](https://github.com/kyomufs/Rhythm/actions/workflows/android-build.yml/badge.svg)](https://github.com/kyomufs/Rhythm/actions/workflows/android-build.yml)
-[![Build iOS IPA](https://github.com/kyomufs/Rhythm/actions/workflows/ios-build.yml/badge.svg)](https://github.com/kyomufs/Rhythm/actions/workflows/ios-build.yml)
-[![Release](https://github.com/kyomufs/Rhythm/actions/workflows/release.yml/badge.svg)](https://github.com/kyomufs/Rhythm/actions/workflows/release.yml)
+[![Build Android APK](https://github.com/kyomufs/tulgusch/actions/workflows/android-build.yml/badge.svg)](https://github.com/kyomufs/tulgusch/actions/workflows/android-build.yml)
+[![Build iOS IPA](https://github.com/kyomufs/tulgusch/actions/workflows/ios-build.yml/badge.svg)](https://github.com/kyomufs/tulgusch/actions/workflows/ios-build.yml)
+[![Release](https://github.com/kyomufs/tulgusch/actions/workflows/release.yml/badge.svg)](https://github.com/kyomufs/tulgusch/actions/workflows/release.yml)
 [![Flutter](https://img.shields.io/badge/Flutter-3.47.4-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![Material Design 3](https://img.shields.io/badge/Material%20Design-3-6750A4)](https://m3.material.io)
 
@@ -38,12 +38,12 @@ tracking — all wrapped in a Material You (MD3) UI with dynamic theming.
 
 Tap the link on a device with SideStore installed to add the source:
 
-**[Add tulgusch to SideStore](sidestore://source?url=https://raw.githubusercontent.com/kyomufs/Rhythm/main/sidestore/source.json)**
+**[Add tulgusch to SideStore](sidestore://source?url=https://raw.githubusercontent.com/kyomufs/tulgusch/main/sidestore/source.json)**
 
 Manual fallback (SideStore → Settings → Sources → `+` → paste):
 
 ```
-https://raw.githubusercontent.com/kyomufs/Rhythm/main/sidestore/source.json
+https://raw.githubusercontent.com/kyomufs/tulgusch/main/sidestore/source.json
 ```
 
 > `sidestore/source.json` updates itself: right after each release is
@@ -54,7 +54,7 @@ https://raw.githubusercontent.com/kyomufs/Rhythm/main/sidestore/source.json
 ### Android
 
 Grab `tulgusch-<tag>.apk` from
-[Releases](https://github.com/kyomufs/Rhythm/releases), or install an
+[Releases](https://github.com/kyomufs/tulgusch/releases), or install an
 older build and let the in-app updater offer the new one.
 
 ## Platforms
@@ -103,7 +103,7 @@ Android принимает обновление только от того же 
 
 ```bash
 keytool -genkeypair -v -keystore upload-keystore.jks -storetype JKS \
-  -keyalg RSA -keysize 2048 -validity 10000 -alias rhythm
+  -keyalg RSA -keysize 2048 -validity 10000 -alias tulgusch
 base64 -w0 upload-keystore.jks > keystore.b64   # содержимое → в секрет
 ```
 
@@ -113,18 +113,23 @@ base64 -w0 upload-keystore.jks > keystore.b64   # содержимое → в с
 |---|---|
 | `ANDROID_KEYSTORE_BASE64` | вывод `base64 -w0 upload-keystore.jks` |
 | `ANDROID_KEYSTORE_PASSWORD` | пароль хранилища |
-| `ANDROID_KEY_ALIAS` | `rhythm` |
+| `ANDROID_KEY_ALIAS` | `tulgusch` |
 | `ANDROID_KEY_PASSWORD` | пароль ключа |
 
 Локально те же четыре значения кладутся в `tulgusch/android/key.properties`
 (файл в `.gitignore`):
 
 ```properties
-storeFile=upload-keystore.jks
+storeFile=/home/<user>/.keystores/tulgusch-release.jks
 storePassword=…
-keyAlias=rhythm
+keyAlias=androiddebugkey
 keyPassword=…
 ```
+
+Текущий ключ — это debug-сертификат, которым подписаны все прошлые сборки
+приложения: он же лежит в секретах CI, поэтому новая версия ставится поверх
+установленной. Менять ключ можно только вместе с переустановкой приложения
+на каждом устройстве.
 
 ## CI/CD
 

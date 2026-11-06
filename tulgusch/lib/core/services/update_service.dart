@@ -18,7 +18,7 @@ class UpdateInfo {
 /// (system installer prompt). All failures are swallowed by the caller —
 /// an update check must never break normal startup.
 class UpdateService {
-  static const _repo = 'kyomufs/Rhythm';
+  static const _repo = 'kyomufs/tulgusch';
   static const _apiBase = 'https://api.github.com/repos/$_repo';
 
   final Dio _dio = Dio(BaseOptions(
