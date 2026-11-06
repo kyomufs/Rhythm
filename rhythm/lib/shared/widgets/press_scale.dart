@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:rhythm/core/theme/motion.dart';
+import 'package:tulgusch/core/theme/motion.dart';
 
 /// Отклик на нажатие в духе M3E: элемент слегка «проваливается» пружиной.
 ///

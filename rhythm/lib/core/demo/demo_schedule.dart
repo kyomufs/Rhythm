@@ -1,4 +1,4 @@
-import 'package:rhythm/core/models/schedule.dart';
+import 'package:tulgusch/core/models/schedule.dart';
 
 /// Демо-режим показывает только то, что программа умеет на самом деле:
 /// реальные пары, реальные корпуса и реальную сетку звонков ТулГУ. Выдумана

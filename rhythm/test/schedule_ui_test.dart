@@ -4,18 +4,17 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:rhythm/core/domain/source.dart';
-import 'package:rhythm/core/models/schedule.dart';
-import 'package:rhythm/core/sources/source_api.dart';
-import 'package:rhythm/core/sources/source_store.dart';
-import 'package:rhythm/core/providers/clock_provider.dart';
-import 'package:rhythm/core/services/connectivity_service.dart';
-import 'package:rhythm/core/services/notification_service.dart';
-import 'package:rhythm/core/services/schedule_service.dart';
-import 'package:rhythm/core/services/storage_service.dart';
-import 'package:rhythm/features/schedule/screens/schedule_screen.dart';
-import 'package:rhythm/features/schedule/widgets/lesson_detail_sheet.dart';
-import 'package:rhythm/features/schedule/widgets/lesson_tile.dart';
+import 'package:tulgusch/core/models/schedule.dart';
+import 'package:tulgusch/core/api/schedule_api.dart';
+import 'package:tulgusch/core/api/api_providers.dart';
+import 'package:tulgusch/core/providers/clock_provider.dart';
+import 'package:tulgusch/core/services/connectivity_service.dart';
+import 'package:tulgusch/core/services/notification_service.dart';
+import 'package:tulgusch/core/services/schedule_service.dart';
+import 'package:tulgusch/core/services/storage_service.dart';
+import 'package:tulgusch/features/schedule/screens/schedule_screen.dart';
+import 'package:tulgusch/features/schedule/widgets/lesson_detail_sheet.dart';
+import 'package:tulgusch/features/schedule/widgets/lesson_tile.dart';
 
 // ── Fakes ──────────────────────────────────────────────────────
 
@@ -42,6 +41,9 @@ ScheduleItem _item({
 }
 
 class _FakeApi extends ScheduleApi {
+  @override
+  Future<bool> ping() async => true;
+
   _FakeApi(this.items, {this.auditoriumItems});
 
   final List<ScheduleItem> items;
@@ -53,8 +55,8 @@ class _FakeApi extends ScheduleApi {
   int auditoriumCalls = 0;
 
   @override
-  Future<SourceDateRange> dateRange(String searchValue) async =>
-      SourceDateRange(
+  Future<ScheduleDateRange> dateRange(String searchValue) async =>
+      ScheduleDateRange(
         minDate: DateTime(2026, 9, 1),
         maxDate: DateTime(2027, 1, 25),
         searchField: SearchField.group,
@@ -76,7 +78,7 @@ class _FakeApi extends ScheduleApi {
   Future<List<CalendarItem>> calendar(String searchValue) async => [];
 
   @override
-  Future<List<SourceSuggestion>> search(String query) async => [];
+  Future<List<ScheduleSuggestion>> search(String query) async => [];
 }
 
 class _FakeStorage extends StorageService {
@@ -113,18 +115,19 @@ class _FakeStorage extends StorageService {
 
   @override
   CachedSchedule? getCachedSchedule(String searchValue,
-          {String namespace = ''}) =>
+          ) =>
       null;
 
   @override
   Future<void> cacheSchedule(String searchValue, ScheduleData data,
-      {String namespace = ''}) async {}
+      ) async {}
 
   @override
   String? getLastSearch() => null;
 
   @override
-  Future<void> saveLastSearch(String searchValue) async {}
+  Future<void> saveLastSearch(String searchValue,
+      ) async {}
 
   @override
   List<Map<String, dynamic>> getChangeLog() => changeLog;
@@ -182,15 +185,6 @@ String _fmt(DateTime d) => '${d.day.toString().padLeft(2, '0')}.'
     '${d.month.toString().padLeft(2, '0')}.${d.year}';
 
 /// Источник, от лица которого идёт тест: экран берёт группу и возможности
-/// из него, а не из глобального хранилища.
-Source _source(String group) => Source(
-      id: 'tulsu',
-      kind: SourceKind.university,
-      title: 'ТулГУ',
-      providerId: 'tulsu',
-      config: {'group': group, 'subgroup': '01'},
-      createdAt: DateTime(2026, 9, 1),
-    );
 
 Widget _app({
   required List<ScheduleItem> items,
@@ -202,7 +196,6 @@ Widget _app({
   return ProviderScope(
     overrides: [
       demoModeProvider.overrideWithValue(false),
-      activeSourceProvider.overrideWithValue(_source(_group)),
       scheduleApiProvider.overrideWithValue(client),
       scheduleServiceProvider.overrideWithValue(
         ScheduleService(

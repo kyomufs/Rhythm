@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:rhythm/app.dart';
-import 'package:rhythm/core/services/storage_service.dart';
+import 'package:tulgusch/app.dart';
+import 'package:tulgusch/core/services/storage_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,7 +25,7 @@ void main() async {
 
   // Draw edge-to-edge so the UI extends behind the gesture pill instead
   // of leaving a system inset strip below the navigation bar.
-  // System bar colors are applied per app theme in RhythmApp.build —
+  // System bar colors are applied per app theme in TulguschApp.build —
   // a hard-coded style here would not follow theme/seed changes.
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
@@ -51,7 +51,7 @@ void main() async {
       overrides: [
         storageServiceProvider.overrideWithValue(storageService),
       ],
-      child: RhythmApp(startScreen: onboardingDone),
+      child: TulguschApp(startScreen: onboardingDone),
     ),
   );
 

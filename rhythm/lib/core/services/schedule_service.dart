@@ -1,16 +1,15 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:rhythm/core/api/api_exception.dart';
-import 'package:rhythm/core/models/schedule.dart';
-import 'package:rhythm/core/services/storage_service.dart';
-import 'package:rhythm/core/sources/source_api.dart';
-import 'package:rhythm/core/sources/source_store.dart';
+import 'package:tulgusch/core/api/api_exception.dart';
+import 'package:tulgusch/core/api/api_providers.dart';
+import 'package:tulgusch/core/api/schedule_api.dart';
+import 'package:tulgusch/core/models/schedule.dart';
+import 'package:tulgusch/core/services/storage_service.dart';
 
 /// Schedule service provider
 final scheduleServiceProvider = Provider<ScheduleService>((ref) {
   return ScheduleService(
     api: ref.watch(scheduleApiProvider),
     storage: ref.watch(storageServiceProvider),
-    namespace: ref.watch(activeSourceNamespaceProvider),
   );
 });
 
@@ -19,14 +18,8 @@ class ScheduleService {
   final ScheduleApi _api;
   final StorageService _storage;
 
-  /// id источника: снимки разных вузов не должны перетираться.
-  final String namespace;
-
-  ScheduleService({
-    required ScheduleApi api,
-    required StorageService storage,
-    this.namespace = '',
-  })  : _api = api,
+  ScheduleService({required ScheduleApi api, required StorageService storage})
+      : _api = api,
         _storage = storage;
 
   /// Search for groups, teachers, or auditoriums

@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:rhythm/core/models/app_settings.dart';
-import 'package:rhythm/core/models/schedule.dart';
-import 'package:rhythm/core/providers/clock_provider.dart';
-import 'package:rhythm/core/services/connectivity_service.dart';
-import 'package:rhythm/core/services/notification_service.dart';
-import 'package:rhythm/core/services/schedule_service.dart';
-import 'package:rhythm/core/services/storage_service.dart';
-import 'package:rhythm/core/sources/source_api.dart';
-import 'package:rhythm/core/sources/source_store.dart';
-import 'package:rhythm/core/widgets/background_sync_host.dart';
-import 'package:rhythm/features/schedule/providers/schedule_provider.dart';
+import 'package:tulgusch/core/models/app_settings.dart';
+import 'package:tulgusch/core/models/schedule.dart';
+import 'package:tulgusch/core/providers/clock_provider.dart';
+import 'package:tulgusch/core/services/connectivity_service.dart';
+import 'package:tulgusch/core/services/notification_service.dart';
+import 'package:tulgusch/core/services/schedule_service.dart';
+import 'package:tulgusch/core/services/storage_service.dart';
+import 'package:tulgusch/core/api/schedule_api.dart';
+import 'package:tulgusch/core/api/api_providers.dart';
+import 'package:tulgusch/core/widgets/background_sync_host.dart';
+import 'package:tulgusch/features/schedule/providers/schedule_provider.dart';
 
 const _group = '221341:01';
 
@@ -27,14 +27,17 @@ ScheduleItem _item(String subject) => ScheduleItem(
     );
 
 class _CountingApi extends ScheduleApi {
+  @override
+  Future<bool> ping() async => true;
+
   _CountingApi(this.items);
 
   List<ScheduleItem> items;
   int scheduleCalls = 0;
 
   @override
-  Future<SourceDateRange> dateRange(String searchValue) async =>
-      SourceDateRange(
+  Future<ScheduleDateRange> dateRange(String searchValue) async =>
+      ScheduleDateRange(
         minDate: DateTime(2026, 9, 1),
         maxDate: DateTime(2027, 1, 25),
         searchField: SearchField.group,
@@ -53,7 +56,7 @@ class _CountingApi extends ScheduleApi {
   Future<List<CalendarItem>> calendar(String searchValue) async => [];
 
   @override
-  Future<List<SourceSuggestion>> search(String query) async => [];
+  Future<List<ScheduleSuggestion>> search(String query) async => [];
 }
 
 class _FakeStorage extends StorageService {
@@ -90,18 +93,19 @@ class _FakeStorage extends StorageService {
 
   @override
   CachedSchedule? getCachedSchedule(String searchValue,
-          {String namespace = ''}) =>
+          ) =>
       null;
 
   @override
   Future<void> cacheSchedule(String searchValue, ScheduleData data,
-      {String namespace = ''}) async {}
+      ) async {}
 
   @override
   String? getLastSearch() => null;
 
   @override
-  Future<void> saveLastSearch(String searchValue) async {}
+  Future<void> saveLastSearch(String searchValue,
+      ) async {}
 
   @override
   List<Map<String, dynamic>> getChangeLog() => changeLog;

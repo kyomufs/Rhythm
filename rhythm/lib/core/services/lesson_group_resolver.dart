@@ -1,8 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:rhythm/core/api/api_exception.dart';
-import 'package:rhythm/core/models/schedule.dart';
-import 'package:rhythm/core/sources/source_api.dart';
-import 'package:rhythm/core/sources/source_store.dart';
+import 'package:tulgusch/core/api/api_exception.dart';
+import 'package:tulgusch/core/models/schedule.dart';
+import 'package:tulgusch/core/api/api_providers.dart';
+import 'package:tulgusch/core/api/schedule_api.dart';
 
 /// Provider for the lesson group resolver
 final lessonGroupResolverProvider = Provider<LessonGroupResolver>((ref) {

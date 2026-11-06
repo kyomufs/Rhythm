@@ -1,10 +1,10 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:rhythm/core/theme/motion.dart';
-import 'package:rhythm/core/theme/shapes.dart';
-import 'package:rhythm/core/theme/typography.dart';
-import 'package:rhythm/shared/widgets/expressive_button_group.dart';
+import 'package:tulgusch/core/theme/motion.dart';
+import 'package:tulgusch/core/theme/shapes.dart';
+import 'package:tulgusch/core/theme/typography.dart';
+import 'package:tulgusch/shared/widgets/expressive_button_group.dart';
 
 /// Пункт меню разрезной кнопки.
 class ExpressiveSplitAction {

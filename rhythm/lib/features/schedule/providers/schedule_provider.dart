@@ -2,21 +2,20 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:rhythm/core/demo/demo_schedule.dart';
-import 'package:rhythm/core/domain/source.dart';
-import 'package:rhythm/core/models/change_record.dart';
-import 'package:rhythm/core/models/schedule.dart';
-import 'package:rhythm/core/providers/clock_provider.dart';
-import 'package:rhythm/core/utils/error_messages.dart';
-import 'package:rhythm/core/services/connectivity_service.dart';
-import 'package:rhythm/core/services/lesson_group_resolver.dart';
-import 'package:rhythm/core/services/notification_service.dart';
-import 'package:rhythm/core/services/schedule_service.dart';
-import 'package:rhythm/core/services/storage_service.dart';
-import 'package:rhythm/core/sources/source_store.dart';
-import 'package:rhythm/core/services/update_coordinator.dart';
-import 'package:rhythm/core/utils/week_utils.dart';
-import 'package:rhythm/integrations/catalog.dart';
+import 'package:tulgusch/core/demo/demo_schedule.dart';
+import 'package:tulgusch/core/models/change_record.dart';
+import 'package:tulgusch/core/models/schedule.dart';
+import 'package:tulgusch/core/providers/clock_provider.dart';
+import 'package:tulgusch/core/utils/error_messages.dart';
+import 'package:tulgusch/core/api/api_providers.dart';
+import 'package:tulgusch/core/services/connectivity_service.dart';
+import 'package:tulgusch/core/services/lesson_group_resolver.dart';
+import 'package:tulgusch/core/services/notification_service.dart';
+import 'package:tulgusch/core/services/schedule_service.dart';
+import 'package:tulgusch/core/services/storage_service.dart';
+import 'package:tulgusch/core/services/update_coordinator.dart';
+import 'package:tulgusch/core/utils/week_utils.dart';
+import 'package:tulgusch/features/profile/providers/profile_providers.dart';
 
 /// Schedule screen state
 class ScheduleScreenState {
@@ -176,9 +175,8 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
   final LessonGroupResolver? _resolver;
   final bool _demo;
 
-  /// Группа/uuid активного источника и пространство имён его снимков.
+  /// Группа из профиля; если не передана — читается из хранилища.
   final String? _target;
-  final String _namespace;
 
   /// Journal size and age limits (plan: cap 50, TTL 14 days).
   static const _journalLimit = 50;
@@ -193,11 +191,9 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
     LessonGroupResolver? resolver,
     bool demo = false,
     String? target,
-    String namespace = '',
   })  : _resolver = resolver,
         _demo = demo,
         _target = target,
-        _namespace = namespace,
         super(ScheduleScreenState(
           currentWeekStart: getCurrentWeekStart(),
         )) {
@@ -219,8 +215,8 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
       _bootRefresh.complete(false);
       return;
     }
-    // Цель источника главнее: у каждого вуза своя группа. Старая группа
-    // из хранилища остаётся запасным путём, пока источников нет.
+    // Виджет подставляет группу из профиля, но нотификатор живёт и без
+    // него (тесты, фоновые задачи): тогда источник — само хранилище.
     final myGroup = _target ?? _storage.getMyGroup();
     final journal = _loadJournal();
     final seenAt = _storage.getChangesSeenAt();
@@ -233,7 +229,8 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
     );
     if (myGroup != null) {
       // Fingerprint of the schedule the user last saw (for change alerts).
-      final previousFingerprint = _storage.getScheduleFingerprint();
+      final previousFingerprint =
+          _storage.getScheduleFingerprint();
       // Stale-while-revalidate: paint the local copy synchronously,
       // BEFORE the connectivity probe — a slow network must never blank
       // an already-known schedule. The sync below replaces it in place.
@@ -288,7 +285,7 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
   /// when the revalidation cannot run.
   bool _applyCachedSchedule(String searchValue) {
     final cached =
-        _storage.getCachedSchedule(searchValue, namespace: _namespace);
+        _storage.getCachedSchedule(searchValue);
     if (cached == null || cached.data.items.isEmpty) return false;
     state = state.copyWith(schedule: _stateFromCache(searchValue, cached));
     return true;
@@ -676,12 +673,14 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
 
   Future<void> addFavoriteGroup(String groupNumber) async {
     await _storage.addFavoriteGroup(groupNumber);
-    state = state.copyWith(favoriteGroups: _storage.getFavoriteGroups());
+    state = state.copyWith(
+        favoriteGroups: _storage.getFavoriteGroups());
   }
 
   Future<void> removeFavoriteGroup(String groupNumber) async {
     await _storage.removeFavoriteGroup(groupNumber);
-    state = state.copyWith(favoriteGroups: _storage.getFavoriteGroups());
+    state = state.copyWith(
+        favoriteGroups: _storage.getFavoriteGroups());
   }
 
   bool isFavoriteGroup(String groupNumber) {
@@ -724,7 +723,7 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
       // If the API returned an error, try cache as fallback
       if (result.error != null) {
         final cached =
-            _storage.getCachedSchedule(searchValue, namespace: _namespace);
+            _storage.getCachedSchedule(searchValue);
         if (cached != null && cached.data.items.isNotEmpty) {
           state =
               state.copyWith(schedule: _stateFromCache(searchValue, cached));
@@ -738,7 +737,7 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
     } catch (e) {
       // Unexpected error — try cache
       final cached =
-          _storage.getCachedSchedule(searchValue, namespace: _namespace);
+          _storage.getCachedSchedule(searchValue);
       if (cached != null && cached.data.items.isNotEmpty) {
         state = state.copyWith(schedule: _stateFromCache(searchValue, cached));
         return await _fallbackNote(ErrorMessages.fromException(e));
@@ -890,23 +889,15 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
 
 final scheduleScreenProvider =
     StateNotifierProvider<ScheduleScreenNotifier, ScheduleScreenState>((ref) {
-  final demo = ref.watch(demoModeProvider);
-  final source = ref.watch(activeSourceProvider);
-  // Добор групп пар — только для источников, которые умеют искать по
-  // аудитории. У остальных resolver молча выключен.
-  final canResolve = ref.watch(activeSourceCapabilitiesProvider).contains(
-        SourceCapability.directory,
-      );
   return ScheduleScreenNotifier(
     ref.watch(scheduleServiceProvider),
     ref.watch(storageServiceProvider),
     ref.watch(connectivityServiceProvider),
     ref.watch(notificationServiceProvider),
     ref.watch(updateCoordinatorProvider),
-    resolver: canResolve ? ref.watch(lessonGroupResolverProvider) : null,
-    demo: demo,
-    target: source == null ? null : connectorFor(source).targetValue(source),
-    namespace: ref.watch(activeSourceNamespaceProvider),
+    resolver: ref.watch(lessonGroupResolverProvider),
+    demo: ref.watch(demoModeProvider),
+    target: ref.watch(profileGroupProvider),
   );
 });
 

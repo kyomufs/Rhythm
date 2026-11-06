@@ -1,13 +1,13 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:rhythm/core/demo/demo_schedule.dart';
-import 'package:rhythm/core/models/change_record.dart';
-import 'package:rhythm/core/models/schedule.dart';
-import 'package:rhythm/core/services/connectivity_service.dart';
-import 'package:rhythm/core/services/notification_service.dart';
-import 'package:rhythm/core/services/schedule_service.dart';
-import 'package:rhythm/core/services/storage_service.dart';
-import 'package:rhythm/core/services/update_coordinator.dart';
-import 'package:rhythm/features/schedule/providers/schedule_provider.dart';
+import 'package:tulgusch/core/demo/demo_schedule.dart';
+import 'package:tulgusch/core/models/change_record.dart';
+import 'package:tulgusch/core/models/schedule.dart';
+import 'package:tulgusch/core/services/connectivity_service.dart';
+import 'package:tulgusch/core/services/notification_service.dart';
+import 'package:tulgusch/core/services/schedule_service.dart';
+import 'package:tulgusch/core/services/storage_service.dart';
+import 'package:tulgusch/core/services/update_coordinator.dart';
+import 'package:tulgusch/features/schedule/providers/schedule_provider.dart';
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -36,9 +36,6 @@ Future<void> _flush() async {
 class FakeScheduleService implements ScheduleService {
   List<ScheduleItem> data;
   int getScheduleCalls = 0;
-
-  @override
-  String get namespace => '';
 
   FakeScheduleService(this.data);
 
@@ -94,7 +91,7 @@ class FakeStorage extends StorageService {
 
   @override
   CachedSchedule? getCachedSchedule(String searchValue,
-          {String namespace = ''}) =>
+          ) =>
       null;
 
   // The base class keeps these in an uninitialized Hive box; tests use

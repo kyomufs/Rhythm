@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:rhythm/core/theme/motion.dart';
-import 'package:rhythm/core/theme/typography.dart';
+import 'package:tulgusch/core/theme/motion.dart';
+import 'package:tulgusch/core/theme/typography.dart';
 
 /// Один пункт нижнего меню.
 class AppNavDestination {

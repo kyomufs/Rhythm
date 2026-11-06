@@ -2,15 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:rhythm/core/services/storage_service.dart';
-import 'package:rhythm/core/theme/shapes.dart';
-import 'package:rhythm/core/theme/typography.dart';
-import 'package:rhythm/features/schedule/providers/schedule_provider.dart';
-import 'package:rhythm/core/theme/spacing.dart';
-import 'package:rhythm/features/profile/providers/profile_providers.dart';
-import 'package:rhythm/features/sources/widgets/source_pill.dart';
-import 'package:rhythm/features/profile/screens/settings_screen.dart';
-import 'package:rhythm/features/profile/screens/student_profile_screen.dart';
+import 'package:tulgusch/core/services/storage_service.dart';
+import 'package:tulgusch/core/theme/shapes.dart';
+import 'package:tulgusch/core/theme/typography.dart';
+import 'package:tulgusch/features/schedule/providers/schedule_provider.dart';
+import 'package:tulgusch/features/profile/providers/profile_providers.dart';
+import 'package:tulgusch/features/profile/screens/settings_screen.dart';
+import 'package:tulgusch/features/profile/screens/student_profile_screen.dart';
 
 /// Профиль: карточка-удостоверение и два перехода.
 ///
@@ -30,17 +28,11 @@ class ProfileScreen extends ConsumerWidget {
     final studentId = storage.getStudentId();
     final subgroup = storage.getMySubgroup();
     final version = ref.watch(appVersionProvider).valueOrNull;
-    final versionLabel = version == null ? 'О приложении' : 'Rhythm v$version';
+    final versionLabel = version == null ? 'О приложении' : 'tulgusch v$version';
 
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          children: [
-            const SourcePill(),
-            const Gap(AppSpacing.xs),
-            Text('Профиль', style: Theme.of(context).textTheme.titleLarge),
-          ],
-        ),
+        title: Text('Профиль', style: Theme.of(context).textTheme.titleLarge),
         centerTitle: false,
       ),
       body: ListView(
@@ -88,7 +80,7 @@ class ProfileScreen extends ConsumerWidget {
   ) {
     showAboutDialog(
       context: context,
-      applicationName: 'Rhythm',
+      applicationName: 'tulgusch',
       applicationVersion: version ?? '',
       applicationIcon: Icon(
         Icons.school,
@@ -97,8 +89,7 @@ class ProfileScreen extends ConsumerWidget {
       ),
       children: [
         const Text(
-          'Расписание, журнал успеваемости и дедлайны. '
-          'Поддерживается ТулГУ и ручные источники.',
+          'Расписание ТулГУ, журнал успеваемости и дедлайны.',
         ),
         const Gap(16),
         const ListTile(
@@ -145,7 +136,7 @@ class _IdentityCard extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final hasSubgroup = subgroup != null && subgroup!.isNotEmpty;
-    final monogram = (group != null && group!.isNotEmpty) ? group! : 'Rhythm';
+    final monogram = (group != null && group!.isNotEmpty) ? group! : 'tulgusch';
 
     return Material(
       color: colorScheme.primaryContainer,

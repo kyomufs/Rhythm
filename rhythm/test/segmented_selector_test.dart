@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:rhythm/shared/widgets/app_segmented_selector.dart';
+import 'package:tulgusch/shared/widgets/app_segmented_selector.dart';
 
 void main() {
   /// Левая граница индикатора выбора в координатах экрана.

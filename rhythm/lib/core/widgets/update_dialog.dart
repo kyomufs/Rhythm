@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
-import 'package:rhythm/core/services/update_service.dart';
-import 'package:rhythm/shared/widgets/wavy_progress.dart';
+import 'package:tulgusch/core/services/update_service.dart';
+import 'package:tulgusch/shared/widgets/wavy_progress.dart';
 
 /// Shows the app-update flow dialog: "update available" → download with
 /// a progress bar → system install prompt.

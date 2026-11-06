@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:rhythm/core/theme/theme_provider.dart';
+import 'package:tulgusch/core/theme/theme_provider.dart';
 
 /// Demo mode (derived from app settings): switches the schedule to a
 /// generated throwaway timetable and enables the fun preview features.

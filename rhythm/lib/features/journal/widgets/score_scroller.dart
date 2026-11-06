@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
-import 'package:rhythm/core/input/desktop_input.dart';
+import 'package:tulgusch/core/input/desktop_input.dart';
 
 /// Горизонтальный скроллер-пикер балла: чипы 0…max, которые тянутся пальцем
 /// или мышью, плюс степпер для точной правки. `null` — балл не выставлен.

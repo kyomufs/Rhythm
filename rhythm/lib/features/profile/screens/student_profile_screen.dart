@@ -1,17 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
-import 'package:rhythm/core/sources/source_store.dart';
-import 'package:rhythm/core/theme/shapes.dart';
-import 'package:rhythm/core/theme/typography.dart';
-import 'package:rhythm/features/profile/providers/profile_providers.dart';
-import 'package:rhythm/features/sources/widgets/connector_field_form.dart';
-import 'package:rhythm/integrations/catalog.dart';
+import 'package:tulgusch/core/services/storage_service.dart';
+import 'package:tulgusch/core/theme/shapes.dart';
+import 'package:tulgusch/core/theme/typography.dart';
+import 'package:tulgusch/features/profile/providers/profile_providers.dart';
+import 'package:tulgusch/features/profile/widgets/tulgu_profile_form.dart';
 
-/// Профиль ученика: группа, подгруппа, зачётка.
-///
-/// Поля принадлежат активному источнику, а не приложению: у ТулГУ своя
-/// зачётка, у Бауманки её нет вовсе. Форму рисует дескриптор коннектора.
+/// Профиль ученика ТулГУ: группа, подгруппа, зачётка.
 class StudentProfileScreen extends ConsumerStatefulWidget {
   const StudentProfileScreen({super.key});
 
@@ -21,34 +17,33 @@ class StudentProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
-  final _formKey = GlobalKey<ConnectorFieldFormState>();
-  late final Map<String, String> _initialConfig;
-
-  @override
-  void initState() {
-    super.initState();
-    final source = ref.read(activeSourceProvider);
-    _initialConfig = Map<String, String>.from(
-      source?.config ?? const <String, String>{},
-    );
-  }
+  final _formKey = GlobalKey<TulguProfileFormState>();
+  String? _error;
 
   Future<void> _save() async {
-    final source = ref.read(activeSourceProvider);
-    if (source == null) return;
-    final error = _formKey.currentState?.validate();
+    final form = _formKey.currentState;
+    if (form == null) return;
+
+    final error = form.validate();
     if (error != null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(error)));
+      setState(() => _error = error);
       return;
     }
-    final config = {
-      ...source.config,
-      ...?_formKey.currentState?.config,
-    };
-    await ref.read(sourcesProvider.notifier).update(
-          source.copyWith(config: config),
-        );
+
+    final storage = ref.read(storageServiceProvider);
+    await storage.setMyGroup(form.group);
+    final subgroup = form.subgroup;
+    if (subgroup == null) {
+      await storage.setMySubgroup('');
+    } else {
+      await storage.setMySubgroup(subgroup);
+    }
+    final studentId = form.studentId;
+    if (studentId == null) {
+      await storage.clearStudentId();
+    } else {
+      await storage.setStudentId(studentId);
+    }
     // Оценки и карточка профиля пересобираются по этому счётчику.
     ref.read(profileRevisionProvider.notifier).state++;
 
@@ -63,9 +58,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final source = ref.watch(activeSourceProvider);
-    final connector = connectorFor(source);
-    final descriptor = connector.descriptor;
+    final storage = ref.watch(storageServiceProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Профиль ученика'), centerTitle: false),
@@ -88,38 +81,43 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
                     const Gap(8),
                     Expanded(
                       child: Text(
-                        source?.title ?? descriptor.title,
+                        'ТулГУ',
                         style: AppTypography.emphasizedTitleSmall(
                           theme.textTheme.titleSmall!,
                         ),
                       ),
                     ),
-                    Text(
-                      descriptor.kind.badge,
-                      style: theme.textTheme.labelSmall
-                          ?.copyWith(color: colorScheme.onSurfaceVariant),
-                    ),
                   ],
                 ),
                 const Gap(8),
                 Text(
-                  descriptor.fields.isEmpty
-                      ? 'У источника нет профиля: данные вносятся вручную.'
-                      : 'Эти поля принадлежат источнику «${source?.title ?? descriptor.title}».',
+                  'Номер группы приходит из API вуза: расписание строится по '
+                  'нему, остальные поля — уточнения.',
                   style: theme.textTheme.bodySmall
                       ?.copyWith(color: colorScheme.onSurfaceVariant),
                 ),
-                if (descriptor.fields.isNotEmpty) ...[
-                  const Gap(16),
-                  ConnectorFieldForm(
-                    key: _formKey,
-                    connector: connector,
-                    initialConfig: _initialConfig,
-                  ),
-                ],
+                const Gap(16),
+                TulguProfileForm(
+                  key: _formKey,
+                  initialGroup: storage.getMyGroup(),
+                  initialSubgroup: storage.getMySubgroup(),
+                  initialStudentId: storage.getStudentId(),
+                  onChanged: () {
+                    if (_error != null) setState(() => _error = null);
+                  },
+                ),
               ],
             ),
           ),
+          if (_error != null) ...[
+            const Gap(12),
+            Text(
+              _error!,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: colorScheme.error),
+            ),
+          ],
           const Gap(24),
           SizedBox(
             height: 56,

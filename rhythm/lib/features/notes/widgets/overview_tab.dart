@@ -3,10 +3,10 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:intl/intl.dart';
-import 'package:rhythm/core/models/note_models.dart';
-import 'package:rhythm/core/theme/motion.dart';
-import 'package:rhythm/core/theme/shapes.dart';
-import 'package:rhythm/core/theme/typography.dart';
+import 'package:tulgusch/core/models/note_models.dart';
+import 'package:tulgusch/core/theme/motion.dart';
+import 'package:tulgusch/core/theme/shapes.dart';
+import 'package:tulgusch/core/theme/typography.dart';
 
 /// Вкладка «Обзор»: прогресс предмета, статистика и ближайшие дедлайны.
 class OverviewTab extends StatelessWidget {

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:rhythm/core/utils/mark_labels.dart';
+import 'package:tulgusch/core/utils/mark_labels.dart';
 
 void main() {
   test('нормализация снимает регистр, «ё» и лишние пробелы', () {

@@ -2,26 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
-import 'package:rhythm/app.dart';
-import 'package:rhythm/core/demo/demo_schedule.dart';
-import 'package:rhythm/core/models/schedule.dart';
-import 'package:rhythm/core/services/schedule_service.dart';
-import 'package:rhythm/core/theme/spacing.dart';
-import 'package:rhythm/core/theme/typography.dart';
-import 'package:rhythm/core/widgets/refresh_confirmation.dart';
-import 'package:rhythm/core/widgets/update_feedback.dart';
-import 'package:rhythm/features/schedule/providers/schedule_provider.dart';
-import 'package:rhythm/features/schedule/screens/schedule_changes_screen.dart';
-import 'package:rhythm/features/schedule/screens/schedule_preview_screen.dart';
-import 'package:rhythm/features/schedule/widgets/day_schedule.dart';
-import 'package:rhythm/features/schedule/widgets/lesson_detail_sheet.dart';
-import 'package:rhythm/features/sources/widgets/source_pill.dart';
-import 'package:rhythm/features/schedule/widgets/week_navigator.dart';
-import 'package:rhythm/shared/widgets/empty_state.dart';
-import 'package:rhythm/shared/widgets/wavy_progress.dart';
-import 'package:rhythm/shared/widgets/expressive_button_group.dart';
-import 'package:rhythm/shared/widgets/expressive_loading_indicator.dart';
-import 'package:rhythm/shared/widgets/loading_indicator.dart';
+import 'package:tulgusch/app.dart';
+import 'package:tulgusch/core/demo/demo_schedule.dart';
+import 'package:tulgusch/core/models/schedule.dart';
+import 'package:tulgusch/core/services/schedule_service.dart';
+import 'package:tulgusch/core/theme/typography.dart';
+import 'package:tulgusch/core/widgets/refresh_confirmation.dart';
+import 'package:tulgusch/core/widgets/update_feedback.dart';
+import 'package:tulgusch/features/schedule/providers/schedule_provider.dart';
+import 'package:tulgusch/features/schedule/screens/schedule_changes_screen.dart';
+import 'package:tulgusch/features/schedule/screens/schedule_preview_screen.dart';
+import 'package:tulgusch/features/schedule/widgets/day_schedule.dart';
+import 'package:tulgusch/features/schedule/widgets/lesson_detail_sheet.dart';
+import 'package:tulgusch/features/schedule/widgets/week_navigator.dart';
+import 'package:tulgusch/shared/widgets/empty_state.dart';
+import 'package:tulgusch/shared/widgets/wavy_progress.dart';
+import 'package:tulgusch/shared/widgets/expressive_button_group.dart';
+import 'package:tulgusch/shared/widgets/expressive_loading_indicator.dart';
+import 'package:tulgusch/shared/widgets/loading_indicator.dart';
 
 /// Ниже этой ширины панель действий не помещается рядом с заголовком.
 const double _compactWidth = 360;
@@ -139,14 +137,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
         titleSpacing: 16,
         title: _ScheduleHeader(state: state),
         centerTitle: false,
-        actions: [
-          SourcePill(
-            maxWidth:
-                MediaQuery.sizeOf(context).width < _compactWidth ? 96 : 150,
-          ),
-          const Gap(AppSpacing.xxs),
-          ..._buildActions(context, ref, state),
-        ],
+        actions: _buildActions(context, ref, state),
       ),
       body: state.currentGroup == null && !state.isDemo
           ? _buildNoGroupView(context, ref)
@@ -287,8 +278,8 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
   Widget _buildNoGroupView(BuildContext context, WidgetRef ref) {
     return EmptyState(
       icon: Icons.school_outlined,
-      title: 'Выберите группу',
-      message: 'Укажите номер группы\nв разделе «Профиль» → «Настройки»',
+      title: 'Группа не выбрана',
+      message: 'Укажите номер группы в профиле,\nи расписание подтянется само',
       action: FilledButton.icon(
         onPressed: () {
           ref.read(currentTabProvider.notifier).state = 3;

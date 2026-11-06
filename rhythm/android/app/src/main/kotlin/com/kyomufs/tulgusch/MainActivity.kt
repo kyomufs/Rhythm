@@ -1,4 +1,4 @@
-package com.kyomufs.rhythm
+package com.kyomufs.tulgusch
 
 import android.content.Intent
 import android.net.Uri
@@ -9,7 +9,7 @@ import io.flutter.plugin.common.MethodChannel
 import java.io.File
 
 class MainActivity : FlutterActivity() {
-    private val installerChannel = "com.kyomufs.rhythm/installer"
+    private val installerChannel = "com.kyomufs.tulgusch/installer"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)

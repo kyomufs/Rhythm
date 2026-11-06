@@ -5,32 +5,32 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:rhythm/core/input/desktop_input.dart';
-import 'package:rhythm/core/services/notification_service.dart';
-import 'package:rhythm/core/services/storage_service.dart';
-import 'package:rhythm/core/services/update_service.dart';
-import 'package:rhythm/core/theme/theme_provider.dart';
-import 'package:rhythm/core/widgets/background_sync_host.dart';
-import 'package:rhythm/core/widgets/update_dialog.dart';
-import 'package:rhythm/core/widgets/update_feedback.dart';
-import 'package:rhythm/features/journal/screens/journal_screen.dart';
-import 'package:rhythm/features/performance/providers/performance_provider.dart';
-import 'package:rhythm/features/performance/screens/performance_screen.dart';
-import 'package:rhythm/features/profile/screens/onboarding_screen.dart';
-import 'package:rhythm/features/profile/screens/profile_screen.dart';
-import 'package:rhythm/features/schedule/providers/schedule_provider.dart';
-import 'package:rhythm/features/schedule/screens/schedule_changes_screen.dart';
-import 'package:rhythm/features/schedule/screens/schedule_screen.dart';
-import 'package:rhythm/shared/widgets/app_nav_bar.dart';
+import 'package:tulgusch/core/input/desktop_input.dart';
+import 'package:tulgusch/core/services/notification_service.dart';
+import 'package:tulgusch/core/services/storage_service.dart';
+import 'package:tulgusch/core/services/update_service.dart';
+import 'package:tulgusch/core/theme/theme_provider.dart';
+import 'package:tulgusch/core/widgets/background_sync_host.dart';
+import 'package:tulgusch/core/widgets/update_dialog.dart';
+import 'package:tulgusch/core/widgets/update_feedback.dart';
+import 'package:tulgusch/features/journal/screens/journal_screen.dart';
+import 'package:tulgusch/features/performance/providers/performance_provider.dart';
+import 'package:tulgusch/features/performance/screens/performance_screen.dart';
+import 'package:tulgusch/features/profile/screens/onboarding_screen.dart';
+import 'package:tulgusch/features/profile/screens/profile_screen.dart';
+import 'package:tulgusch/features/schedule/providers/schedule_provider.dart';
+import 'package:tulgusch/features/schedule/screens/schedule_changes_screen.dart';
+import 'package:tulgusch/features/schedule/screens/schedule_screen.dart';
+import 'package:tulgusch/shared/widgets/app_nav_bar.dart';
 
 /// Current tab index
 final currentTabProvider = StateProvider<int>((ref) => 0);
 
 /// Main app widget
-class RhythmApp extends ConsumerWidget {
+class TulguschApp extends ConsumerWidget {
   final bool startScreen;
 
-  const RhythmApp({super.key, this.startScreen = true});
+  const TulguschApp({super.key, this.startScreen = true});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -43,7 +43,7 @@ class RhythmApp extends ConsumerWidget {
     final darkTheme = ref.watch(themeDataProviderDark);
 
     return MaterialApp(
-      title: 'Rhythm',
+      title: 'tulgusch',
       debugShowCheckedModeBanner: false,
       theme: lightTheme,
       darkTheme: darkTheme,
@@ -160,7 +160,7 @@ class _MainShellState extends ConsumerState<MainShell> {
       await service.show(
         1,
         'Уведомления включены',
-        'Rhythm сообщит об изменениях расписания и оценок',
+        'tulgusch сообщит об изменениях расписания и оценок',
       );
     }
   }

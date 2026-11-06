@@ -1,9 +1,9 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:rhythm/core/theme/motion.dart';
-import 'package:rhythm/core/theme/shapes.dart';
-import 'package:rhythm/core/theme/typography.dart';
+import 'package:tulgusch/core/theme/motion.dart';
+import 'package:tulgusch/core/theme/shapes.dart';
+import 'package:tulgusch/core/theme/typography.dart';
 
 /// Чип с морфом формы — экспрессивная замена `FilterChip`.
 ///

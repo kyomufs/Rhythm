@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:rhythm/core/demo/demo_schedule.dart';
+import 'package:tulgusch/core/demo/demo_schedule.dart';
 
 /// Фиксированное время внутри второй пары (10:00–11:30) — тесты на
 /// «идущую сейчас» пару не должны зависеть от момента запуска.

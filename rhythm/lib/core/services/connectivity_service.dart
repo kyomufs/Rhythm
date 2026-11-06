@@ -1,19 +1,11 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:rhythm/integrations/catalog.dart';
-import 'package:rhythm/integrations/contract/connector.dart';
-import 'package:rhythm/core/sources/source_store.dart';
+import 'package:tulgusch/core/api/schedule_api.dart';
 
-/// Provider for connectivity service
-final connectivityServiceProvider = Provider<ConnectivityService>((ref) {
-  return ConnectivityService(connectorFor(ref.watch(activeSourceProvider)));
-});
-
-/// Проверка доступности API активного источника с кэшем на полминуты:
-/// один сбой сети не должен запирать приложение в офлайне.
+/// Проверка доступности API с кэшем на полминуты: один сбой сети не должен
+/// запирать приложение в офлайне.
 class ConnectivityService {
-  final ScheduleConnector _provider;
+  ConnectivityService(this._api);
 
-  ConnectivityService(this._provider);
+  final ScheduleApi _api;
 
   bool? _lastResult;
   DateTime? _lastCheckTime;
@@ -28,7 +20,7 @@ class ConnectivityService {
       }
     }
 
-    _lastResult = await _provider.ping();
+    _lastResult = await _api.ping();
     _lastCheckTime = DateTime.now();
     return _lastResult!;
   }

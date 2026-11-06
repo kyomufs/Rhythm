@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:rhythm/core/models/note_models.dart';
-import 'package:rhythm/core/services/storage_service.dart';
+import 'package:tulgusch/core/models/note_models.dart';
+import 'package:tulgusch/core/services/storage_service.dart';
 
 // ── Notes State ─────────────────────────────────────────────
 

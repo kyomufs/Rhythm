@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:rhythm/core/domain/journal.dart';
-import 'package:rhythm/core/journal/journal_store.dart';
-import 'package:rhythm/core/models/schedule.dart';
-import 'package:rhythm/core/services/storage_service.dart';
+import 'package:tulgusch/core/domain/journal.dart';
+import 'package:tulgusch/core/journal/journal_store.dart';
+import 'package:tulgusch/core/models/schedule.dart';
+import 'package:tulgusch/core/services/storage_service.dart';
 
 class _FakeStorage extends StorageService {
   JournalData data = const JournalData();
@@ -11,10 +11,10 @@ class _FakeStorage extends StorageService {
   bool get isInitialized => true;
 
   @override
-  JournalData getJournal(String sourceId) => data;
+  JournalData getJournal() => data;
 
   @override
-  Future<void> saveJournal(String sourceId, JournalData value) async {
+  Future<void> saveJournal(JournalData value) async {
     data = value;
   }
 }
@@ -41,7 +41,7 @@ ScheduleItem _item(
 void main() {
   test('импорт заводит семестр, дисциплины и пары из расписания', () {
     final storage = _FakeStorage();
-    final notifier = JournalNotifier(storage, 's1');
+    final notifier = JournalNotifier(storage);
 
     final result = notifier.importSchedule([
       _item('10.09.2026', '08:30 - 10:00', 'Математика'),
@@ -67,7 +67,7 @@ void main() {
 
   test('повторный импорт ничего не дублирует', () {
     final storage = _FakeStorage();
-    final notifier = JournalNotifier(storage, 's1');
+    final notifier = JournalNotifier(storage);
     final items = [
       _item('10.09.2026', '08:30 - 10:00', 'Математика'),
       _item('11.09.2026', '10:15 - 11:45', 'Физика'),
@@ -84,7 +84,7 @@ void main() {
 
   test('импорт не стирает ручные правки и баллы', () {
     final storage = _FakeStorage();
-    final notifier = JournalNotifier(storage, 's1');
+    final notifier = JournalNotifier(storage);
     notifier.importSchedule([_item('10.09.2026', '08:30 - 10:00', 'Математика')]);
 
     final course = notifier.state.data.courses.single;
@@ -112,7 +112,7 @@ void main() {
 
   test('импорт за весь учебный год делит его на два семестра', () {
     final storage = _FakeStorage();
-    final notifier = JournalNotifier(storage, 's1');
+    final notifier = JournalNotifier(storage);
 
     final result = notifier.importSchedule([
       _item('05.09.2026', '08:30 - 10:00', 'Математика'),
@@ -138,7 +138,7 @@ void main() {
 
   test('удаление пары убирает только её', () {
     final storage = _FakeStorage();
-    final notifier = JournalNotifier(storage, 's1');
+    final notifier = JournalNotifier(storage);
     notifier.importSchedule([
       _item('10.09.2026', '08:30 - 10:00', 'Математика'),
       _item('17.09.2026', '10:15 - 11:45', 'Математика'),

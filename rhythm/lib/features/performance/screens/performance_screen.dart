@@ -1,18 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
-import 'package:rhythm/core/theme/spacing.dart';
-import 'package:rhythm/core/theme/typography.dart';
-import 'package:rhythm/app.dart';
-import 'package:rhythm/core/widgets/refresh_confirmation.dart';
-import 'package:rhythm/core/widgets/update_feedback.dart';
-import 'package:rhythm/features/performance/providers/performance_provider.dart';
-import 'package:rhythm/features/sources/widgets/source_pill.dart';
-import 'package:rhythm/features/performance/widgets/marks_table.dart';
-import 'package:rhythm/shared/widgets/empty_state.dart';
-import 'package:rhythm/shared/widgets/loading_indicator.dart';
-import 'package:rhythm/shared/widgets/morph_chip.dart';
-import 'package:rhythm/shared/widgets/wavy_progress.dart';
+import 'package:tulgusch/core/theme/spacing.dart';
+import 'package:tulgusch/core/theme/typography.dart';
+import 'package:tulgusch/app.dart';
+import 'package:tulgusch/core/widgets/refresh_confirmation.dart';
+import 'package:tulgusch/core/widgets/update_feedback.dart';
+import 'package:tulgusch/features/performance/providers/performance_provider.dart';
+import 'package:tulgusch/features/performance/widgets/marks_table.dart';
+import 'package:tulgusch/shared/widgets/empty_state.dart';
+import 'package:tulgusch/shared/widgets/loading_indicator.dart';
+import 'package:tulgusch/shared/widgets/morph_chip.dart';
+import 'package:tulgusch/shared/widgets/wavy_progress.dart';
 
 /// Performance (academic marks) screen
 class PerformanceScreen extends ConsumerWidget {
@@ -27,13 +26,7 @@ class PerformanceScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          children: [
-            const SourcePill(),
-            const Gap(AppSpacing.xs),
-            Text('Успеваемость', style: theme.textTheme.titleLarge),
-          ],
-        ),
+        title: Text('Успеваемость', style: theme.textTheme.titleLarge),
         centerTitle: false,
         actions: [
           if (isConfigured)

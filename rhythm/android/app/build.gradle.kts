@@ -18,7 +18,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.kyomufs.rhythm"
+    namespace = "com.kyomufs.tulgusch"
     compileSdk = 36
     ndkVersion = "29.0.14206865"
 
@@ -29,7 +29,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.kyomufs.rhythm"
+        applicationId = "com.kyomufs.tulgusch"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

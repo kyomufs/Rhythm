@@ -2,18 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:intl/intl.dart';
-import 'package:rhythm/core/domain/journal.dart';
-import 'package:rhythm/core/journal/journal_store.dart';
-import 'package:rhythm/core/models/schedule.dart';
-import 'package:rhythm/core/theme/shapes.dart';
-import 'package:rhythm/core/theme/spacing.dart';
-import 'package:rhythm/core/theme/typography.dart';
-import 'package:rhythm/features/journal/widgets/course_style.dart';
-import 'package:rhythm/features/journal/widgets/journal_editors.dart';
-import 'package:rhythm/features/journal/widgets/score_scroller.dart';
-import 'package:rhythm/shared/widgets/expressive_button_group.dart';
-import 'package:rhythm/shared/widgets/morph_chip.dart';
-import 'package:rhythm/shared/widgets/wavy_progress.dart';
+import 'package:tulgusch/core/domain/journal.dart';
+import 'package:tulgusch/core/journal/journal_store.dart';
+import 'package:tulgusch/core/models/schedule.dart';
+import 'package:tulgusch/core/theme/shapes.dart';
+import 'package:tulgusch/core/theme/spacing.dart';
+import 'package:tulgusch/core/theme/typography.dart';
+import 'package:tulgusch/features/journal/widgets/course_style.dart';
+import 'package:tulgusch/features/journal/widgets/journal_editors.dart';
+import 'package:tulgusch/features/journal/widgets/score_scroller.dart';
+import 'package:tulgusch/shared/widgets/expressive_button_group.dart';
+import 'package:tulgusch/shared/widgets/morph_chip.dart';
+import 'package:tulgusch/shared/widgets/wavy_progress.dart';
 
 /// Дисциплина: сводка, посещение, события и шкала.
 class CourseScreen extends ConsumerStatefulWidget {

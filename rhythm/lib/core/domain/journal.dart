@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import 'package:rhythm/core/models/schedule.dart';
+import 'package:tulgusch/core/models/schedule.dart';
 
 /// ═══════════════════════════════════════════════════════════════
 /// Журнал успеваемости: семестр → дисциплина → шкала → записи.
@@ -337,7 +337,6 @@ GradeScale defaultGradeScale() => gradeScalePresets.first.build();
 
 class Term {
   final String id;
-  final String sourceId;
   final String title;
   final DateTime start;
   final DateTime end;
@@ -345,7 +344,6 @@ class Term {
 
   const Term({
     required this.id,
-    required this.sourceId,
     required this.title,
     required this.start,
     required this.end,
@@ -364,7 +362,6 @@ class Term {
   }) {
     return Term(
       id: id,
-      sourceId: sourceId,
       title: title ?? this.title,
       start: start ?? this.start,
       end: end ?? this.end,
@@ -374,7 +371,6 @@ class Term {
 
   Map<String, dynamic> toJson() => {
         'id': id,
-        'sourceId': sourceId,
         'title': title,
         'start': start.toIso8601String(),
         'end': end.toIso8601String(),
@@ -384,7 +380,6 @@ class Term {
   factory Term.fromJson(Map<String, dynamic> json) {
     return Term(
       id: json['id'] as String,
-      sourceId: json['sourceId'] as String? ?? '',
       title: json['title'] as String? ?? 'Семестр',
       start: DateTime.parse(json['start'] as String),
       end: DateTime.parse(json['end'] as String),

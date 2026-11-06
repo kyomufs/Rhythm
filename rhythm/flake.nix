@@ -1,5 +1,5 @@
 {
-  description = "Rhythm — Расписание ТулГУ";
+  description = "tulgusch — расписание ТулГУ";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -32,7 +32,7 @@
           ];
 
           shellHook = ''
-            echo "=== Rhythm dev environment ==="
+            echo "=== tulgusch dev environment ==="
             echo "Run: flutter pub get && flutter run -d linux"
           '';
         };

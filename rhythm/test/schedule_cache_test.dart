@@ -1,13 +1,13 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:rhythm/core/api/api_exception.dart';
-import 'package:rhythm/core/models/schedule.dart';
-import 'package:rhythm/core/sources/source_api.dart';
-import 'package:rhythm/core/services/connectivity_service.dart';
-import 'package:rhythm/core/services/notification_service.dart';
-import 'package:rhythm/core/services/schedule_service.dart';
-import 'package:rhythm/core/services/storage_service.dart';
-import 'package:rhythm/core/services/update_coordinator.dart';
-import 'package:rhythm/features/schedule/providers/schedule_provider.dart';
+import 'package:tulgusch/core/api/api_exception.dart';
+import 'package:tulgusch/core/models/schedule.dart';
+import 'package:tulgusch/core/api/schedule_api.dart';
+import 'package:tulgusch/core/services/connectivity_service.dart';
+import 'package:tulgusch/core/services/notification_service.dart';
+import 'package:tulgusch/core/services/schedule_service.dart';
+import 'package:tulgusch/core/services/storage_service.dart';
+import 'package:tulgusch/core/services/update_coordinator.dart';
+import 'package:tulgusch/features/schedule/providers/schedule_provider.dart';
 
 // ── Fakes ──────────────────────────────────────────────────────
 
@@ -35,6 +35,9 @@ ScheduleData _data(List<ScheduleItem> items) => ScheduleData(
     );
 
 class _FakeApi extends ScheduleApi {
+  @override
+  Future<bool> ping() async => true;
+
   _FakeApi({this.items = const [], this.fail = false});
 
   final List<ScheduleItem> items;
@@ -42,12 +45,12 @@ class _FakeApi extends ScheduleApi {
   int calls = 0;
 
   @override
-  Future<SourceSchedule> fullSchedule(String searchValue) async {
+  Future<ScheduleBundle> fullSchedule(String searchValue) async {
     calls++;
     if (fail) throw const ApiException('Нет подключения к интернету');
     final data = _data(items);
-    return SourceSchedule(
-      dateRange: SourceDateRange(
+    return ScheduleBundle(
+      dateRange: ScheduleDateRange(
         minDate: data.dateRange.minDate,
         maxDate: data.dateRange.maxDate,
         searchField: data.dateRange.searchField,
@@ -58,7 +61,7 @@ class _FakeApi extends ScheduleApi {
   }
 
   @override
-  Future<SourceDateRange> dateRange(String searchValue) async =>
+  Future<ScheduleDateRange> dateRange(String searchValue) async =>
       throw UnimplementedError();
 
   @override
@@ -73,7 +76,7 @@ class _FakeApi extends ScheduleApi {
       throw UnimplementedError();
 
   @override
-  Future<List<SourceSuggestion>> search(String query) async => const [];
+  Future<List<ScheduleSuggestion>> search(String query) async => const [];
 }
 
 class _CacheStorage extends StorageService {
@@ -122,17 +125,18 @@ class _CacheStorage extends StorageService {
 
   @override
   CachedSchedule? getCachedSchedule(String searchValue,
-          {String namespace = ''}) =>
+          ) =>
       cached[searchValue];
 
   @override
   Future<void> cacheSchedule(String searchValue, ScheduleData data,
-      {String namespace = ''}) async {
+      ) async {
     written[searchValue] = data;
   }
 
   @override
-  Future<void> saveLastSearch(String searchValue) async {}
+  Future<void> saveLastSearch(String searchValue,
+      ) async {}
 }
 
 class _OfflineConnectivity implements ConnectivityService {

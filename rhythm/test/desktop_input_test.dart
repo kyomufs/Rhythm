@@ -1,7 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:rhythm/core/input/desktop_input.dart';
+import 'package:tulgusch/core/input/desktop_input.dart';
 
 Widget _harness(Widget child, ScrollController controller) {
   return MaterialApp(

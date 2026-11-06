@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:intl/intl.dart';
-import 'package:rhythm/core/models/note_models.dart';
-import 'package:rhythm/features/notes/providers/notes_provider.dart';
-import 'package:rhythm/core/theme/motion.dart';
-import 'package:rhythm/core/theme/shapes.dart';
-import 'package:rhythm/core/theme/typography.dart';
-import 'package:rhythm/features/notes/widgets/task_sheet.dart';
-import 'package:rhythm/shared/widgets/empty_state.dart';
-import 'package:rhythm/shared/widgets/wavy_progress.dart';
+import 'package:tulgusch/core/models/note_models.dart';
+import 'package:tulgusch/features/notes/providers/notes_provider.dart';
+import 'package:tulgusch/core/theme/motion.dart';
+import 'package:tulgusch/core/theme/shapes.dart';
+import 'package:tulgusch/core/theme/typography.dart';
+import 'package:tulgusch/features/notes/widgets/task_sheet.dart';
+import 'package:tulgusch/shared/widgets/empty_state.dart';
+import 'package:tulgusch/shared/widgets/wavy_progress.dart';
 
 /// Вкладка «Задачи»: скрытые подпапки отфильтрованы, остальные идут секциями.
 class TasksTab extends StatelessWidget {

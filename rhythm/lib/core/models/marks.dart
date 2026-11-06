@@ -1,4 +1,4 @@
-import 'package:rhythm/core/sources/source_api.dart';
+import 'package:tulgusch/core/api/schedule_api.dart';
 
 /// Итоговая оценка за семестр. Баллы за пары в API не приходят —
 /// это отдельный, локальный слой журнала.

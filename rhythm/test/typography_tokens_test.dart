@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:rhythm/core/theme/spacing.dart';
-import 'package:rhythm/core/theme/typography.dart';
+import 'package:tulgusch/core/theme/spacing.dart';
+import 'package:tulgusch/core/theme/typography.dart';
 
 /// Значения ниже — из таблиц `references/tokens.md` скилла `m3-expressive`
 /// (baseline и emphasized type scale). Тест ловит расхождение при правке

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:intl/intl.dart';
-import 'package:rhythm/core/models/note_models.dart';
-import 'package:rhythm/core/theme/shapes.dart';
-import 'package:rhythm/shared/widgets/expressive_button_group.dart';
+import 'package:tulgusch/core/models/note_models.dart';
+import 'package:tulgusch/core/theme/shapes.dart';
+import 'package:tulgusch/shared/widgets/expressive_button_group.dart';
 
 /// Лист задачи: одно и то же поле для создания и редактирования.
 class TaskSheet extends StatefulWidget {

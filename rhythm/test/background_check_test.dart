@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:rhythm/core/models/app_settings.dart';
+import 'package:tulgusch/core/models/app_settings.dart';
 
 void main() {
   test('период фоновой проверки переживает сохранение и чтение', () {

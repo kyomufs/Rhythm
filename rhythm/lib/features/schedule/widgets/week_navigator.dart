@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
-import 'package:rhythm/core/theme/shapes.dart';
-import 'package:rhythm/core/theme/typography.dart';
-import 'package:rhythm/core/utils/week_utils.dart';
+import 'package:tulgusch/core/theme/shapes.dart';
+import 'package:tulgusch/core/theme/typography.dart';
+import 'package:tulgusch/core/utils/week_utils.dart';
 
 /// Навигатор недели в форме разрезной кнопки: `< неделя >`.
 ///

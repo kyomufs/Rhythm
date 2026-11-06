@@ -3,10 +3,10 @@ import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:rhythm/core/models/marks.dart';
-import 'package:rhythm/core/theme/shapes.dart';
-import 'package:rhythm/core/utils/mark_labels.dart';
-import 'package:rhythm/shared/widgets/expressive_button_group.dart';
+import 'package:tulgusch/core/models/marks.dart';
+import 'package:tulgusch/core/theme/shapes.dart';
+import 'package:tulgusch/core/utils/mark_labels.dart';
+import 'package:tulgusch/shared/widgets/expressive_button_group.dart';
 
 /// Таблица успеваемости: липкая шапка, вертикальная прокрутка строк и
 /// горизонтальная прокрутка столбцов, ширины столбцов тянутся мышью или

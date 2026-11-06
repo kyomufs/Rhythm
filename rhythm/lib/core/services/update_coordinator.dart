@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:rhythm/core/services/connectivity_service.dart';
+import 'package:tulgusch/core/api/api_providers.dart';
+import 'package:tulgusch/core/services/connectivity_service.dart';
 
 /// Результат попытки обновления данных.
 enum UpdateOutcome {

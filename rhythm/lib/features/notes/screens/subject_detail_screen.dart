@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
-import 'package:rhythm/core/models/note_models.dart';
-import 'package:rhythm/core/theme/motion.dart';
-import 'package:rhythm/features/notes/providers/notes_provider.dart';
-import 'package:rhythm/features/notes/widgets/overview_tab.dart';
-import 'package:rhythm/features/notes/widgets/task_list.dart';
-import 'package:rhythm/features/notes/widgets/task_sheet.dart';
-import 'package:rhythm/shared/widgets/expressive_button_group.dart';
+import 'package:tulgusch/core/models/note_models.dart';
+import 'package:tulgusch/core/theme/motion.dart';
+import 'package:tulgusch/features/notes/providers/notes_provider.dart';
+import 'package:tulgusch/features/notes/widgets/overview_tab.dart';
+import 'package:tulgusch/features/notes/widgets/task_list.dart';
+import 'package:tulgusch/features/notes/widgets/task_sheet.dart';
+import 'package:tulgusch/shared/widgets/expressive_button_group.dart';
 
 /// Subject detail screen — overview + subfolder tabs
 class SubjectDetailScreen extends ConsumerStatefulWidget {

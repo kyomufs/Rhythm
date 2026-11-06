@@ -28,7 +28,7 @@ class UpdateService {
   ));
 
   static const MethodChannel _installer =
-      MethodChannel('com.kyomufs.rhythm/installer');
+      MethodChannel('com.kyomufs.tulgusch/installer');
 
   /// Returns the newer release, or null when up-to-date/offline/API404.
   Future<UpdateInfo?> check() async {
@@ -61,7 +61,7 @@ class UpdateService {
   Future<String> download(
       UpdateInfo info, void Function(double) onProgress) async {
     final dir = await getTemporaryDirectory();
-    final path = '${dir.path}/Rhythm-${info.version}.apk';
+    final path = '${dir.path}/tulgusch-${info.version}.apk';
     await _dio.download(
       info.apkUrl,
       path,

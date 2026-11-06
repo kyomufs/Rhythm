@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:rhythm/core/theme/motion.dart';
-import 'package:rhythm/core/theme/shapes.dart';
-import 'package:rhythm/core/theme/typography.dart';
+import 'package:tulgusch/core/theme/motion.dart';
+import 'package:tulgusch/core/theme/shapes.dart';
+import 'package:tulgusch/core/theme/typography.dart';
 
 /// Сегментированный переключатель в духе M3 Expressive.
 ///

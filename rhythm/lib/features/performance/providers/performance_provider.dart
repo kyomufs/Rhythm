@@ -1,16 +1,15 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:rhythm/core/models/marks.dart';
-import 'package:rhythm/core/demo/demo_marks.dart';
-import 'package:rhythm/core/providers/clock_provider.dart';
-import 'package:rhythm/core/utils/error_messages.dart';
-import 'package:rhythm/core/services/storage_service.dart';
-import 'package:rhythm/core/services/update_coordinator.dart';
-import 'package:rhythm/core/sources/source_api.dart';
-import 'package:rhythm/core/sources/source_store.dart';
-import 'package:rhythm/integrations/catalog.dart';
-import 'package:rhythm/features/profile/providers/profile_providers.dart';
+import 'package:tulgusch/core/models/marks.dart';
+import 'package:tulgusch/core/demo/demo_marks.dart';
+import 'package:tulgusch/core/providers/clock_provider.dart';
+import 'package:tulgusch/core/utils/error_messages.dart';
+import 'package:tulgusch/core/services/storage_service.dart';
+import 'package:tulgusch/core/services/update_coordinator.dart';
+import 'package:tulgusch/core/api/api_providers.dart';
+import 'package:tulgusch/core/api/schedule_api.dart';
+import 'package:tulgusch/features/profile/providers/profile_providers.dart';
 
 /// Performance screen state
 class PerformanceState {
@@ -84,8 +83,6 @@ class PerformanceNotifier extends StateNotifier<PerformanceState> {
   final Completer<bool> _bootRefresh = Completer<bool>();
   Future<bool> get bootRefresh => _bootRefresh.future;
 
-  /// Профиль ученика берётся из активного источника: у каждого вуза
-  /// своя зачётка, глобальной больше нет.
   PerformanceNotifier(
     this._api,
     this._storage,
@@ -127,7 +124,10 @@ class PerformanceNotifier extends StateNotifier<PerformanceState> {
     // Stale-while-revalidate: paint the local snapshot first (this runs
     // synchronously during construction, before any network wait), then
     // sync with the API and swap the data in place.
-    final cached = _storage.getCachedMarks(studentId: studentId, group: group);
+    final cached = _storage.getCachedMarks(
+      studentId: studentId,
+      group: group,
+    );
     if (state.marks.isEmpty && cached != null && cached.isNotEmpty) {
       state = state.copyWith(marks: cached, clearError: true);
       _autoSelectSemester();
@@ -149,7 +149,10 @@ class PerformanceNotifier extends StateNotifier<PerformanceState> {
               UpdateOutcome.failed, 'Не удалось обновить оценки');
         }
         await _storage.cacheMarks(
-            studentId: studentId, group: group, marks: marks);
+          studentId: studentId,
+          group: group,
+          marks: marks,
+        );
         state = state.copyWith(marks: marks, isLoading: false);
         _autoSelectSemester();
         return const UpdateResult(UpdateOutcome.updated, marksUpdatedText);
@@ -185,32 +188,23 @@ class PerformanceNotifier extends StateNotifier<PerformanceState> {
   }
 }
 
-/// Whether performance is configured (student ID + group)
+/// Хватает ли профиля для итоговых оценок: нужны зачётка и группа.
 final isPerformanceConfiguredProvider = Provider<bool>((ref) {
   // Demo mode never needs real profile fields — marks are generated.
   if (ref.watch(demoModeProvider)) return true;
-  // Re-evaluate when profile fields change (group/subgroup/student ID).
-  ref.watch(profileRevisionProvider);
-  final source = ref.watch(activeSourceProvider);
-  if (source == null) return false;
-  final connector = connectorFor(source);
-  return connector.studentId(source) != null &&
-      connector.academicGroup(source) != null;
+  return ref.watch(profileStudentIdProvider) != null &&
+      ref.watch(profileGroupProvider) != null;
 });
 
 final performanceProvider =
     StateNotifierProvider<PerformanceNotifier, PerformanceState>((ref) {
-  // Recreate the notifier (and reload marks) whenever profile data changes.
-  ref.watch(profileRevisionProvider);
-  final demo = ref.watch(demoModeProvider);
-  final source = ref.watch(activeSourceProvider);
-  final connector = connectorFor(source);
+  // Пересоздаём notifier (и перечитываем оценки) при смене профиля.
   return PerformanceNotifier(
     ref.watch(finalMarksApiProvider),
     ref.watch(storageServiceProvider),
     ref.watch(updateCoordinatorProvider),
-    demo: demo,
-    studentId: source == null ? null : connector.studentId(source),
-    group: source == null ? null : connector.academicGroup(source),
+    demo: ref.watch(demoModeProvider),
+    studentId: ref.watch(profileStudentIdProvider),
+    group: ref.watch(profileGroupProvider),
   );
 });

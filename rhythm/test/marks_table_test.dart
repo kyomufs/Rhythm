@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:rhythm/core/models/marks.dart';
-import 'package:rhythm/features/performance/widgets/marks_table.dart';
+import 'package:tulgusch/core/models/marks.dart';
+import 'package:tulgusch/features/performance/widgets/marks_table.dart';
 
 MarksItem _mark(
   String discipline, {

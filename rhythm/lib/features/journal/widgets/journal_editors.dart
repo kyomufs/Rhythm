@@ -2,21 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:intl/intl.dart';
-import 'package:rhythm/core/domain/journal.dart';
-import 'package:rhythm/core/journal/journal_store.dart';
-import 'package:rhythm/core/theme/shapes.dart';
-import 'package:rhythm/core/theme/spacing.dart';
-import 'package:rhythm/core/theme/typography.dart';
-import 'package:rhythm/shared/widgets/morph_chip.dart';
+import 'package:tulgusch/core/domain/journal.dart';
+import 'package:tulgusch/core/journal/journal_store.dart';
+import 'package:tulgusch/core/theme/shapes.dart';
+import 'package:tulgusch/core/theme/spacing.dart';
+import 'package:tulgusch/core/theme/typography.dart';
+import 'package:tulgusch/shared/widgets/morph_chip.dart';
 
 /// Редактор семестра: имя, границы и удаление вместе с содержимым.
 ///
 /// Семестр — это контейнер для дисциплин, поэтому удаление всегда
 /// подтверждается отдельно: вместе с ним уходят пары и события.
 class TermEditorDialog extends ConsumerStatefulWidget {
-  const TermEditorDialog({super.key, required this.sourceId, this.term});
+  const TermEditorDialog({super.key, this.term});
 
-  final String sourceId;
   final Term? term;
 
   @override
@@ -77,7 +76,6 @@ class _TermEditorDialogState extends ConsumerState<TermEditorDialog> {
     if (term == null) {
       notifier.addTerm(Term(
         id: 'term-${DateTime.now().microsecondsSinceEpoch}',
-        sourceId: widget.sourceId,
         title: title,
         start: _start,
         end: _end,

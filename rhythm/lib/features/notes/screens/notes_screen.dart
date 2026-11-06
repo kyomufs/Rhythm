@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
-import 'package:rhythm/core/models/note_models.dart';
-import 'package:rhythm/core/theme/color_utils.dart';
-import 'package:rhythm/core/theme/shapes.dart';
-import 'package:rhythm/core/theme/typography.dart';
-import 'package:rhythm/features/notes/providers/notes_provider.dart';
-import 'package:rhythm/features/notes/screens/subject_detail_screen.dart';
-import 'package:rhythm/features/schedule/providers/schedule_provider.dart';
-import 'package:rhythm/shared/widgets/empty_state.dart';
-import 'package:rhythm/shared/widgets/expressive_button_group.dart';
-import 'package:rhythm/shared/widgets/wavy_progress.dart';
+import 'package:tulgusch/core/models/note_models.dart';
+import 'package:tulgusch/core/theme/color_utils.dart';
+import 'package:tulgusch/core/theme/shapes.dart';
+import 'package:tulgusch/core/theme/typography.dart';
+import 'package:tulgusch/features/notes/providers/notes_provider.dart';
+import 'package:tulgusch/features/notes/screens/subject_detail_screen.dart';
+import 'package:tulgusch/features/schedule/providers/schedule_provider.dart';
+import 'package:tulgusch/shared/widgets/empty_state.dart';
+import 'package:tulgusch/shared/widgets/expressive_button_group.dart';
+import 'package:tulgusch/shared/widgets/wavy_progress.dart';
 
 /// Notes main screen — list of subject folders
 class NotesScreen extends ConsumerWidget {

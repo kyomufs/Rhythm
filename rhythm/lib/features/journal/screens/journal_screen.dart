@@ -2,25 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:intl/intl.dart';
-import 'package:rhythm/core/domain/journal.dart';
-import 'package:rhythm/core/domain/source.dart';
-import 'package:rhythm/core/input/desktop_input.dart';
-import 'package:rhythm/core/journal/journal_store.dart';
-import 'package:rhythm/core/services/schedule_service.dart';
-import 'package:rhythm/core/sources/source_store.dart';
-import 'package:rhythm/core/theme/shapes.dart';
-import 'package:rhythm/core/theme/spacing.dart';
-import 'package:rhythm/core/theme/typography.dart';
-import 'package:rhythm/features/journal/screens/course_screen.dart';
-import 'package:rhythm/features/journal/widgets/course_style.dart';
-import 'package:rhythm/features/journal/widgets/journal_editors.dart';
-import 'package:rhythm/features/schedule/providers/schedule_provider.dart';
-import 'package:rhythm/features/sources/screens/source_edit_screen.dart';
-import 'package:rhythm/features/sources/widgets/source_pill.dart';
-import 'package:rhythm/integrations/catalog.dart';
-import 'package:rhythm/shared/widgets/empty_state.dart';
-import 'package:rhythm/shared/widgets/morph_chip.dart';
-import 'package:rhythm/shared/widgets/wavy_progress.dart';
+import 'package:tulgusch/core/domain/journal.dart';
+import 'package:tulgusch/core/input/desktop_input.dart';
+import 'package:tulgusch/core/journal/journal_store.dart';
+import 'package:tulgusch/core/services/schedule_service.dart';
+import 'package:tulgusch/features/profile/providers/profile_providers.dart';
+import 'package:tulgusch/core/theme/shapes.dart';
+import 'package:tulgusch/core/theme/spacing.dart';
+import 'package:tulgusch/core/theme/typography.dart';
+import 'package:tulgusch/features/journal/screens/course_screen.dart';
+import 'package:tulgusch/features/journal/widgets/course_style.dart';
+import 'package:tulgusch/features/journal/widgets/journal_editors.dart';
+import 'package:tulgusch/features/schedule/providers/schedule_provider.dart';
+import 'package:tulgusch/shared/widgets/empty_state.dart';
+import 'package:tulgusch/shared/widgets/morph_chip.dart';
+import 'package:tulgusch/shared/widgets/wavy_progress.dart';
 
 /// Журнал успеваемости: лента семестров, сводка и дисциплины.
 ///
@@ -47,18 +43,17 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
     super.dispose();
   }
 
-  Term _draftTerm(Source source) => Term(
+  Term _draftTerm() => Term(
         id: '_draft',
-        sourceId: source.id,
         title: 'Текущий семестр',
         start: DateTime.now(),
         end: DateTime.now(),
       );
 
-  Future<void> _newTerm(Source source) async {
+  Future<void> _newTerm() async {
     await showDialog<void>(
       context: context,
-      builder: (_) => TermEditorDialog(sourceId: source.id),
+      builder: (_) => const TermEditorDialog(),
     );
     final terms = ref.read(journalProvider).data.terms;
     if (terms.isNotEmpty) {
@@ -69,7 +64,7 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
   Future<void> _editTerm(Term term) async {
     await showDialog<void>(
       context: context,
-      builder: (_) => TermEditorDialog(sourceId: term.sourceId, term: term),
+      builder: (_) => TermEditorDialog(term: term),
     );
   }
 
@@ -94,20 +89,13 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
 
   /// Импорт расписания. Сначала берём уже загруженное на вкладке
   /// «Расписание», и только если его нет — идём в сеть за своей группой.
-  Future<void> _import(Source source) async {
+  Future<void> _import() async {
     if (_importing) return;
-    if (source.isManual) {
-      _snack('У источника «${source.title}» нет расписания — дисциплины '
-          'добавляются вручную');
-      return;
-    }
     setState(() => _importing = true);
     try {
       var items = ref.read(scheduleScreenProvider).schedule.items;
       if (items.isEmpty) {
-        final active = ref.read(activeSourceProvider);
-        final group =
-            active == null ? null : connectorFor(active).targetValue(active);
+        final group = ref.read(profileGroupProvider);
         if (group != null) {
           final state =
               await ref.read(scheduleServiceProvider).getSchedule(group);
@@ -140,34 +128,13 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final source = ref.watch(activeSourceProvider);
     final journal = ref.watch(journalProvider);
-
-    if (source == null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Журнал')),
-        body: EmptyState(
-          icon: Icons.inbox_outlined,
-          title: 'Нет источника',
-          message: 'Добавьте университет, школу или работу —\n'
-              'журнал ведётся отдельно для каждого',
-          action: FilledButton.icon(
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const SourceEditScreen()),
-            ),
-            icon: const Icon(Icons.add),
-            label: const Text('Добавить источник'),
-          ),
-        ),
-      );
-    }
-
     final terms = journal.data.terms;
     final term = _termId == null
         ? (terms.isEmpty ? null : terms.last)
         : terms.firstWhere(
             (t) => t.id == _termId,
-            orElse: () => terms.isEmpty ? _draftTerm(source) : terms.last,
+            orElse: () => terms.isEmpty ? _draftTerm() : terms.last,
           );
     final courses =
         term == null ? const <Course>[] : journal.data.coursesOf(term.id);
@@ -175,7 +142,7 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
     return Scaffold(
       appBar: AppBar(
         titleSpacing: AppSpacing.md,
-        title: const SourcePill(maxWidth: 130),
+        title: const Text('Журнал'),
         actions: [
           PopupMenuButton<_JournalAction>(
             tooltip: 'Журнал',
@@ -183,9 +150,9 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
             onSelected: (action) {
               switch (action) {
                 case _JournalAction.import:
-                  _import(source);
+                  _import();
                 case _JournalAction.newTerm:
-                  _newTerm(source);
+                  _newTerm();
                 case _JournalAction.editTerm:
                   if (term != null) _editTerm(term);
                 case _JournalAction.deleteTerm:
@@ -193,14 +160,13 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
               }
             },
             itemBuilder: (_) => [
-              if (!source.isManual)
-                const PopupMenuItem(
-                  value: _JournalAction.import,
-                  child: _MenuRow(
-                    icon: Icons.sync,
-                    label: 'Заполнить из расписания',
-                  ),
+              const PopupMenuItem(
+                value: _JournalAction.import,
+                child: _MenuRow(
+                  icon: Icons.sync,
+                  label: 'Заполнить из расписания',
                 ),
+              ),
               const PopupMenuItem(
                 value: _JournalAction.newTerm,
                 child:
@@ -276,8 +242,7 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
                   term: term,
                   courses: courses,
                   importing: _importing,
-                  canImport: !source.isManual,
-                  onImport: () => _import(source),
+                  onImport: _import,
                 ),
               ),
             ),
@@ -300,31 +265,26 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
                   title: term == null
                       ? 'Журнал ещё пуст'
                       : 'В семестре нет дисциплин',
-                  message: source.isManual
-                      ? 'Добавьте предмет и настройте шкалу —\n'
-                          'баллы и посещение отмечаются вручную'
-                      : 'Заполните журнал из расписания или добавьте\n'
-                          'предмет вручную — данные можно править',
+                  message: 'Заполните журнал из расписания или добавьте\n'
+                      'предмет вручную — данные можно править',
                   action: Column(
                     children: [
-                      if (!source.isManual)
-                        FilledButton.icon(
-                          onPressed: _importing ? null : () => _import(source),
-                          icon: _importing
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child:
-                                      CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : const Icon(Icons.sync),
-                          label: const Text('Заполнить из расписания'),
-                        ),
-                      if (!source.isManual) const Gap(AppSpacing.xs),
+                      FilledButton.icon(
+                        onPressed: _importing ? null : _import,
+                        icon: _importing
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.sync),
+                        label: const Text('Заполнить из расписания'),
+                      ),
+                      const Gap(AppSpacing.xs),
                       TextButton.icon(
-                        onPressed: term == null
-                            ? () => _newTerm(source)
-                            : () => _addCourse(term),
+                        onPressed:
+                            term == null ? _newTerm : () => _addCourse(term),
                         icon:
                             Icon(term == null ? Icons.event_repeat : Icons.add),
                         label: Text(term == null
@@ -474,14 +434,12 @@ class _TermHero extends ConsumerWidget {
     required this.term,
     required this.courses,
     required this.importing,
-    required this.canImport,
     required this.onImport,
   });
 
   final Term term;
   final List<Course> courses;
   final bool importing;
-  final bool canImport;
   final VoidCallback onImport;
 
   @override
@@ -595,7 +553,6 @@ class _TermHero extends ConsumerWidget {
                 label: 'посещение',
               ),
               const Spacer(),
-              if (canImport)
                 TextButton.icon(
                   onPressed: importing ? null : onImport,
                   style: TextButton.styleFrom(

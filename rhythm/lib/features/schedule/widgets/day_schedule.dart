@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:intl/intl.dart';
-import 'package:rhythm/core/models/schedule.dart';
-import 'package:rhythm/core/theme/shapes.dart';
-import 'package:rhythm/core/theme/typography.dart';
-import 'package:rhythm/features/schedule/widgets/lesson_tile.dart';
+import 'package:tulgusch/core/models/schedule.dart';
+import 'package:tulgusch/core/theme/shapes.dart';
+import 'package:tulgusch/core/theme/typography.dart';
+import 'package:tulgusch/features/schedule/widgets/lesson_tile.dart';
 
 /// Расписание дня: одна карточка на день.
 ///

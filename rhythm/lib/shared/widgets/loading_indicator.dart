@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:rhythm/core/theme/spacing.dart';
-import 'package:rhythm/shared/widgets/expressive_loading_indicator.dart';
+import 'package:tulgusch/core/theme/spacing.dart';
+import 'package:tulgusch/shared/widgets/expressive_loading_indicator.dart';
 
 /// Loading indicator widget
 class LoadingIndicator extends StatelessWidget {

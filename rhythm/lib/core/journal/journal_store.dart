@@ -1,8 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:rhythm/core/domain/journal.dart';
-import 'package:rhythm/core/models/schedule.dart';
-import 'package:rhythm/core/services/storage_service.dart';
-import 'package:rhythm/core/sources/source_store.dart';
+import 'package:tulgusch/core/domain/journal.dart';
+import 'package:tulgusch/core/models/schedule.dart';
+import 'package:tulgusch/core/services/storage_service.dart';
 
 class JournalState {
   final JournalData data;
@@ -14,22 +13,18 @@ class JournalState {
       JournalState(data: data ?? this.data, isReady: isReady ?? this.isReady);
 }
 
-/// Журнал активного источника. Всё пишется сразу: балл на паре и
-/// посещаемость не должно теряться из-за незакрытого экрана.
+/// Журнал. Всё пишется сразу: балл на паре и посещаемость не должно
+/// теряться из-за незакрытого экрана.
 class JournalNotifier extends StateNotifier<JournalState> {
   final StorageService _storage;
-  final String sourceId;
 
-  JournalNotifier(this._storage, this.sourceId) : super(const JournalState()) {
-    state = JournalState(
-      data: sourceId.isEmpty ? const JournalData() : _storage.getJournal(sourceId),
-      isReady: true,
-    );
+  JournalNotifier(this._storage) : super(const JournalState()) {
+    state = JournalState(data: _storage.getJournal(), isReady: true);
   }
 
   void _write(JournalData data) {
     state = state.copyWith(data: data);
-    if (sourceId.isNotEmpty) _storage.saveJournal(sourceId, data);
+    _storage.saveJournal(data);
   }
 
   // ── Семестры ─────────────────────────────────────────────
@@ -59,7 +54,6 @@ class JournalNotifier extends StateNotifier<JournalState> {
         : DateTime(now.year, 6, 30);
     return Term(
       id: 'term-${now.microsecondsSinceEpoch}',
-      sourceId: sourceId,
       title: isAutumn ? 'Осенний семестр' : 'Весенний семестр',
       start: start,
       end: end,
@@ -300,7 +294,6 @@ class JournalNotifier extends StateNotifier<JournalState> {
         : 'Весенний семестр $year/${(year + 1) % 100}';
     final term = Term(
       id: 'term-${first.microsecondsSinceEpoch}-$year',
-      sourceId: sourceId,
       title: title,
       start: DateTime(first.year, first.month, first.day),
       end: DateTime(last.year, last.month, last.day),
@@ -402,11 +395,7 @@ class JournalNotifier extends StateNotifier<JournalState> {
 
 final journalProvider =
     StateNotifierProvider<JournalNotifier, JournalState>((ref) {
-  final source = ref.watch(activeSourceProvider);
-  return JournalNotifier(
-    ref.watch(storageServiceProvider),
-    source?.id ?? '',
-  );
+  return JournalNotifier(ref.watch(storageServiceProvider));
 });
 
 /// Статистика дисциплины: пересчитывается при любом изменении журнала.

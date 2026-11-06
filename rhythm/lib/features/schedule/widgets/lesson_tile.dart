@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
-import 'package:rhythm/core/models/schedule.dart';
-import 'package:rhythm/core/providers/clock_provider.dart';
-import 'package:rhythm/core/theme/app_theme.dart';
-import 'package:rhythm/core/theme/shapes.dart';
-import 'package:rhythm/shared/widgets/press_scale.dart';
-import 'package:rhythm/shared/widgets/wavy_progress.dart';
+import 'package:tulgusch/core/models/schedule.dart';
+import 'package:tulgusch/core/providers/clock_provider.dart';
+import 'package:tulgusch/core/theme/app_theme.dart';
+import 'package:tulgusch/core/theme/shapes.dart';
+import 'package:tulgusch/shared/widgets/press_scale.dart';
+import 'package:tulgusch/shared/widgets/wavy_progress.dart';
 
 /// Lesson tile widget for displaying a single lesson.
 ///

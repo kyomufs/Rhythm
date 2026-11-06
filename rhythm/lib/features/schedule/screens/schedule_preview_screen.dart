@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
-import 'package:rhythm/core/models/schedule.dart';
-import 'package:rhythm/core/services/schedule_service.dart';
-import 'package:rhythm/core/utils/week_utils.dart';
-import 'package:rhythm/core/widgets/refresh_confirmation.dart';
-import 'package:rhythm/features/schedule/providers/schedule_provider.dart';
-import 'package:rhythm/features/schedule/widgets/day_schedule.dart';
-import 'package:rhythm/features/schedule/widgets/lesson_detail_sheet.dart';
-import 'package:rhythm/features/schedule/widgets/week_navigator.dart';
-import 'package:rhythm/shared/widgets/empty_state.dart';
-import 'package:rhythm/shared/widgets/loading_indicator.dart';
+import 'package:tulgusch/core/models/schedule.dart';
+import 'package:tulgusch/core/services/schedule_service.dart';
+import 'package:tulgusch/core/utils/week_utils.dart';
+import 'package:tulgusch/core/widgets/refresh_confirmation.dart';
+import 'package:tulgusch/features/schedule/providers/schedule_provider.dart';
+import 'package:tulgusch/features/schedule/widgets/day_schedule.dart';
+import 'package:tulgusch/features/schedule/widgets/lesson_detail_sheet.dart';
+import 'package:tulgusch/features/schedule/widgets/week_navigator.dart';
+import 'package:tulgusch/shared/widgets/empty_state.dart';
+import 'package:tulgusch/shared/widgets/loading_indicator.dart';
 
 /// Read-only schedule preview for any search value (group, teacher, auditorium).
 /// Does NOT change the user's persistent group.

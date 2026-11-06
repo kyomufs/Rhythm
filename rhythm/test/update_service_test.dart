@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:rhythm/core/services/update_service.dart';
+import 'package:tulgusch/core/services/update_service.dart';
 
 void main() {
   test('compareVersions orders dotted numeric versions', () {

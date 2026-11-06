@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:intl/intl.dart';
-import 'package:rhythm/core/models/change_record.dart';
-import 'package:rhythm/core/theme/shapes.dart';
-import 'package:rhythm/features/schedule/providers/schedule_provider.dart';
+import 'package:tulgusch/core/models/change_record.dart';
+import 'package:tulgusch/core/theme/shapes.dart';
+import 'package:tulgusch/features/schedule/providers/schedule_provider.dart';
 
 /// Dedicated screen listing every detected schedule change, grouped
 /// into one block per day. Changed lessons are visually highlighted;

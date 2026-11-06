@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:rhythm/core/models/app_settings.dart';
-import 'package:rhythm/core/services/storage_service.dart';
-import 'package:rhythm/core/theme/shapes.dart';
-import 'package:rhythm/core/theme/typography.dart';
+import 'package:tulgusch/core/models/app_settings.dart';
+import 'package:tulgusch/core/services/storage_service.dart';
+import 'package:tulgusch/core/theme/shapes.dart';
+import 'package:tulgusch/core/theme/typography.dart';
 
 /// App settings state notifier
 class AppSettingsNotifier extends StateNotifier<AppSettings> {

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:rhythm/core/models/schedule.dart';
-import 'package:rhythm/core/providers/clock_provider.dart';
-import 'package:rhythm/features/schedule/widgets/lesson_tile.dart';
+import 'package:tulgusch/core/models/schedule.dart';
+import 'package:tulgusch/core/providers/clock_provider.dart';
+import 'package:tulgusch/features/schedule/widgets/lesson_tile.dart';
 
 /// Clock pinned to a fixed instant, so the rendered countdown text is
 /// predictable instead of depending on the wall clock.

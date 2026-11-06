@@ -8,20 +8,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
-import 'package:rhythm/app.dart';
-import 'package:rhythm/core/api/api_exception.dart';
-import 'package:rhythm/core/domain/source.dart';
-import 'package:rhythm/core/models/app_settings.dart';
-import 'package:rhythm/core/models/marks.dart';
-import 'package:rhythm/core/models/note_models.dart';
-import 'package:rhythm/core/models/schedule.dart';
-import 'package:rhythm/core/providers/clock_provider.dart';
-import 'package:rhythm/core/services/connectivity_service.dart';
-import 'package:rhythm/core/services/notification_service.dart';
-import 'package:rhythm/core/services/schedule_service.dart';
-import 'package:rhythm/core/services/storage_service.dart';
-import 'package:rhythm/core/sources/source_api.dart';
-import 'package:rhythm/core/sources/source_store.dart';
+import 'package:tulgusch/app.dart';
+import 'package:tulgusch/core/api/api_exception.dart';
+import 'package:tulgusch/core/models/app_settings.dart';
+import 'package:tulgusch/core/models/marks.dart';
+import 'package:tulgusch/core/models/note_models.dart';
+import 'package:tulgusch/core/models/schedule.dart';
+import 'package:tulgusch/core/providers/clock_provider.dart';
+import 'package:tulgusch/core/services/connectivity_service.dart';
+import 'package:tulgusch/core/services/notification_service.dart';
+import 'package:tulgusch/core/services/schedule_service.dart';
+import 'package:tulgusch/core/services/storage_service.dart';
+import 'package:tulgusch/core/api/schedule_api.dart';
+import 'package:tulgusch/core/api/api_providers.dart';
 
 final _now = DateTime.now();
 
@@ -40,13 +39,16 @@ ScheduleItem _lesson(String subject) => ScheduleItem(
     );
 
 class _FakeApi extends ScheduleApi {
+  @override
+  Future<bool> ping() async => true;
+
   _FakeApi(this.items);
 
   final List<ScheduleItem> items;
 
   @override
-  Future<SourceDateRange> dateRange(String searchValue) async =>
-      SourceDateRange(
+  Future<ScheduleDateRange> dateRange(String searchValue) async =>
+      ScheduleDateRange(
         minDate: DateTime(2026, 9, 1),
         maxDate: DateTime(2027, 1, 25),
         searchField: SearchField.group,
@@ -63,7 +65,7 @@ class _FakeApi extends ScheduleApi {
   Future<List<CalendarItem>> calendar(String searchValue) async => [];
 
   @override
-  Future<List<SourceSuggestion>> search(String query) async => [];
+  Future<List<ScheduleSuggestion>> search(String query) async => [];
 }
 
 class _FakeProgress implements FinalMarksApi {
@@ -106,18 +108,19 @@ class _FakeStorage extends StorageService {
 
   @override
   CachedSchedule? getCachedSchedule(String searchValue,
-          {String namespace = ''}) =>
+          ) =>
       null;
 
   @override
   Future<void> cacheSchedule(String searchValue, ScheduleData data,
-      {String namespace = ''}) async {}
+      ) async {}
 
   @override
   String? getLastSearch() => null;
 
   @override
-  Future<void> saveLastSearch(String searchValue) async {}
+  Future<void> saveLastSearch(String searchValue,
+      ) async {}
 
   @override
   Future<void> saveAppSettings(AppSettings settings) async {}
@@ -195,22 +198,12 @@ class _FakeNotifications implements NotificationService {
       {String? payload}) async {}
 }
 
-/// Источник, от лица которого идёт тест: группа и зачётка принадлежат ему.
-Source _source() => Source(
-      id: 'tulsu',
-      kind: SourceKind.university,
-      title: 'ТулГУ',
-      providerId: 'tulsu',
-      config: const {'group': '221341', 'subgroup': '01', 'studentId': '12345'},
-      createdAt: DateTime(2026, 9, 1),
-    );
 
 Widget _app({_FakeProgress? progress}) {
   final api = _FakeApi([_lesson('Математический анализ')]);
   return ProviderScope(
     overrides: [
       demoModeProvider.overrideWithValue(false),
-      activeSourceProvider.overrideWithValue(_source()),
       scheduleApiProvider.overrideWithValue(api),
       finalMarksApiProvider.overrideWithValue(progress ?? _FakeProgress()),
       scheduleServiceProvider.overrideWithValue(

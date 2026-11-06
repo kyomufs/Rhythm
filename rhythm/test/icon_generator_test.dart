@@ -1,4 +1,4 @@
-// One-off generator for the Rhythm launcher icons (iOS + Android).
+// One-off generator for the tulgusch launcher icons (iOS + Android).
 // Composes the university glyph (tool/app_icon_glyph.png, white PNG
 // rasterized from university-svgrepo-com.svg via rsvg-convert) on the
 // brand gradient, and writes every required PNG size. Run locally:

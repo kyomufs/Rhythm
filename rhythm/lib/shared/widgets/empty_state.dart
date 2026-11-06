@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:rhythm/core/theme/spacing.dart';
-import 'package:rhythm/core/theme/typography.dart';
+import 'package:tulgusch/core/theme/spacing.dart';
+import 'package:tulgusch/core/theme/typography.dart';
 
 /// Пустое состояние экрана: иконка, заголовок, пояснение и одно действие.
 ///

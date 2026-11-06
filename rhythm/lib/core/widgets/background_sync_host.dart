@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:rhythm/core/theme/theme_provider.dart';
-import 'package:rhythm/features/schedule/providers/schedule_provider.dart';
+import 'package:tulgusch/core/theme/theme_provider.dart';
+import 'package:tulgusch/features/schedule/providers/schedule_provider.dart';
 
 /// Держит фоновую проверку расписания: таймер по периоду из настроек плюс
 /// внеочередной опрос при возврате приложения на передний план.

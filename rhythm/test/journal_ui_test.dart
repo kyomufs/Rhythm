@@ -3,16 +3,14 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:rhythm/core/domain/journal.dart';
-import 'package:rhythm/core/domain/source.dart';
-import 'package:rhythm/core/models/schedule.dart';
-import 'package:rhythm/core/services/storage_service.dart';
-import 'package:rhythm/features/journal/screens/journal_screen.dart';
-import 'package:rhythm/features/journal/widgets/score_scroller.dart';
+import 'package:tulgusch/core/domain/journal.dart';
+import 'package:tulgusch/core/models/schedule.dart';
+import 'package:tulgusch/core/services/storage_service.dart';
+import 'package:tulgusch/features/journal/screens/journal_screen.dart';
+import 'package:tulgusch/features/journal/widgets/score_scroller.dart';
 
 final _term = Term(
   id: 't1',
-  sourceId: 's1',
   title: 'Осенний семестр',
   start: DateTime(2026, 9, 1),
   end: DateTime(2026, 12, 31),
@@ -38,25 +36,10 @@ class _FakeStorage extends StorageService {
   bool get isInitialized => true;
 
   @override
-  List<Source> getSources() => [
-        Source(
-          id: 's1',
-          kind: SourceKind.university,
-          title: 'ТулГУ',
-          subtitle: '221341',
-          providerId: 'tulsu',
-          createdAt: DateTime(2026, 9, 1),
-        ),
-      ];
+  JournalData getJournal() => data;
 
   @override
-  String? getActiveSourceId() => 's1';
-
-  @override
-  JournalData getJournal(String sourceId) => data;
-
-  @override
-  Future<void> saveJournal(String sourceId, JournalData data) async {}
+  Future<void> saveJournal(JournalData data) async {}
 
   @override
   String? getMyGroup() => '221341';

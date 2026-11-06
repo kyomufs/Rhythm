@@ -1,8 +1,8 @@
 import 'package:dio/dio.dart';
-import 'package:rhythm/core/api/api_exception.dart';
-import 'package:rhythm/core/models/schedule.dart';
-import 'package:rhythm/core/sources/source_api.dart';
-import 'package:rhythm/core/utils/error_messages.dart';
+import 'package:tulgusch/core/api/api_exception.dart';
+import 'package:tulgusch/core/models/schedule.dart';
+import 'package:tulgusch/core/api/schedule_api.dart';
+import 'package:tulgusch/core/utils/error_messages.dart';
 
 /// Эндпоинты ТулГУ. Всё, что знает про конкретный вуз, живёт в этой папке.
 class TulsuEndpoints {
@@ -34,7 +34,7 @@ class TulsuScheduleApi extends ScheduleApi {
       : _dio = newDio(baseUrl);
 
   @override
-  Future<List<SourceSuggestion>> search(String query) async {
+  Future<List<ScheduleSuggestion>> search(String query) async {
     if (query.isEmpty) return const [];
     final response = await _guard(
       () => _dio.get<List<dynamic>>(
@@ -44,7 +44,7 @@ class TulsuScheduleApi extends ScheduleApi {
     );
     return (response.data ?? const [])
         .cast<Map<String, dynamic>>()
-        .map((item) => SourceSuggestion(
+        .map((item) => ScheduleSuggestion(
               value: '${item['value'] ?? ''}',
               sort: '${item['SORT'] ?? ''}',
             ))
@@ -52,7 +52,7 @@ class TulsuScheduleApi extends ScheduleApi {
   }
 
   @override
-  Future<SourceDateRange> dateRange(String searchValue) async {
+  Future<ScheduleDateRange> dateRange(String searchValue) async {
     final response = await _guard(
       () => _dio.get<Map<String, dynamic>>(
         TulsuEndpoints.dates,
@@ -60,7 +60,7 @@ class TulsuScheduleApi extends ScheduleApi {
       ),
     );
     final data = Map<String, dynamic>.from(response.data ?? const {});
-    return SourceDateRange(
+    return ScheduleDateRange(
       minDate: DateTime.parse(data['MIN_DATE'] as String),
       maxDate: DateTime.parse(data['MAX_DATE'] as String),
       searchField: SearchField.values.firstWhere(
@@ -102,6 +102,20 @@ class TulsuScheduleApi extends ScheduleApi {
         .cast<Map<String, dynamic>>()
         .map((json) => CalendarItem.fromJson(json))
         .toList();
+  }
+
+  /// Доступен ли API: один дешёвый запрос без разбора ответа.
+  @override
+  Future<bool> ping() async {
+    try {
+      await _dio.get<dynamic>(
+        TulsuEndpoints.dates,
+        queryParameters: {'search_value': ''},
+      );
+      return true;
+    } on DioException {
+      return false;
+    }
   }
 
   Future<Response<T>> _guard<T>(Future<Response<T>> Function() request) async {

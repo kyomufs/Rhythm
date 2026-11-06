@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:rhythm/core/services/update_coordinator.dart';
-import 'package:rhythm/core/widgets/app_notice.dart';
+import 'package:tulgusch/core/services/update_coordinator.dart';
+import 'package:tulgusch/core/widgets/app_notice.dart';
 
 /// Показывает уведомление о результате обновления.
 ///

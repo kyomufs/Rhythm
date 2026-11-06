@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
-import 'package:rhythm/core/models/app_settings.dart';
-import 'package:rhythm/core/services/notification_service.dart';
-import 'package:rhythm/core/services/storage_service.dart';
-import 'package:rhythm/core/theme/color_utils.dart';
-import 'package:rhythm/core/theme/motion.dart';
-import 'package:rhythm/core/theme/shapes.dart';
-import 'package:rhythm/core/theme/theme_provider.dart';
-import 'package:rhythm/core/theme/typography.dart';
-import 'package:rhythm/features/profile/screens/onboarding_screen.dart';
-import 'package:rhythm/features/profile/screens/student_profile_screen.dart';
-import 'package:rhythm/shared/widgets/expressive_button_group.dart';
+import 'package:tulgusch/core/models/app_settings.dart';
+import 'package:tulgusch/core/services/notification_service.dart';
+import 'package:tulgusch/core/services/storage_service.dart';
+import 'package:tulgusch/core/theme/color_utils.dart';
+import 'package:tulgusch/core/theme/motion.dart';
+import 'package:tulgusch/core/theme/shapes.dart';
+import 'package:tulgusch/core/theme/theme_provider.dart';
+import 'package:tulgusch/core/theme/typography.dart';
+import 'package:tulgusch/features/profile/screens/onboarding_screen.dart';
+import 'package:tulgusch/features/profile/screens/student_profile_screen.dart';
+import 'package:tulgusch/shared/widgets/expressive_button_group.dart';
 
 /// Settings screen for app customization
 class SettingsScreen extends ConsumerWidget {

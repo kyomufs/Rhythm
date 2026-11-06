@@ -1,4 +1,4 @@
-import 'package:rhythm/core/models/marks.dart';
+import 'package:tulgusch/core/models/marks.dart';
 
 /// Fake marks shown in demo mode instead of calling the progress API.
 /// Tone matches the demo schedule: plausible subjects, joke teachers,

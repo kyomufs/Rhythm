@@ -1,11 +1,14 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:rhythm/core/models/schedule.dart';
-import 'package:rhythm/core/sources/source_api.dart';
-import 'package:rhythm/core/services/lesson_group_resolver.dart';
+import 'package:tulgusch/core/models/schedule.dart';
+import 'package:tulgusch/core/api/schedule_api.dart';
+import 'package:tulgusch/core/services/lesson_group_resolver.dart';
 
 /// API-заглушка: расписание группы отдаёт одну свою группу, расписание
 /// аудитории — все группы пары. Второй ответ и есть источник полного списка.
 class _FakeApi extends ScheduleApi {
+  @override
+  Future<bool> ping() async => true;
+
   _FakeApi({required this.roomItems});
 
   final List<ScheduleItem> roomItems;
@@ -24,7 +27,7 @@ class _FakeApi extends ScheduleApi {
   }
 
   @override
-  Future<SourceDateRange> dateRange(String searchValue) async => SourceDateRange(
+  Future<ScheduleDateRange> dateRange(String searchValue) async => ScheduleDateRange(
         minDate: DateTime(2026, 9, 1),
         maxDate: DateTime(2027, 1, 25),
         searchField: SearchField.group,
@@ -34,7 +37,7 @@ class _FakeApi extends ScheduleApi {
   Future<List<CalendarItem>> calendar(String searchValue) async => [];
 
   @override
-  Future<List<SourceSuggestion>> search(String query) async => [];
+  Future<List<ScheduleSuggestion>> search(String query) async => [];
 }
 
 ScheduleItem _item({

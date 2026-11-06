@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:rhythm/core/models/app_settings.dart';
-import 'package:rhythm/core/services/notification_service.dart';
-import 'package:rhythm/core/services/storage_service.dart';
-import 'package:rhythm/features/profile/screens/settings_screen.dart';
+import 'package:tulgusch/core/models/app_settings.dart';
+import 'package:tulgusch/core/services/notification_service.dart';
+import 'package:tulgusch/core/services/storage_service.dart';
+import 'package:tulgusch/features/profile/screens/settings_screen.dart';
 
 class _FakeStorage extends StorageService {
   AppSettings settings = const AppSettings();

@@ -1,11 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:rhythm/core/domain/journal.dart';
-import 'package:rhythm/core/domain/source.dart';
-import 'package:rhythm/core/models/app_settings.dart';
-import 'package:rhythm/core/models/marks.dart';
-import 'package:rhythm/core/models/note_models.dart';
-import 'package:rhythm/core/models/schedule.dart';
+import 'package:tulgusch/core/domain/journal.dart';
+import 'package:tulgusch/core/models/app_settings.dart';
+import 'package:tulgusch/core/models/marks.dart';
+import 'package:tulgusch/core/models/note_models.dart';
+import 'package:tulgusch/core/models/schedule.dart';
 
 // ============================================================
 // Storage Keys
@@ -30,8 +30,6 @@ class StorageKeys {
   static const String scheduleChangeLog = 'schedule_changes_log';
   static const String changesSeenAt = 'schedule_changes_seen_at';
   static const String marksCache = 'marks_cache';
-  static const String sources = 'sources';
-  static const String activeSourceId = 'active_source_id';
   static const String journalPrefix = 'journal_v1';
 }
 
@@ -88,6 +86,15 @@ final storageServiceProvider = Provider<StorageService>((ref) {
 // Storage Service
 // ============================================================
 class StorageService {
+  StorageService();
+
+  /// Ящик, открытый снаружи: нужен тестам, где Hive инициализируется
+  /// во временном каталоге, а не через path_provider.
+  @visibleForTesting
+  StorageService.withBox(Box<dynamic> box)
+      : _box = box,
+        _opened = true;
+
   late Box<dynamic> _box;
   bool _opened = false;
 
@@ -97,7 +104,7 @@ class StorageService {
 
   Future<void> init() async {
     await Hive.initFlutter();
-    _box = await Hive.openBox('rhythm');
+    _box = await Hive.openBox('tulgusch');
     _opened = true;
   }
 
@@ -132,7 +139,8 @@ class StorageService {
   // ── Favorite Groups ───────────────────────────────────────
 
   List<FavoriteGroup> getFavoriteGroups() {
-    final raw = _box.get(StorageKeys.favoriteGroups, defaultValue: <dynamic>[]);
+    final raw =
+        _box.get(StorageKeys.favoriteGroups, defaultValue: <dynamic>[]);
     return (raw as List)
         .map((e) => FavoriteGroup.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
@@ -314,16 +322,13 @@ class StorageService {
 
   // ── Schedule Cache ────────────────────────────────────────
 
-  /// Ключ снимка. Пространство имён — id источника: номера групп в разных
-  /// вузах совпадают, и без него снимки перетирают друг друга.
-  String _cacheKey(String searchValue, String namespace) => namespace.isEmpty
-      ? '${StorageKeys.scheduleCache}_$searchValue'
-      : '${StorageKeys.scheduleCache}_${namespace}_$searchValue';
+  /// Кэш расписания — по номеру группы: вуз один, ключ простой.
+  String _cacheKey(String searchValue) =>
+      '${StorageKeys.scheduleCache}_$searchValue';
 
-  CachedSchedule? getCachedSchedule(String searchValue,
-      {String namespace = ''}) {
+  CachedSchedule? getCachedSchedule(String searchValue) {
     try {
-      final raw = _box.get(_cacheKey(searchValue, namespace));
+      final raw = _box.get(_cacheKey(searchValue));
       if (raw == null) return null;
       final map = Map<String, dynamic>.from(raw as Map);
       final items = (map['items'] as List)
@@ -350,7 +355,7 @@ class StorageService {
       );
     } catch (_) {
       // Corrupted cache — delete and return null so API fetches fresh data
-      _box.delete(_cacheKey(searchValue, namespace));
+      _box.delete(_cacheKey(searchValue));
       return null;
     }
   }
@@ -361,10 +366,9 @@ class StorageService {
   /// целиком ради них незачем — берём сохранённый и меняем только пары.
   Future<void> cacheScheduleGroups(
     String searchValue,
-    List<ScheduleItem> items, {
-    String namespace = '',
-  }) async {
-    final cached = getCachedSchedule(searchValue, namespace: namespace);
+    List<ScheduleItem> items,
+  ) async {
+    final cached = getCachedSchedule(searchValue);
     if (cached == null) return;
     await cacheSchedule(
       searchValue,
@@ -373,17 +377,15 @@ class StorageService {
         items: items,
         calendar: cached.data.calendar,
       ),
-      namespace: namespace,
     );
   }
 
   Future<void> cacheSchedule(
     String searchValue,
-    ScheduleData data, {
-    String namespace = '',
-  }) async {
+    ScheduleData data,
+  ) async {
     await _box.put(
-      _cacheKey(searchValue, namespace),
+      _cacheKey(searchValue),
       {
         'minDate': data.dateRange.minDate.toIso8601String(),
         'maxDate': data.dateRange.maxDate.toIso8601String(),
@@ -455,6 +457,10 @@ class StorageService {
     await _box.put(StorageKeys.studentId, id);
   }
 
+  Future<void> clearStudentId() async {
+    await _box.delete(StorageKeys.studentId);
+  }
+
   // ── Notifications ────────────────────────────────────────
 
   bool isNotificationsAsked() =>
@@ -470,10 +476,11 @@ class StorageService {
       _box.get(StorageKeys.scheduleFingerprint) as String?;
 
   Future<void> setScheduleFingerprint(String? value) async {
+    const key = StorageKeys.scheduleFingerprint;
     if (value == null) {
-      await _box.delete(StorageKeys.scheduleFingerprint);
+      await _box.delete(key);
     } else {
-      await _box.put(StorageKeys.scheduleFingerprint, value);
+      await _box.put(key, value);
     }
   }
 
@@ -481,8 +488,8 @@ class StorageService {
   /// newest first). Enforced limits (50 entries / 14 days) live in the
   /// schedule provider; storage only persists what it is given.
   List<Map<String, dynamic>> getChangeLog() {
-    final raw =
-        _box.get(StorageKeys.scheduleChangeLog, defaultValue: <dynamic>[]);
+    final raw = _box.get(StorageKeys.scheduleChangeLog,
+        defaultValue: <dynamic>[]);
     return (raw as List)
         .map((e) => Map<String, dynamic>.from(e as Map))
         .toList();
@@ -498,7 +505,8 @@ class StorageService {
 
   /// When the user last opened the «Изменения» screen (drives the badge).
   DateTime? getChangesSeenAt() {
-    final raw = _box.get(StorageKeys.changesSeenAt) as String?;
+    final raw = _box.get(StorageKeys.changesSeenAt)
+        as String?;
     return raw == null ? null : DateTime.tryParse(raw);
   }
 
@@ -546,46 +554,11 @@ class StorageService {
     }
   }
 
-  // ── Sources ──────────────────────────────────────────────
-
-  List<Source> getSources() {
-    if (!_opened) return const [];
-    final raw = _box.get(StorageKeys.sources);
-    if (raw == null) return const [];
-    try {
-      return (raw as List)
-          .map((e) => Source.fromJson(Map<String, dynamic>.from(e as Map)))
-          .toList();
-    } catch (_) {
-      return const [];
-    }
-  }
-
-  Future<void> saveSources(List<Source> sources) async {
-    if (!_opened) return;
-    await _box.put(
-      StorageKeys.sources,
-      sources.map((s) => s.toJson()).toList(),
-    );
-  }
-
-  String? getActiveSourceId() =>
-      _opened ? _box.get(StorageKeys.activeSourceId) as String? : null;
-
-  Future<void> setActiveSourceId(String? id) async {
-    if (!_opened) return;
-    if (id == null) {
-      await _box.delete(StorageKeys.activeSourceId);
-    } else {
-      await _box.put(StorageKeys.activeSourceId, id);
-    }
-  }
-
   // ── Journal ──────────────────────────────────────────────
 
-  JournalData getJournal(String sourceId) {
+  JournalData getJournal() {
     if (!_opened) return const JournalData();
-    final raw = _box.get('${StorageKeys.journalPrefix}_$sourceId');
+    final raw = _box.get(StorageKeys.journalPrefix);
     if (raw == null) return const JournalData();
     try {
       return JournalData.fromJson(Map<String, dynamic>.from(raw as Map));
@@ -594,17 +567,17 @@ class StorageService {
     }
   }
 
-  Future<void> saveJournal(String sourceId, JournalData data) async {
+  Future<void> saveJournal(JournalData data) async {
     if (!_opened) return;
     await _box.put(
-      '${StorageKeys.journalPrefix}_$sourceId',
+      StorageKeys.journalPrefix,
       data.toJson(),
     );
   }
 
-  Future<void> deleteJournal(String sourceId) async {
+  Future<void> deleteJournal() async {
     if (!_opened) return;
-    await _box.delete('${StorageKeys.journalPrefix}_$sourceId');
+    await _box.delete(StorageKeys.journalPrefix);
   }
 
   // ── Onboarding ───────────────────────────────────────────

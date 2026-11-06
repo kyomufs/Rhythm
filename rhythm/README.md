@@ -1,4 +1,4 @@
-# Rhythm
+# tulgusch
 
 Расписание, журнал успеваемости и дедлайны с Material 3 Expressive.
 

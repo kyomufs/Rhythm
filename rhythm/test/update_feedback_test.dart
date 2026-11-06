@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:rhythm/core/services/update_coordinator.dart';
-import 'package:rhythm/core/widgets/update_feedback.dart';
+import 'package:tulgusch/core/services/update_coordinator.dart';
+import 'package:tulgusch/core/widgets/update_feedback.dart';
 
 void main() {
   group('тексты уведомлений об обновлении', () {

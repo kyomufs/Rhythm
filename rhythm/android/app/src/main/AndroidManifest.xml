@@ -5,7 +5,7 @@
          downloaded APK (Android8+). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
     <application
-        android:label="Rhythm"
+        android:label="tulgusch"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round">

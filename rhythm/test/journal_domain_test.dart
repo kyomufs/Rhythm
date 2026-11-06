@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:rhythm/core/domain/journal.dart';
-import 'package:rhythm/core/models/schedule.dart';
+import 'package:tulgusch/core/domain/journal.dart';
+import 'package:tulgusch/core/models/schedule.dart';
 
 Course _course({GradeScale? scale}) => Course(
       id: 'c1',
@@ -169,8 +169,7 @@ void main() {
     test('журнал переживает сериализацию', () {
       final term = Term(
         id: 't1',
-        sourceId: 's1',
-        title: 'Осень',
+              title: 'Осень',
         start: DateTime(2026, 9, 1),
         end: DateTime(2026, 12, 31),
       );

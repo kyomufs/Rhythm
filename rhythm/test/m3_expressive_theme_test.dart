@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:rhythm/core/theme/motion.dart';
-import 'package:rhythm/core/theme/shapes.dart';
-import 'package:rhythm/core/theme/theme_provider.dart';
-import 'package:rhythm/shared/widgets/app_nav_bar.dart';
-import 'package:rhythm/shared/widgets/empty_state.dart';
-import 'package:rhythm/shared/widgets/expressive_loading_indicator.dart';
+import 'package:tulgusch/core/theme/motion.dart';
+import 'package:tulgusch/core/theme/shapes.dart';
+import 'package:tulgusch/core/theme/theme_provider.dart';
+import 'package:tulgusch/shared/widgets/app_nav_bar.dart';
+import 'package:tulgusch/shared/widgets/empty_state.dart';
+import 'package:tulgusch/shared/widgets/expressive_loading_indicator.dart';
 
 /// Проверки геометрии и моушена на уровне виджетов: то, что нельзя увидеть в
 /// `flutter analyze`, но что ломается при правке темы.
