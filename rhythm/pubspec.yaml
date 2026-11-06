@@ -1,0 +1,70 @@
+name: rhythm
+description: "Rhythm — расписание, журнал и дедлайны"
+publish_to: 'none'
+version: 1.2.0+3
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State Management
+  flutter_riverpod: ^2.4.9
+
+  # Network
+  dio: ^5.4.1
+
+  # Local Storage
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+
+  # Navigation
+  go_router: ^13.1.0
+
+  # UI
+  gap: ^3.0.1
+
+  # Localization
+  flutter_localizations:
+    sdk: flutter
+
+  # Utils
+  intl: ^0.20.3
+
+  # Icons
+  cupertino_icons: ^1.0.6
+  flutter_local_notifications: ^22.3.1
+  url_launcher: ^6.3.2
+  package_info_plus: ^10.2.1
+  path_provider: ^2.1.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^3.0.1
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    # Монохромный герб ТулГУ для шапки расписания (щит с вырезанной «Т»).
+    - assets/branding/tulsu_shield.png
+    - assets/branding/app_icon.png
+
+  fonts:
+    - family: Rubik
+      fonts:
+        - asset: assets/fonts/Rubik-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Rubik-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Rubik-SemiBold.ttf
+          weight: 600
+
+dependency_overrides:
+  # path_provider_android 2.3.x тянет jni (нативная сборка через NDK+CMake).
+  # Приложению JNI не нужен, а NDK в окружении нет — держим ветку без него.
+  path_provider_android: 2.2.21

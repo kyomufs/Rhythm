@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'uniflow/**'
+      - 'rhythm/**'
       - '.github/workflows/ios-build.yml'
   pull_request:
     branches: [main]
@@ -12,7 +12,7 @@ on:
 
 defaults:
   run:
-    working-directory: uniflow
+    working-directory: rhythm
 
 jobs:
   build-ios:
@@ -36,11 +36,11 @@ jobs:
         run: |
           mkdir -p Payload
           cp -r build/ios/iphoneos/Runner.app Payload/
-          zip -r UniFlow.ipa Payload
+          zip -r Rhythm.ipa Payload
           rm -rf Payload
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
-          name: UniFlow-iOS
-          path: uniflow/UniFlow.ipa
+          name: Rhythm-iOS
+          path: rhythm/Rhythm.ipa

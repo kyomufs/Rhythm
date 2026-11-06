@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'uniflow/**'
+      - 'rhythm/**'
       - '.github/workflows/android-build.yml'
   pull_request:
     branches: [main]
@@ -12,7 +12,7 @@ on:
 
 defaults:
   run:
-    working-directory: uniflow
+    working-directory: rhythm
 
 jobs:
   build-android:
@@ -62,5 +62,5 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: UniFlow-Android
-          path: uniflow/build/app/outputs/flutter-apk/app-release.apk
+          name: Rhythm-Android
+          path: rhythm/build/app/outputs/flutter-apk/app-release.apk

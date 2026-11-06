@@ -1,10 +1,10 @@
-# UniFlow: план UX/UI-полировки на M3 Expressive
+# Rhythm: план UX/UI-полировки на M3 Expressive
 
 **Дата:** 2026-11-03
 **Статус:** план на ревью оператора
 **Класс:** UX/UI-полировка поверх уже внедрённого фундамента M3E
 **Скиллы:** `m3-expressive` (значения), `m3-expressive-impl` (код и моушен)
-**Спека-предшественник:** [2026-11-03-uniflow-m3-expressive-design.md](../specs/2026-11-03-uniflow-m3-expressive-design.md)
+**Спека-предшественник:** [2026-11-03-rhythm-m3-expressive-design.md](../specs/2026-11-03-rhythm-m3-expressive-design.md)
 
 ---
 
@@ -305,7 +305,7 @@ nix develop --command flutter run -d linux
 ```
 nix develop --command bash -c "flutter analyze"   # No issues found!
 nix develop --command bash -c "flutter test"      # 69 тестов, All tests passed!
-nix develop --command bash -c "flutter build linux --debug"  # Built build/linux/x64/debug/bundle/uniflow
+nix develop --command bash -c "flutter build linux --debug"  # Built build/linux/x64/debug/bundle/rhythm
 ```
 
 Новые тесты: `test/m3_expressive_theme_test.dart` — геометрия панели и кнопок,
@@ -348,7 +348,7 @@ standard-схема при `disableAnimations`, морф и reduce-motion инд
 ```
 nix develop --command bash -c "flutter analyze"   # No issues found! (ran in 1.5s)
 nix develop --command bash -c "flutter test"      # 76 тестов, All tests passed!
-nix develop --command bash -c "flutter build linux --debug"  # Built build/linux/x64/debug/bundle/uniflow
+nix develop --command bash -c "flutter build linux --debug"  # Built build/linux/x64/debug/bundle/rhythm
 ```
 
 Новые тесты: `test/marks_table_test.dart` — шапка и строки, скрытие пустой
@@ -365,4 +365,4 @@ nix develop --command bash -c "flutter build linux --debug"  # Built build/linux
 - Столбец «Аттестация» стал уже: 130dp вместо 160dp, минимум 92dp.
 - Версия `1.2.0+3`, тег `v1.2.0`. Workflow `release.yml` собрал APK и IPA,
   опубликовал релиз и сам переписал `sidestore/source.json` (version 1.2.0,
-  size 9252850, URL на `UniFlow-v1.2.0.ipa`).
+  size 9252850, URL на `Rhythm-v1.2.0.ipa`).

@@ -1,0 +1,848 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:gap/gap.dart';
+import 'package:rhythm/app.dart';
+import 'package:rhythm/core/demo/demo_schedule.dart';
+import 'package:rhythm/core/models/schedule.dart';
+import 'package:rhythm/core/services/schedule_service.dart';
+import 'package:rhythm/core/theme/spacing.dart';
+import 'package:rhythm/core/theme/typography.dart';
+import 'package:rhythm/core/widgets/refresh_confirmation.dart';
+import 'package:rhythm/core/widgets/update_feedback.dart';
+import 'package:rhythm/features/schedule/providers/schedule_provider.dart';
+import 'package:rhythm/features/schedule/screens/schedule_changes_screen.dart';
+import 'package:rhythm/features/schedule/screens/schedule_preview_screen.dart';
+import 'package:rhythm/features/schedule/widgets/day_schedule.dart';
+import 'package:rhythm/features/schedule/widgets/lesson_detail_sheet.dart';
+import 'package:rhythm/features/sources/widgets/source_pill.dart';
+import 'package:rhythm/features/schedule/widgets/week_navigator.dart';
+import 'package:rhythm/shared/widgets/empty_state.dart';
+import 'package:rhythm/shared/widgets/wavy_progress.dart';
+import 'package:rhythm/shared/widgets/expressive_button_group.dart';
+import 'package:rhythm/shared/widgets/expressive_loading_indicator.dart';
+import 'package:rhythm/shared/widgets/loading_indicator.dart';
+
+/// Ниже этой ширины панель действий не помещается рядом с заголовком.
+const double _compactWidth = 360;
+
+/// Действия шапки расписания.
+enum _ScheduleAction { changes, refresh, search, today }
+
+/// Пункт меню действий: иконка и подпись в одну строку.
+class _ActionLabel extends StatelessWidget {
+  const _ActionLabel({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 20, color: colorScheme.onSurfaceVariant),
+        const SizedBox(width: 12),
+        Text(label),
+      ],
+    );
+  }
+}
+
+/// Main Schedule Screen
+class ScheduleScreen extends ConsumerStatefulWidget {
+  const ScheduleScreen({super.key});
+
+  @override
+  ConsumerState<ScheduleScreen> createState() => _ScheduleScreenState();
+}
+
+class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
+  final _scrollController = ScrollController();
+  final _listKey = GlobalKey();
+  final Map<String, GlobalKey> _dayKeys = {};
+  bool _scrolledToToday = false;
+
+  GlobalKey _getKeyForDay(DateTime day) {
+    final key = '${day.year}-${day.month}-${day.day}';
+    return _dayKeys.putIfAbsent(key, () => GlobalKey());
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  /// Scroll so the given day header sits at the top of the list.
+  /// Retries across frames because the list may still be loading
+  /// (day keys are absent until the schedule items are built).
+  /// Uses an instant jump: an animated scroll can be cancelled by a
+  /// content re-layout (e.g. the week switching right after a pick).
+  void _scrollToDay(DateTime day,
+      {int attempt = 0, void Function(bool ok)? onDone}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final ctx = _getKeyForDay(day).currentContext;
+      if (ctx == null) {
+        if (attempt < 12) {
+          // addPostFrameCallback never schedules a frame on its own —
+          // without this the retry chain stalls forever after a miss.
+          WidgetsBinding.instance.scheduleFrame();
+          _scrollToDay(day, attempt: attempt + 1, onDone: onDone);
+        } else {
+          onDone?.call(false);
+        }
+        return;
+      }
+      Scrollable.ensureVisible(
+        ctx,
+        duration: Duration.zero,
+        curve: Curves.linear,
+        alignment: 0.0,
+      );
+      onDone?.call(true);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = ref.watch(scheduleScreenProvider);
+
+    // Auto-scroll when highlightedDate changes (calendar pick)
+    ref.listen<ScheduleScreenState>(scheduleScreenProvider, (prev, next) {
+      if (next.highlightedDate != null &&
+          next.highlightedDate != prev?.highlightedDate) {
+        _scrollToDay(next.highlightedDate!, onDone: (_) {});
+      }
+    });
+
+    // On first open, jump straight to today's section of the week.
+    if (!_scrolledToToday &&
+        (state.currentGroup != null || state.isDemo) &&
+        !state.schedule.isLoading &&
+        state.schedule.error == null &&
+        state.schedule.items.isNotEmpty &&
+        state.isCurrentWeek) {
+      _scrolledToToday = true;
+      final now = DateTime.now();
+      _scrollToDay(DateTime(now.year, now.month, now.day), onDone: (ok) {
+        // The day card was not built yet — retry on a later qualifying
+        // rebuild instead of giving up silently.
+        if (!ok) _scrolledToToday = false;
+      });
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        titleSpacing: 16,
+        title: _ScheduleHeader(state: state),
+        centerTitle: false,
+        actions: [
+          SourcePill(
+            maxWidth:
+                MediaQuery.sizeOf(context).width < _compactWidth ? 96 : 150,
+          ),
+          const Gap(AppSpacing.xxs),
+          ..._buildActions(context, ref, state),
+        ],
+      ),
+      body: state.currentGroup == null && !state.isDemo
+          ? _buildNoGroupView(context, ref)
+          : _buildScheduleView(context, ref, state),
+    );
+  }
+
+  /// Панель действий. Уже 360dp четыре иконки выдавливают заголовок, поэтому
+  /// на узких экранах они складываются в одно меню «⋮».
+  List<Widget> _buildActions(
+    BuildContext context,
+    WidgetRef ref,
+    ScheduleScreenState state,
+  ) {
+    final hasGroup = state.currentGroup != null || state.isDemo;
+    final compact = MediaQuery.sizeOf(context).width < _compactWidth;
+
+    if (compact) {
+      return [
+        PopupMenuButton<_ScheduleAction>(
+          tooltip: 'Ещё',
+          icon: Badge(
+            isLabelVisible: state.hasUnseenChanges,
+            child: const Icon(Icons.more_vert),
+          ),
+          onSelected: (action) => _handleAction(action, context, ref, state),
+          itemBuilder: (ctx) => [
+            PopupMenuItem(
+              value: _ScheduleAction.changes,
+              child: _ActionLabel(
+                icon: Icons.difference_outlined,
+                label: state.changeRecords.isNotEmpty
+                    ? 'Изменения (${state.changeRecords.length})'
+                    : 'Изменения',
+              ),
+            ),
+            if (hasGroup)
+              PopupMenuItem(
+                value: _ScheduleAction.refresh,
+                enabled: !state.schedule.isLoading,
+                child: _ActionLabel(
+                  icon: Icons.refresh,
+                  label: state.schedule.isLoading ? 'Обновление…' : 'Обновить',
+                ),
+              ),
+            if (state.currentGroup != null)
+              const PopupMenuItem(
+                value: _ScheduleAction.search,
+                child: _ActionLabel(icon: Icons.search, label: 'Поиск'),
+              ),
+            if (!state.isCurrentWeek)
+              const PopupMenuItem(
+                value: _ScheduleAction.today,
+                child: _ActionLabel(icon: Icons.today, label: 'Сегодня'),
+              ),
+          ],
+        ),
+      ];
+    }
+
+    return [
+      // Стандартная группа кнопок: нажатая раздувается пружиной, соседние
+      // ужимаются — панель действий отвечает на касание, а не просто
+      // подсвечивает иконку.
+      Padding(
+        padding: const EdgeInsets.only(right: 4),
+        child: ExpressiveActionGroup(
+          items: [
+            ExpressiveActionItem(
+              icon: Badge(
+                isLabelVisible: state.hasUnseenChanges,
+                label: state.changeRecords.isNotEmpty
+                    ? Text('${state.changeRecords.length}')
+                    : null,
+                child: const Icon(Icons.difference_outlined),
+              ),
+              tooltip: 'Изменения',
+              onPressed: () =>
+                  _handleAction(_ScheduleAction.changes, context, ref, state),
+            ),
+            if (hasGroup)
+              ExpressiveActionItem(
+                icon: state.schedule.isLoading
+                    ? const ExpressiveLoadingIndicator(size: 20)
+                    : const Icon(Icons.refresh),
+                tooltip: state.schedule.isLoading ? 'Обновление…' : 'Обновить',
+                onPressed: state.schedule.isLoading
+                    ? null
+                    : () => _handleAction(
+                        _ScheduleAction.refresh, context, ref, state),
+              ),
+            if (state.currentGroup != null)
+              ExpressiveActionItem(
+                icon: const Icon(Icons.search),
+                tooltip: 'Поиск',
+                onPressed: () =>
+                    _handleAction(_ScheduleAction.search, context, ref, state),
+              ),
+            if (!state.isCurrentWeek)
+              ExpressiveActionItem(
+                icon: const Icon(Icons.today),
+                tooltip: 'Сегодня',
+                onPressed: () =>
+                    _handleAction(_ScheduleAction.today, context, ref, state),
+              ),
+          ],
+        ),
+      ),
+    ];
+  }
+
+  Future<void> _handleAction(
+    _ScheduleAction action,
+    BuildContext context,
+    WidgetRef ref,
+    ScheduleScreenState state,
+  ) async {
+    switch (action) {
+      case _ScheduleAction.changes:
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+              builder: (_) => const ScheduleChangesScreen()),
+        );
+      case _ScheduleAction.refresh:
+        final confirmed = await _confirmRefresh(context);
+        if (!confirmed || !context.mounted) return;
+        final result =
+            await ref.read(scheduleScreenProvider.notifier).refresh();
+        if (!context.mounted) return;
+        showUpdateFeedback(context, result);
+      case _ScheduleAction.search:
+        _showSearchSheet(context, ref);
+      case _ScheduleAction.today:
+        ref.read(scheduleScreenProvider.notifier).goToToday();
+    }
+  }
+
+  Widget _buildNoGroupView(BuildContext context, WidgetRef ref) {
+    return EmptyState(
+      icon: Icons.school_outlined,
+      title: 'Выберите группу',
+      message: 'Укажите номер группы\nв разделе «Профиль» → «Настройки»',
+      action: FilledButton.icon(
+        onPressed: () {
+          ref.read(currentTabProvider.notifier).state = 3;
+        },
+        icon: const Icon(Icons.person),
+        label: const Text('Открыть профиль'),
+      ),
+    );
+  }
+
+  Widget _buildScheduleView(
+    BuildContext context,
+    WidgetRef ref,
+    ScheduleScreenState state,
+  ) {
+    final schedule = state.schedule;
+
+    // Stale-while-revalidate: when a local copy is already on screen,
+    // keep it visible during a background sync and only show the slim
+    // progress bar; the full-screen spinner is for a cold start with
+    // nothing to display yet.
+    final hasVisibleContent =
+        schedule.error == null && schedule.items.isNotEmpty;
+
+    return Column(
+      children: [
+        WeekNavigatorBar(
+          weekInfo: state.weekInfo,
+          isCurrentWeek: state.isCurrentWeek,
+          onNextWeek: () =>
+              ref.read(scheduleScreenProvider.notifier).goToNextWeek(),
+          onPrevWeek: () =>
+              ref.read(scheduleScreenProvider.notifier).goToPrevWeek(),
+          onOpenCalendar: () => _openCalendar(context, ref),
+        ),
+        if (schedule.isLoading && hasVisibleContent)
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 0, 16, 4),
+            child: WavyProgressIndicator(
+              value: null,
+              height: 4,
+              strokeWidth: 2,
+              wavelength: 12,
+              amplitude: 1.2,
+            ),
+          ),
+        Expanded(
+          child: schedule.isLoading && schedule.items.isEmpty
+              ? const LoadingIndicator(message: 'Загрузка расписания...')
+              : schedule.error != null
+                  ? _buildError(
+                      context, ref, schedule, Theme.of(context).colorScheme)
+                  : schedule.items.isEmpty
+                      ? _buildEmpty(Theme.of(context).colorScheme)
+                      : _buildWeekSchedule(context, ref, state),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildError(BuildContext context, WidgetRef ref,
+      ScheduleState schedule, ColorScheme colorScheme) {
+    return EmptyState(
+      icon: Icons.cloud_off_outlined,
+      title: 'Ошибка загрузки',
+      message: schedule.error!,
+      action: FilledButton.tonalIcon(
+        onPressed: () async {
+          final result =
+              await ref.read(scheduleScreenProvider.notifier).refresh();
+          if (!context.mounted) return;
+          showUpdateFeedback(context, result);
+        },
+        icon: const Icon(Icons.refresh),
+        label: const Text('Повторить'),
+      ),
+    );
+  }
+
+  Widget _buildEmpty(ColorScheme colorScheme) {
+    return const EmptyState(
+      icon: Icons.event_busy_outlined,
+      title: 'Нет занятий',
+      message: 'На эту неделю пар в расписании нет',
+    );
+  }
+
+  Widget _buildWeekSchedule(
+      BuildContext context, WidgetRef ref, ScheduleScreenState state) {
+    final weekByDay = state.currentWeekByDay;
+    final allDays = List.generate(7, (i) {
+      final day = state.currentWeekStart.add(Duration(days: i));
+      return DateTime(day.year, day.month, day.day);
+    });
+    final today = DateTime.now();
+    final todayKey = DateTime(today.year, today.month, today.day);
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        // Жест вниз — это намерение, а не команда: сначала подтверждение.
+        final confirmed = await _confirmRefresh(context);
+        if (!confirmed || !context.mounted) return;
+        final result =
+            await ref.read(scheduleScreenProvider.notifier).refresh();
+        if (!context.mounted) return;
+        showUpdateFeedback(context, result);
+      },
+      child: ListView(
+        key: _listKey,
+        controller: _scrollController,
+        // Build every day of the week up front: a lazy SliverList leaves
+        // far-off day cards unmounted, so GlobalKey lookups for scroll
+        // targets (today / calendar picks) would silently find nothing.
+        scrollCacheExtent: const ScrollCacheExtent.pixels(50000),
+        padding: const EdgeInsets.only(bottom: 80),
+        children: [
+          for (final day in allDays)
+            Padding(
+              key: _getKeyForDay(day),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: DaySchedule(
+                date: day,
+                lessons: weekByDay[day] ?? [],
+                isToday: day == todayKey,
+                isHighlighted: state.highlightedDate == day,
+                onLessonClick: (lesson) => _showLessonDetail(context, lesson),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _showLessonDetail(BuildContext context, ScheduleItem lesson) {
+    showLessonDetailSheet(context, lesson);
+  }
+
+  /// Подтверждение обновления: и для кнопки в шапке, и для жеста вниз.
+  Future<bool> _confirmRefresh(BuildContext context) {
+    return confirmRefresh(
+      context,
+      title: 'Обновить расписание?',
+      body: 'Данные будут запрошены заново. Сохранённое расписание '
+          'останется, если сеть недоступна.',
+    );
+  }
+
+  Future<void> _openCalendar(BuildContext context, WidgetRef ref) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2020, 9, 1),
+      lastDate: DateTime(2030, 8, 31),
+      locale: const Locale('ru'),
+    );
+    if (picked != null && context.mounted) {
+      ref.read(scheduleScreenProvider.notifier).selectDate(picked);
+    }
+  }
+
+  void _showSearchSheet(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => const _SearchBottomSheet(),
+    );
+  }
+}
+
+// ============================================================
+// Шапка: герб, номер группы и вход в избранное
+// ============================================================
+class _ScheduleHeader extends ConsumerWidget {
+  final ScheduleScreenState state;
+
+  const _ScheduleHeader({required this.state});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final group = state.isDemo ? demoGroup : state.currentGroup;
+
+    if (group == null) {
+      return Text('Расписание', style: theme.textTheme.titleLarge);
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Монохромный герб: тот же силуэт, что на иконке приложения, но
+        // перекрашенный в цвет текста — в шапке он не должен спорить с
+        // акцентным цветом.
+        Image.asset(
+          'assets/branding/tulsu_shield.png',
+          width: 28,
+          height: 28,
+          color: colorScheme.onSurfaceVariant,
+          colorBlendMode: BlendMode.srcIn,
+          filterQuality: FilterQuality.high,
+        ),
+        const Gap(8),
+        Flexible(
+          child: Text(
+            group,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTypography.emphasizedTitleLarge(
+              theme.textTheme.titleLarge!,
+            ),
+          ),
+        ),
+        const Gap(2),
+        // Тональный кружок с залитой звездой: обводка `star_outline` на 22dp
+        // смазывается в кашу, а залитая форма читается и как «избранное»,
+        // и как кнопка.
+        Material(
+          color: colorScheme.primaryContainer.withValues(alpha: 0.7),
+          shape: const CircleBorder(),
+          clipBehavior: Clip.antiAlias,
+          child: IconButton(
+            onPressed: () => _showFavoritesSheet(context),
+            icon: const Icon(Icons.star_rounded),
+            iconSize: 20,
+            color: colorScheme.primary,
+            visualDensity: VisualDensity.compact,
+            tooltip: 'Избранные группы',
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ============================================================
+// Избранные группы — лист из-под шапки
+// ============================================================
+void _showFavoritesSheet(BuildContext context) {
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    builder: (_) => const _FavoritesSheet(),
+  );
+}
+
+class _FavoritesSheet extends ConsumerWidget {
+  const _FavoritesSheet();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final favorites =
+        ref.watch(scheduleScreenProvider.select((s) => s.favoriteGroups));
+
+    return Material(
+      type: MaterialType.transparency,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.7,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 4),
+              child: Row(
+                children: [
+                  Icon(Icons.star_rounded,
+                      size: 20, color: colorScheme.primary),
+                  const Gap(8),
+                  Text('Избранные группы', style: theme.textTheme.titleLarge),
+                ],
+              ),
+            ),
+            if (favorites.isEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Пока пусто. Добавьте группу через поиск — она появится '
+                      'здесь и будет доступна без сети.',
+                      style: theme.textTheme.bodyMedium
+                          ?.copyWith(color: colorScheme.onSurfaceVariant),
+                    ),
+                    const Gap(16),
+                    FilledButton.tonalIcon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        showModalBottomSheet<void>(
+                          context: context,
+                          isScrollControlled: true,
+                          useSafeArea: true,
+                          builder: (_) => const _SearchBottomSheet(),
+                        );
+                      },
+                      icon: const Icon(Icons.search),
+                      label: const Text('Найти группу'),
+                    ),
+                  ],
+                ),
+              )
+            else
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.only(bottom: 12),
+                  itemCount: favorites.length,
+                  itemBuilder: (context, index) {
+                    final fav = favorites[index];
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: colorScheme.secondaryContainer,
+                        child: Icon(Icons.groups_outlined,
+                            size: 20, color: colorScheme.onSecondaryContainer),
+                      ),
+                      title: Text(fav.groupNumber,
+                          style: theme.textTheme.titleMedium),
+                      subtitle: const Text('Открыть расписание'),
+                      trailing: IconButton(
+                        onPressed: () => ref
+                            .read(scheduleScreenProvider.notifier)
+                            .removeFavoriteGroup(fav.groupNumber),
+                        icon: const Icon(Icons.star_rounded),
+                        color: colorScheme.primary,
+                        tooltip: 'Убрать из избранного',
+                      ),
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => SchedulePreviewScreen(
+                              searchValue: fav.groupNumber,
+                              title: fav.groupNumber,
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// Search Bottom Sheet — preview + favorite toggle
+// ============================================================
+class _SearchBottomSheet extends ConsumerStatefulWidget {
+  const _SearchBottomSheet();
+
+  @override
+  ConsumerState<_SearchBottomSheet> createState() => _SearchBottomSheetState();
+}
+
+class _SearchBottomSheetState extends ConsumerState<_SearchBottomSheet> {
+  final _controller = TextEditingController();
+  List<SearchResult> _results = [];
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _search(String query) async {
+    if (query.length < 2) {
+      setState(() {
+        _results = [];
+        _isLoading = false;
+      });
+      return;
+    }
+    setState(() => _isLoading = true);
+    try {
+      final service = ref.read(scheduleServiceProvider);
+      final results = await service.search(query);
+      if (mounted) {
+        setState(() {
+          _results = results;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final notifier = ref.read(scheduleScreenProvider.notifier);
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.7,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (context, scrollController) {
+        // Цвет и скругления даёт bottomSheetTheme — меню поиска выглядит
+        // частью того меню, из которого открылось. Крестик не нужен:
+        // закрытие — свайп вниз или тап по затемнению.
+        return Material(
+          type: MaterialType.transparency,
+          child: Column(
+            children: [
+              // Title
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Поиск', style: theme.textTheme.titleLarge),
+                ),
+              ),
+              // Search field
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: TextField(
+                  controller: _controller,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    hintText: 'Группа, преподаватель или аудитория',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _controller.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _controller.clear();
+                              _search('');
+                            },
+                          )
+                        : null,
+                  ),
+                  onChanged: _search,
+                ),
+              ),
+              const Gap(8),
+              // Results
+              Expanded(
+                child: _isLoading
+                    ? const LoadingIndicator()
+                    : _results.isEmpty
+                        ? _buildEmptyState(context)
+                        : Material(
+                            type: MaterialType.transparency,
+                            child: ListView.builder(
+                              controller: scrollController,
+                              itemCount: _results.length,
+                              itemBuilder: (context, index) {
+                                final result = _results[index];
+                                final isFav =
+                                    notifier.isFavoriteGroup(result.value);
+                                return ListTile(
+                                  leading: Icon(_iconForType(result.type)),
+                                  title: Text(result.value),
+                                  subtitle: Text(result.type.displayName),
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      // Favorite toggle
+                                      IconButton(
+                                        icon: Icon(
+                                          isFav
+                                              ? Icons.star_rounded
+                                              : Icons.star_outline_rounded,
+                                          size: 20,
+                                        ),
+                                        color: isFav
+                                            ? colorScheme.primary
+                                            : colorScheme.onSurfaceVariant,
+                                        onPressed: () {
+                                          if (isFav) {
+                                            notifier.removeFavoriteGroup(
+                                                result.value);
+                                          } else {
+                                            notifier
+                                                .addFavoriteGroup(result.value);
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                    '«${result.value}» добавлена в избранное'),
+                                                duration:
+                                                    const Duration(seconds: 2),
+                                              ),
+                                            );
+                                          }
+                                        },
+                                      ),
+                                      const Icon(Icons.chevron_right, size: 20),
+                                    ],
+                                  ),
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute<void>(
+                                        builder: (_) => SchedulePreviewScreen(
+                                          searchValue: result.value,
+                                          title: result.value,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
+                            ),
+                          ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.search,
+              size: 48, color: colorScheme.primary.withValues(alpha: 0.3)),
+          const Gap(8),
+          Text('Введите минимум 2 символа',
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: colorScheme.onSurfaceVariant)),
+        ],
+      ),
+    );
+  }
+
+  IconData _iconForType(SearchResultType type) {
+    switch (type) {
+      case SearchResultType.group:
+        return Icons.group_outlined;
+      case SearchResultType.teacher:
+        return Icons.person_outline;
+      case SearchResultType.auditorium:
+        return Icons.room_outlined;
+      case SearchResultType.subject:
+        return Icons.book_outlined;
+    }
+  }
+}

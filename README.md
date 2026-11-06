@@ -1,18 +1,18 @@
 <div align="center">
 
-# Ритм
+# Rhythm
 
 **Cross-platform schedule companion for Tula State University students**
 
-[![Build Android APK](https://github.com/kyomufs/UniFlow/actions/workflows/android-build.yml/badge.svg)](https://github.com/kyomufs/UniFlow/actions/workflows/android-build.yml)
-[![Build iOS IPA](https://github.com/kyomufs/UniFlow/actions/workflows/ios-build.yml/badge.svg)](https://github.com/kyomufs/UniFlow/actions/workflows/ios-build.yml)
-[![Release](https://github.com/kyomufs/UniFlow/actions/workflows/release.yml/badge.svg)](https://github.com/kyomufs/UniFlow/actions/workflows/release.yml)
+[![Build Android APK](https://github.com/kyomufs/Rhythm/actions/workflows/android-build.yml/badge.svg)](https://github.com/kyomufs/Rhythm/actions/workflows/android-build.yml)
+[![Build iOS IPA](https://github.com/kyomufs/Rhythm/actions/workflows/ios-build.yml/badge.svg)](https://github.com/kyomufs/Rhythm/actions/workflows/ios-build.yml)
+[![Release](https://github.com/kyomufs/Rhythm/actions/workflows/release.yml/badge.svg)](https://github.com/kyomufs/Rhythm/actions/workflows/release.yml)
 [![Flutter](https://img.shields.io/badge/Flutter-3.47.4-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![Material Design 3](https://img.shields.io/badge/Material%20Design-3-6750A4)](https://m3.material.io)
 
 </div>
 
-UniFlow turns the open TulSU schedule API into a fast, local-first mobile
+Rhythm turns the open TulSU schedule API into a fast, local-first mobile
 app: live schedule with a change journal, subject notes, grades and task
 tracking — all wrapped in a Material You (MD3) UI with dynamic theming.
 
@@ -38,12 +38,12 @@ tracking — all wrapped in a Material You (MD3) UI with dynamic theming.
 
 Tap the link on a device with SideStore installed to add the source:
 
-**[Add UniFlow to SideStore](sidestore://source?url=https://raw.githubusercontent.com/kyomufs/UniFlow/main/sidestore/source.json)**
+**[Add Rhythm to SideStore](sidestore://source?url=https://raw.githubusercontent.com/kyomufs/Rhythm/main/sidestore/source.json)**
 
 Manual fallback (SideStore → Settings → Sources → `+` → paste):
 
 ```
-https://raw.githubusercontent.com/kyomufs/UniFlow/main/sidestore/source.json
+https://raw.githubusercontent.com/kyomufs/Rhythm/main/sidestore/source.json
 ```
 
 > `sidestore/source.json` updates itself: right after each release is
@@ -53,8 +53,8 @@ https://raw.githubusercontent.com/kyomufs/UniFlow/main/sidestore/source.json
 
 ### Android
 
-Grab `UniFlow-<tag>.apk` from
-[Releases](https://github.com/kyomufs/UniFlow/releases), or install an
+Grab `Rhythm-<tag>.apk` from
+[Releases](https://github.com/kyomufs/Rhythm/releases), or install an
 older build and let the in-app updater offer the new one.
 
 ## Platforms
@@ -73,7 +73,7 @@ older build and let the in-app updater offer the new one.
 ### Run
 
 ```bash
-cd uniflow
+cd rhythm
 flutter pub get
 flutter run            # or: flutter run -d chrome / windows / linux
 ```
@@ -82,7 +82,7 @@ With Nix the toolchain comes from the repo:
 
 ```bash
 nix develop             # Flutter + JDK pinned by flake.lock
-cd uniflow && flutter run
+cd rhythm && flutter run
 ```
 
 ### Build releases locally
@@ -103,7 +103,7 @@ Android принимает обновление только от того же 
 
 ```bash
 keytool -genkeypair -v -keystore upload-keystore.jks -storetype JKS \
-  -keyalg RSA -keysize 2048 -validity 10000 -alias uniflow
+  -keyalg RSA -keysize 2048 -validity 10000 -alias rhythm
 base64 -w0 upload-keystore.jks > keystore.b64   # содержимое → в секрет
 ```
 
@@ -113,16 +113,16 @@ base64 -w0 upload-keystore.jks > keystore.b64   # содержимое → в с
 |---|---|
 | `ANDROID_KEYSTORE_BASE64` | вывод `base64 -w0 upload-keystore.jks` |
 | `ANDROID_KEYSTORE_PASSWORD` | пароль хранилища |
-| `ANDROID_KEY_ALIAS` | `uniflow` |
+| `ANDROID_KEY_ALIAS` | `rhythm` |
 | `ANDROID_KEY_PASSWORD` | пароль ключа |
 
-Локально те же четыре значения кладутся в `uniflow/android/key.properties`
+Локально те же четыре значения кладутся в `rhythm/android/key.properties`
 (файл в `.gitignore`):
 
 ```properties
 storeFile=upload-keystore.jks
 storePassword=…
-keyAlias=uniflow
+keyAlias=rhythm
 keyPassword=…
 ```
 
@@ -134,12 +134,12 @@ GitHub Actions builds both platforms on every push to `main`:
 |---|---|---|
 | `android-build.yml` | push to `main`, PRs | tests + downloadable APK artifact |
 | `ios-build.yml` | push to `main` | tests-free unsigned IPA artifact |
-| `release.yml` | tag `v*` | **GitHub Release** with `UniFlow-<tag>.apk` and `UniFlow-<tag>.ipa` |
+| `release.yml` | tag `v*` | **GitHub Release** with `Rhythm-<tag>.apk` and `Rhythm-<tag>.ipa` |
 
 Cut a release:
 
 ```bash
-git tag -a v1.1.0 -m "UniFlow v1.1.0"
+git tag -a v1.1.0 -m "Rhythm v1.1.0"
 git push origin v1.1.0
 ```
 
@@ -150,7 +150,7 @@ Installation above).
 ## Project structure
 
 ```
-uniflow/
+rhythm/
 ├── lib/
 │   ├── core/                 # theme, storage, notifications, models
 │   ├── features/
@@ -166,7 +166,7 @@ uniflow/
 
 ## Design
 
-UniFlow follows [Material Design 3](https://m3.material.io):
+Rhythm follows [Material Design 3](https://m3.material.io):
 
 - color roles come from `ColorScheme.fromSeed()` (no hard-coded surfaces)
 - tonal surfaces instead of elevation shadows
