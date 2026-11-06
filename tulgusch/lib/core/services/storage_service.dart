@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:tulgusch/core/models/app_settings.dart';
 import 'package:tulgusch/core/models/marks.dart';
-import 'package:tulgusch/core/models/note_models.dart';
 import 'package:tulgusch/core/models/schedule.dart';
 
 // ============================================================
@@ -14,12 +13,6 @@ class StorageKeys {
   static const String myGroup = 'my_group';
   static const String mySubgroup = 'my_subgroup';
   static const String favoriteGroups = 'favorite_groups';
-  static const String studyFolders = 'study_folders';
-  // Legacy keys (kept for migration reference, no longer used)
-  static const String subjects = 'subjects';
-  static const String tasks = 'tasks';
-  static const String notes = 'notes';
-  static const String lastSearch = 'last_search';
   static const String scheduleCache = 'schedule_cache';
   static const String studentId = 'student_id';
   static const String onboardingCompleted = 'onboarding_completed';
@@ -121,19 +114,6 @@ class StorageService {
   }
 
   /// Full academic group with subgroup: "221341:01"
-  String? getFullAcademicGroup() {
-    final group = getMyGroup();
-    final subgroup = getMySubgroup();
-    if (group == null) return null;
-    if (subgroup != null && subgroup.isNotEmpty) return '$group:$subgroup';
-    return group;
-  }
-
-  Future<void> clearMyGroup() async {
-    await _box.delete(StorageKeys.myGroup);
-    await _box.delete(StorageKeys.mySubgroup);
-  }
-
   // ── Favorite Groups ───────────────────────────────────────
 
   List<FavoriteGroup> getFavoriteGroups() {
@@ -167,156 +147,7 @@ class StorageService {
     return getFavoriteGroups().any((g) => g.groupNumber == groupNumber);
   }
 
-  // ── Study Folders (Subjects) ───────────────────────────────
-
-  List<SubjectFolder> getStudyFolders() {
-    final raw = _box.get(StorageKeys.studyFolders, defaultValue: <dynamic>[]);
-    return (raw as List)
-        .map((e) => SubjectFolder.fromJson(Map<String, dynamic>.from(e as Map)))
-        .toList();
-  }
-
-  Future<void> saveStudyFolders(List<SubjectFolder> folders) async {
-    await _box.put(
-      StorageKeys.studyFolders,
-      folders.map((f) => f.toJson()).toList(),
-    );
-  }
-
-  SubjectFolder? getStudyFolderById(String id) {
-    try {
-      return getStudyFolders().firstWhere((f) => f.id == id);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  /// Migrate legacy subjects/tasks/notes to new study folders format
-  Future<void> migrateFromLegacy() async {
-    final rawSubjects = _box.get(StorageKeys.subjects);
-    if (rawSubjects == null) return; // Already migrated or fresh install
-
-    final legacySubjects = (rawSubjects as List)
-        .map((e) => Subject.fromJson(Map<String, dynamic>.from(e as Map)))
-        .toList();
-    final legacyTasks = getLegacyTasks();
-
-    if (legacySubjects.isEmpty) {
-      await _box.delete(StorageKeys.subjects);
-      await _box.delete(StorageKeys.tasks);
-      await _box.delete(StorageKeys.notes);
-      return;
-    }
-
-    final folders = <SubjectFolder>[];
-    for (final subj in legacySubjects) {
-      final subjTasks =
-          legacyTasks.where((t) => t.subjectId == subj.id).toList();
-
-      // Create default subfolders
-      final subfolders = <SubjectSubfolder>[
-        SubjectSubfolder(
-          id: '${subj.id}_lectures',
-          name: 'Лекции',
-          isDefault: true,
-          tasks: [],
-        ),
-        SubjectSubfolder(
-          id: '${subj.id}_labs',
-          name: 'Лабы',
-          isDefault: true,
-          tasks: [],
-        ),
-        SubjectSubfolder(
-          id: '${subj.id}_practice',
-          name: 'Практики',
-          isDefault: true,
-          tasks: [],
-        ),
-      ];
-
-      // Map legacy tasks into appropriate subfolder
-      for (final task in subjTasks) {
-        // Determine subfolder by subject type
-        String subfolderId;
-        switch (subj.type) {
-          case 'lab':
-            subfolderId = '${subj.id}_labs';
-            break;
-          case 'lecture':
-            subfolderId = '${subj.id}_lectures';
-            break;
-          case 'practice':
-            subfolderId = '${subj.id}_practice';
-            break;
-          default:
-            subfolderId = '${subj.id}_lectures';
-        }
-
-        final sfIdx = subfolders.indexWhere((sf) => sf.id == subfolderId);
-        if (sfIdx != -1) {
-          final existing = subfolders[sfIdx];
-          subfolders[sfIdx] = existing.copyWith(
-            tasks: [
-              ...existing.tasks,
-              StudyTask(
-                id: task.id,
-                title: task.title,
-                status: task.isCompleted ? TaskStatus.done : TaskStatus.todo,
-                dueDate: task.dueDate,
-                createdAt: task.createdAt,
-              ),
-            ],
-          );
-        }
-      }
-
-      folders.add(SubjectFolder(
-        id: subj.id,
-        name: subj.name,
-        colorIndex: subj.colorIndex,
-        createdAt: subj.createdAt,
-        subfolders: subfolders,
-      ));
-    }
-
-    await saveStudyFolders(folders);
-
-    // Clean up legacy data
-    await _box.delete(StorageKeys.subjects);
-    await _box.delete(StorageKeys.tasks);
-    await _box.delete(StorageKeys.notes);
-  }
-
-  // Legacy helpers (only for migration)
-  List<Subject> getLegacySubjects() {
-    final raw = _box.get(StorageKeys.subjects, defaultValue: <dynamic>[]);
-    return (raw as List)
-        .map((e) => Subject.fromJson(Map<String, dynamic>.from(e as Map)))
-        .toList();
-  }
-
-  List<Task> getLegacyTasks() {
-    final raw = _box.get(StorageKeys.tasks, defaultValue: <dynamic>[]);
-    return (raw as List)
-        .map((e) => Task.fromJson(Map<String, dynamic>.from(e as Map)))
-        .toList();
-  }
-
-  List<Note> getLegacyNotes() {
-    final raw = _box.get(StorageKeys.notes, defaultValue: <dynamic>[]);
-    return (raw as List)
-        .map((e) => Note.fromJson(Map<String, dynamic>.from(e as Map)))
-        .toList();
-  }
-
   // ── Last Search ───────────────────────────────────────────
-
-  String? getLastSearch() => _box.get(StorageKeys.lastSearch) as String?;
-
-  Future<void> saveLastSearch(String value) async {
-    await _box.put(StorageKeys.lastSearch, value);
-  }
 
   // ── Schedule Cache ────────────────────────────────────────
 

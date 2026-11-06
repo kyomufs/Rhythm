@@ -24,7 +24,6 @@ const List<ColorOption> paletteOptions = [
 class AppSettings {
   final int seedColorValue;
   final String themeMode; // 'system', 'light', 'dark'
-  final bool showGroupsInSchedule;
 
   /// Demo mode: a throwaway generated schedule plus fun previews
   /// (live lesson countdown, sample change journal).
@@ -36,7 +35,6 @@ class AppSettings {
   const AppSettings({
     this.seedColorValue = 0xFF6750A4,
     this.themeMode = 'system',
-    this.showGroupsInSchedule = true,
     this.demoMode = false,
     this.backgroundCheckMinutes = defaultBackgroundCheckMinutes,
   });
@@ -110,14 +108,12 @@ class AppSettings {
   AppSettings copyWith({
     int? seedColorValue,
     String? themeMode,
-    bool? showGroupsInSchedule,
     bool? demoMode,
     int? backgroundCheckMinutes,
   }) {
     return AppSettings(
       seedColorValue: seedColorValue ?? this.seedColorValue,
       themeMode: themeMode ?? this.themeMode,
-      showGroupsInSchedule: showGroupsInSchedule ?? this.showGroupsInSchedule,
       demoMode: demoMode ?? this.demoMode,
       backgroundCheckMinutes:
           backgroundCheckMinutes ?? this.backgroundCheckMinutes,
@@ -127,7 +123,6 @@ class AppSettings {
   Map<String, dynamic> toJson() => {
         'seedColorValue': seedColorValue,
         'themeMode': themeMode,
-        'showGroupsInSchedule': showGroupsInSchedule,
         'demoMode': demoMode,
         'backgroundCheckMinutes': backgroundCheckMinutes,
       };
@@ -136,7 +131,6 @@ class AppSettings {
     return AppSettings(
       seedColorValue: json['seedColorValue'] as int? ?? 0xFF6750A4,
       themeMode: json['themeMode'] as String? ?? 'system',
-      showGroupsInSchedule: json['showGroupsInSchedule'] as bool? ?? true,
       demoMode: json['demoMode'] as bool? ?? false,
       backgroundCheckMinutes: normalizeBackgroundCheckMinutes(
         json['backgroundCheckMinutes'] as int? ?? defaultBackgroundCheckMinutes,

@@ -13,12 +13,6 @@ final profileGroupProvider = Provider<String?>((ref) {
   return group == null || group.isEmpty ? null : group;
 });
 
-final profileSubgroupProvider = Provider<String?>((ref) {
-  ref.watch(profileRevisionProvider);
-  final subgroup = ref.watch(storageServiceProvider).getMySubgroup();
-  return subgroup == null || subgroup.isEmpty ? null : subgroup;
-});
-
 /// Номер зачётки: без него нет итоговых оценок.
 final profileStudentIdProvider = Provider<String?>((ref) {
   ref.watch(profileRevisionProvider);

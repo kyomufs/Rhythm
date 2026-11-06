@@ -12,7 +12,6 @@ import 'package:tulgusch/app.dart';
 import 'package:tulgusch/core/api/api_exception.dart';
 import 'package:tulgusch/core/models/app_settings.dart';
 import 'package:tulgusch/core/models/marks.dart';
-import 'package:tulgusch/core/models/note_models.dart';
 import 'package:tulgusch/core/models/schedule.dart';
 import 'package:tulgusch/core/providers/clock_provider.dart';
 import 'package:tulgusch/core/services/connectivity_service.dart';
@@ -115,12 +114,6 @@ class _FakeStorage extends StorageService {
   Future<void> cacheSchedule(String searchValue, ScheduleData data,
       ) async {}
 
-  @override
-  String? getLastSearch() => null;
-
-  @override
-  Future<void> saveLastSearch(String searchValue,
-      ) async {}
 
   @override
   Future<void> saveAppSettings(AppSettings settings) async {}
@@ -160,16 +153,6 @@ class _FakeStorage extends StorageService {
   @override
   bool isNotificationsAsked() => true;
 
-  // Заметки и остальные вкладки оболочки живут в той же Hive-коробке,
-  // поэтому их чтения тоже отдаём в памяти.
-  @override
-  Future<void> migrateFromLegacy() async {}
-
-  @override
-  List<SubjectFolder> getStudyFolders() => const [];
-
-  @override
-  Future<void> saveStudyFolders(List<SubjectFolder> folders) async {}
 }
 
 class _FakeConnectivity implements ConnectivityService {
@@ -197,7 +180,6 @@ class _FakeNotifications implements NotificationService {
   Future<void> show(int id, String title, String body,
       {String? payload}) async {}
 }
-
 
 Widget _app({_FakeProgress? progress}) {
   final api = _FakeApi([_lesson('Математический анализ')]);

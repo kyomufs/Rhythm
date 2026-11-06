@@ -1,5 +1,5 @@
-// Sanity check for generated icons: samples pixels of the new design
-// (brand gradient + white wave glyph).
+// Sanity check for the launcher icons: фиолетово-синий градиент и белый
+// глиф университета. Ловит случайную замену иконки на чужую/пустую.
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -47,18 +47,18 @@ void main() {
         'ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png';
     final topLeft = await pixel(path, 8, 8);
     final bottomRight = await pixel(path, 1015, 1015);
-    stdout.writeln('topLeft=$topLeft (expect ~123,100,196)');
-    stdout.writeln('bottomRight=$bottomRight (expect ~90,68,151)');
+    stdout.writeln('topLeft=$topLeft (expect ~123,103,176)');
+    stdout.writeln('bottomRight=$bottomRight (expect ~59,70,204)');
 
-    // Gradient start top-left and end bottom-right.
-    expect(topLeft.r, inInclusiveRange(110, 140));
-    expect(topLeft.g, inInclusiveRange(88, 112));
-    expect(topLeft.b, inInclusiveRange(184, 210));
-    expect(bottomRight.r, inInclusiveRange(78, 102));
-    expect(bottomRight.g, inInclusiveRange(56, 80));
-    expect(bottomRight.b, inInclusiveRange(138, 164));
+    // Градиент: сиреневый левый верх → синий правый низ.
+    expect(topLeft.r, inInclusiveRange(111, 135));
+    expect(topLeft.g, inInclusiveRange(91, 115));
+    expect(topLeft.b, inInclusiveRange(164, 188));
+    expect(bottomRight.r, inInclusiveRange(47, 71));
+    expect(bottomRight.g, inInclusiveRange(58, 82));
+    expect(bottomRight.b, inInclusiveRange(192, 216));
 
-    // The white wave glyph must be present in quantity.
+    // Белый глиф должен присутствовать в заметном количестве.
     final white = await countWhite(path);
     stdout.writeln('white samples: $white (grid stride8, expect > 100)');
     expect(white, greaterThan(100));

@@ -22,8 +22,17 @@ import 'package:tulgusch/features/schedule/screens/schedule_changes_screen.dart'
 import 'package:tulgusch/features/schedule/screens/schedule_screen.dart';
 import 'package:tulgusch/shared/widgets/app_nav_bar.dart';
 
+/// Индексы вкладок оболочки — единственный источник истины для переходов
+/// между экранами. Раньше переходы писали числа напрямую, и после удаления
+/// вкладки журнала «Открыть профиль» уводило за пределы списка.
+abstract final class AppTabs {
+  static const int schedule = 0;
+  static const int performance = 1;
+  static const int profile = 2;
+}
+
 /// Current tab index
-final currentTabProvider = StateProvider<int>((ref) => 0);
+final currentTabProvider = StateProvider<int>((ref) => AppTabs.schedule);
 
 /// Main app widget
 class TulguschApp extends ConsumerWidget {
@@ -75,6 +84,10 @@ class MainShell extends ConsumerStatefulWidget {
     ProfileScreen(),
   ];
 
+  /// Число вкладок: по нему проверяются переходы (см. `AppTabs`) и
+  /// раскладка горячих клавиш.
+  static final int tabCount = _screens.length;
+
   @override
   ConsumerState<MainShell> createState() => _MainShellState();
 }
@@ -85,7 +98,7 @@ class _MainShellState extends ConsumerState<MainShell> {
   /// Вкладки строятся при первом показе. IndexedStack держал в дереве все
   /// экраны с первого кадра — расписание, таблицу оценок и профиль, — хотя
   /// виден один.
-  final Set<int> _visited = {0};
+  final Set<int> _visited = {AppTabs.schedule};
 
   @override
   void initState() {
@@ -142,7 +155,7 @@ class _MainShellState extends ConsumerState<MainShell> {
     // изменений: плашка поверх чужого экрана была бы тупиком.
     service.onTap = (payload) {
       if (!mounted) return;
-      ref.read(currentTabProvider.notifier).state = 0;
+      ref.read(currentTabProvider.notifier).state = AppTabs.schedule;
       if (payload == changesNotificationPayload) {
         Navigator.of(context).push(
           MaterialPageRoute<void>(
@@ -181,7 +194,7 @@ class _MainShellState extends ConsumerState<MainShell> {
     ));
 
     void selectTab(int index) {
-      if (index < 0 || index >= MainShell._screens.length) return;
+      if (index < 0 || index >= MainShell.tabCount) return;
       HapticFeedback.lightImpact();
       if (_visited.add(index)) setState(() {});
       ref.read(currentTabProvider.notifier).state = index;
@@ -191,14 +204,14 @@ class _MainShellState extends ConsumerState<MainShell> {
     // планшета, но на ПК это медленно.
     return BackgroundSyncHost(
       child: AppShortcuts(
-        tabCount: MainShell._screens.length,
+        tabCount: MainShell.tabCount,
         onTab: selectTab,
         onEscape: () => Navigator.of(context).maybePop(),
         child: Scaffold(
           body: IndexedStack(
             index: currentTab,
             children: [
-              for (var i = 0; i < MainShell._screens.length; i++)
+              for (var i = 0; i < MainShell.tabCount; i++)
                 _visited.contains(i)
                     ? MainShell._screens[i]
                     : const SizedBox.shrink(),

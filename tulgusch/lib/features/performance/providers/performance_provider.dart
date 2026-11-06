@@ -18,11 +18,16 @@ class PerformanceState {
   final String? error;
   final int selectedSemester;
 
+  /// Последний удачный ответ API вернул пустой список: вуз не знает такой
+  /// пары «зачётка + группа». Экран объясняет это, а не молчит.
+  final bool serverEmpty;
+
   const PerformanceState({
     this.marks = const [],
     this.isLoading = false,
     this.error,
     this.selectedSemester = 0, // 0 = latest
+    this.serverEmpty = false,
   });
 
   /// Available semesters (sorted ascending: 1, 2, 3...)
@@ -37,7 +42,9 @@ class PerformanceState {
     if (selectedSemester == 0 && marks.isNotEmpty) {
       final terms = availableSemesters;
       if (terms.isNotEmpty) {
-        return marks.where((m) => m.termNumber == terms.first).toList();
+        // 0 — «последний семестр», а не первый: по умолчанию студент
+        // открывает текущий семестр, а не самый старый.
+        return marks.where((m) => m.termNumber == terms.last).toList();
       }
       return marks;
     }
@@ -49,22 +56,20 @@ class PerformanceState {
   int get attestedCount => semesterMarks.where((m) => m.isAttested).length;
   int get notAttestedCount => totalSubjects - attestedCount;
 
-  /// The latest (highest) semester number
-  int get latestSemester =>
-      availableSemesters.isEmpty ? 0 : availableSemesters.last;
-
   PerformanceState copyWith({
     List<MarksItem>? marks,
     bool? isLoading,
     String? error,
     bool clearError = false,
     int? selectedSemester,
+    bool? serverEmpty,
   }) {
     return PerformanceState(
       marks: marks ?? this.marks,
       isLoading: isLoading ?? this.isLoading,
       error: clearError ? null : (error ?? this.error),
       selectedSemester: selectedSemester ?? this.selectedSemester,
+      serverEmpty: serverEmpty ?? this.serverEmpty,
     );
   }
 }
@@ -116,7 +121,7 @@ class PerformanceNotifier extends StateNotifier<PerformanceState> {
     if (studentId == null || group == null) {
       final msg = studentId == null
           ? 'Укажите номер зачётки в профиле'
-          : 'Укажите подгруппу в профиле (например, 01)';
+          : 'Укажите группу в профиле (например, 221341)';
       state = state.copyWith(error: msg);
       return UpdateResult(UpdateOutcome.failed, msg);
     }
@@ -148,12 +153,26 @@ class PerformanceNotifier extends StateNotifier<PerformanceState> {
           return const UpdateResult(
               UpdateOutcome.failed, 'Не удалось обновить оценки');
         }
+        if (marks.isEmpty) {
+          // Пустой ответ не должен стирать рабочий кэш: вуз отдаёт `[]`
+          // и когда оценок нет, и когда зачётка с группой не совпали.
+          state = state.copyWith(
+            isLoading: false,
+            clearError: true,
+            serverEmpty: true,
+          );
+          return const UpdateResult(UpdateOutcome.failed, marksEmptyText);
+        }
         await _storage.cacheMarks(
           studentId: studentId,
           group: group,
           marks: marks,
         );
-        state = state.copyWith(marks: marks, isLoading: false);
+        state = state.copyWith(
+          marks: marks,
+          isLoading: false,
+          serverEmpty: false,
+        );
         _autoSelectSemester();
         return const UpdateResult(UpdateOutcome.updated, marksUpdatedText);
       } catch (e) {
@@ -179,7 +198,7 @@ class PerformanceNotifier extends StateNotifier<PerformanceState> {
 
   void _autoSelectSemester() {
     if (state.availableSemesters.isNotEmpty) {
-      state = state.copyWith(selectedSemester: state.availableSemesters.first);
+      state = state.copyWith(selectedSemester: state.availableSemesters.last);
     }
   }
 

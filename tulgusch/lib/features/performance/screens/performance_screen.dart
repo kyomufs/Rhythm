@@ -12,6 +12,7 @@ import 'package:tulgusch/shared/widgets/empty_state.dart';
 import 'package:tulgusch/shared/widgets/loading_indicator.dart';
 import 'package:tulgusch/shared/widgets/morph_chip.dart';
 import 'package:tulgusch/shared/widgets/wavy_progress.dart';
+import 'package:tulgusch/features/profile/providers/profile_providers.dart';
 
 /// Performance (academic marks) screen
 class PerformanceScreen extends ConsumerWidget {
@@ -20,7 +21,6 @@ class PerformanceScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final state = ref.watch(performanceProvider);
     final isConfigured = ref.watch(isPerformanceConfiguredProvider);
 
@@ -51,16 +51,16 @@ class PerformanceScreen extends ConsumerWidget {
         ],
       ),
       body: !isConfigured
-          ? _buildNotConfigured(context, ref, colorScheme, theme)
+          ? _buildNotConfigured(context, ref)
           // Stale-while-revalidate: cached marks stay visible during a
           // background sync (slim progress bar on top); the full spinner
           // only appears when there is nothing local to show yet.
           : state.isLoading && state.marks.isEmpty
               ? const LoadingIndicator()
               : state.error != null
-                  ? _buildError(context, ref, state, colorScheme, theme)
+                  ? _buildError(context, ref, state)
                   : state.marks.isEmpty
-                      ? _buildEmpty(context, ref, colorScheme, theme)
+                      ? _buildEmpty(context, ref, state)
                       : Column(
                           children: [
                             // Тонкая волна вместо прямой полосы: тот же
@@ -84,15 +84,15 @@ class PerformanceScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildNotConfigured(BuildContext context, WidgetRef ref,
-      ColorScheme colorScheme, ThemeData theme) {
+  Widget _buildNotConfigured(BuildContext context, WidgetRef ref) {
     return EmptyState(
       icon: Icons.school_outlined,
       title: 'Настройте профиль',
       message:
-          'Для просмотра успеваемости укажите\nномер зачётки и подгруппу в профиле',
+          'Для просмотра успеваемости укажите\nномер зачётки и группу в профиле',
       action: FilledButton.icon(
-        onPressed: () => ref.read(currentTabProvider.notifier).state = 3,
+        onPressed: () =>
+            ref.read(currentTabProvider.notifier).state = AppTabs.profile,
         icon: const Icon(Icons.person),
         label: const Text('Открыть профиль'),
       ),
@@ -100,7 +100,7 @@ class PerformanceScreen extends ConsumerWidget {
   }
 
   Widget _buildError(BuildContext context, WidgetRef ref,
-      PerformanceState state, ColorScheme colorScheme, ThemeData theme) {
+      PerformanceState state) {
     return EmptyState(
       icon: Icons.sync_problem_outlined,
       title: 'Не удалось загрузить',
@@ -118,21 +118,47 @@ class PerformanceScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildEmpty(BuildContext context, WidgetRef ref,
-      ColorScheme colorScheme, ThemeData theme) {
+  Widget _buildEmpty(
+      BuildContext context, WidgetRef ref, PerformanceState state) {
+    final studentId = ref.watch(profileStudentIdProvider);
+    final group = ref.watch(profileGroupProvider);
+    final facts = [
+      if (studentId != null) 'зачётка $studentId',
+      if (group != null) 'группа $group',
+    ].join(', ');
+    final serverEmpty = state.serverEmpty;
+
     return EmptyState(
-      icon: Icons.assistant_navigation,
-      title: 'Нет данных об успеваемости',
-      message: 'Оценки за семестр ещё не подгружены',
-      action: FilledButton.tonalIcon(
-        onPressed: () async {
-          final result =
-              await ref.read(performanceProvider.notifier).loadMarks();
-          if (!context.mounted) return;
-          showUpdateFeedback(context, result);
-        },
-        icon: const Icon(Icons.download_outlined),
-        label: const Text('Загрузить'),
+      icon: serverEmpty ? Icons.search_off_outlined : Icons.assistant_navigation,
+      title: serverEmpty ? 'Оценок нет' : 'Нет данных об успеваемости',
+      // Вуз ищет оценки ровно по паре «зачётка + группа» и на несовпадение
+      // отвечает пустым списком. Показываем пару, чтобы опечатку было видно.
+      message: serverEmpty
+          ? 'ТулГУ не нашёл оценки для пары: ${facts.isEmpty ? 'поля не заданы' : facts}.\n'
+              'Сверьте зачётку и группу в профиле.'
+          : 'Оценки за семестр ещё не подгружены',
+      action: Wrap(
+        alignment: WrapAlignment.center,
+        spacing: AppSpacing.sm,
+        runSpacing: AppSpacing.sm,
+        children: [
+          FilledButton.tonalIcon(
+            onPressed: () async {
+              final result =
+                  await ref.read(performanceProvider.notifier).loadMarks();
+              if (!context.mounted) return;
+              showUpdateFeedback(context, result);
+            },
+            icon: const Icon(Icons.download_outlined),
+            label: const Text('Загрузить'),
+          ),
+          TextButton.icon(
+            onPressed: () =>
+                ref.read(currentTabProvider.notifier).state = AppTabs.profile,
+            icon: const Icon(Icons.person_outline),
+            label: const Text('Профиль'),
+          ),
+        ],
       ),
     );
   }

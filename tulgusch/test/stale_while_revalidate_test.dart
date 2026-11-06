@@ -89,20 +89,10 @@ class FakeScheduleService implements ScheduleService {
   @override
   Future<bool> prefetch(String searchValue) async => true;
 
-  @override
-  Future<ScheduleState> getCurrentWeekSchedule(String searchValue) =>
-      getSchedule(searchValue);
-
-  @override
-  List<ScheduleItem> getScheduleForDate(
-          List<ScheduleItem> items, DateTime date) =>
-      [];
 
   @override
   Map<DateTime, List<ScheduleItem>> groupByDay(List<ScheduleItem> items) => {};
 
-  @override
-  List<String> getUniqueValues(List<ScheduleItem> items, String field) => [];
 }
 
 class WarmStorage extends StorageService {
@@ -214,9 +204,6 @@ class FakeMarkStorage extends StorageService {
 
   @override
   String? getStudentId() => '12345';
-
-  @override
-  String? getFullAcademicGroup() => '221341-01';
 
   @override
   List<MarksItem>? getCachedMarks({
@@ -332,7 +319,7 @@ void main() {
         storage,
         UpdateCoordinator(connectivity),
         studentId: storage.getStudentId(),
-        group: storage.getFullAcademicGroup(),
+        group: '221341-01',
       );
 
       // Кэш отрисован синхронно, до проверки доступности и запроса.
@@ -365,7 +352,7 @@ void main() {
         storage,
         UpdateCoordinator(connectivity),
         studentId: storage.getStudentId(),
-        group: storage.getFullAcademicGroup(),
+        group: '221341-01',
       );
       expect(notifier.state.marks.single.discipline, 'Из кэша');
       await _flush();

@@ -122,12 +122,6 @@ class _FakeStorage extends StorageService {
   Future<void> cacheSchedule(String searchValue, ScheduleData data,
       ) async {}
 
-  @override
-  String? getLastSearch() => null;
-
-  @override
-  Future<void> saveLastSearch(String searchValue,
-      ) async {}
 
   @override
   List<Map<String, dynamic>> getChangeLog() => changeLog;

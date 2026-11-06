@@ -22,11 +22,6 @@ class AppSettingsNotifier extends StateNotifier<AppSettings> {
     _save();
   }
 
-  void updateShowGroups(bool value) {
-    state = state.copyWith(showGroupsInSchedule: value);
-    _save();
-  }
-
   void updateDemoMode(bool value) {
     state = state.copyWith(demoMode: value);
     _save();

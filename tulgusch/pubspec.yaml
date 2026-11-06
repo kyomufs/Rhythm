@@ -1,5 +1,5 @@
 name: tulgusch
-description: "tulgusch — расписание ТулГУ, журнал и дедлайны"
+description: "tulgusch — расписание и успеваемость ТулГУ"
 publish_to: 'none'
 version: 1.2.0+3
 
@@ -20,9 +20,6 @@ dependencies:
   hive: ^2.2.3
   hive_flutter: ^1.1.0
 
-  # Navigation
-  go_router: ^13.1.0
-
   # UI
   gap: ^3.0.1
 
@@ -33,8 +30,6 @@ dependencies:
   # Utils
   intl: ^0.20.3
 
-  # Icons
-  cupertino_icons: ^1.0.6
   flutter_local_notifications: ^22.3.1
   url_launcher: ^6.3.2
   package_info_plus: ^10.2.1
@@ -52,7 +47,6 @@ flutter:
   assets:
     # Монохромный герб ТулГУ для шапки расписания (щит с вырезанной «Т»).
     - assets/branding/tulsu_shield.png
-    - assets/branding/app_icon.png
 
   fonts:
     - family: Rubik

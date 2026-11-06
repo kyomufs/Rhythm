@@ -64,9 +64,6 @@ class ScheduleService {
         ),
       );
 
-      // Save as last search
-      await _storage.saveLastSearch(searchValue);
-
       return ScheduleState(
         searchValue: searchValue,
         dateRange: DateTimeRange(
@@ -107,38 +104,6 @@ class ScheduleService {
     }
   }
 
-  /// Get schedule for current week
-  Future<ScheduleState> getCurrentWeekSchedule(String searchValue) async {
-    final state = await getSchedule(searchValue);
-
-    if (state.error != null) {
-      return state;
-    }
-
-    final now = DateTime.now();
-    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-    final endOfWeek = startOfWeek.add(const Duration(days: 6));
-
-    final weekItems = state.items.where((item) {
-      final date = item.parsedDate;
-      return date.isAfter(startOfWeek.subtract(const Duration(days: 1))) &&
-          date.isBefore(endOfWeek.add(const Duration(days: 1)));
-    }).toList();
-
-    return state.copyWith(items: weekItems);
-  }
-
-  /// Get schedule for a specific date
-  List<ScheduleItem> getScheduleForDate(
-      List<ScheduleItem> items, DateTime date) {
-    return items.where((item) {
-      final itemDate = item.parsedDate;
-      return itemDate.year == date.year &&
-          itemDate.month == date.month &&
-          itemDate.day == date.day;
-    }).toList();
-  }
-
   /// Get schedule grouped by day
   Map<DateTime, List<ScheduleItem>> groupByDay(List<ScheduleItem> items) {
     final map = <DateTime, List<ScheduleItem>>{};
@@ -156,25 +121,5 @@ class ScheduleService {
     };
   }
 
-  /// Get unique values for filtering
-  List<String> getUniqueValues(List<ScheduleItem> items, String field) {
-    switch (field) {
-      case 'subject':
-        return items.map((e) => e.subject).toSet().toList();
-      case 'teacher':
-        return items
-            .map((e) => e.teacher)
-            .where((e) => e.isNotEmpty)
-            .toSet()
-            .toList();
-      case 'classroom':
-        return items
-            .map((e) => e.classroom)
-            .where((e) => e.isNotEmpty)
-            .toSet()
-            .toList();
-      default:
-        return [];
-    }
-  }
+
 }

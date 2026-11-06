@@ -282,7 +282,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
       message: 'Укажите номер группы в профиле,\nи расписание подтянется само',
       action: FilledButton.icon(
         onPressed: () {
-          ref.read(currentTabProvider.notifier).state = 3;
+          ref.read(currentTabProvider.notifier).state = AppTabs.profile;
         },
         icon: const Icon(Icons.person),
         label: const Text('Открыть профиль'),

@@ -52,20 +52,10 @@ class FakeScheduleService implements ScheduleService {
   @override
   Future<bool> prefetch(String searchValue) async => true;
 
-  @override
-  Future<ScheduleState> getCurrentWeekSchedule(String searchValue) =>
-      getSchedule(searchValue);
-
-  @override
-  List<ScheduleItem> getScheduleForDate(
-          List<ScheduleItem> items, DateTime date) =>
-      [];
 
   @override
   Map<DateTime, List<ScheduleItem>> groupByDay(List<ScheduleItem> items) => {};
 
-  @override
-  List<String> getUniqueValues(List<ScheduleItem> items, String field) => [];
 }
 
 class FakeStorage extends StorageService {

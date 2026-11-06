@@ -134,9 +134,6 @@ class _CacheStorage extends StorageService {
     written[searchValue] = data;
   }
 
-  @override
-  Future<void> saveLastSearch(String searchValue,
-      ) async {}
 }
 
 class _OfflineConnectivity implements ConnectivityService {

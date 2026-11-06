@@ -314,19 +314,7 @@ class ScheduleState {
     return map;
   }
 
-  /// Get unique subjects
-  List<String> get uniqueSubjects {
-    return items.map((e) => e.subject).toSet().toList();
-  }
 
-  /// Get unique teachers
-  List<String> get uniqueTeachers {
-    return items
-        .map((e) => e.teacher)
-        .where((e) => e.isNotEmpty)
-        .toSet()
-        .toList();
-  }
 
   /// Get unique auditoriums
   List<String> get uniqueClassrooms {

@@ -850,12 +850,6 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
     );
   }
 
-  void goToWeek(DateTime date) {
-    state = state.copyWith(
-      currentWeekStart: getWeekStart(date),
-    );
-  }
-
   void selectDate(DateTime date) {
     final dayKey = DateTime(date.year, date.month, date.day);
     state = state.copyWith(
@@ -868,22 +862,6 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
         state = state.copyWith(clearHighlighted: true);
       }
     });
-  }
-
-  // ── Subjects ─────────────────────────────────────────────
-
-  List<String> getUniqueSubjects() {
-    return state.schedule.uniqueSubjects;
-  }
-
-  /// Look up teacher name by subject name from schedule items
-  String? getScheduleTeacherByName(String subjectName) {
-    for (final item in state.schedule.items) {
-      if (item.subject == subjectName && item.teacher.isNotEmpty) {
-        return item.teacher;
-      }
-    }
-    return null;
   }
 }
 

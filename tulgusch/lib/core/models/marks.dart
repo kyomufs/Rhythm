@@ -60,14 +60,4 @@ class MarksItem {
         retake: mark.retake,
         recredit: mark.recredit,
       );
-
-  Map<String, dynamic> toLegacyJson() => {
-        'TERM': term,
-        'DISCIPLINE': discipline,
-        'MARK': mark,
-        'MARK_TITLE': markTitle,
-        'TEACHER_MARK': teacherMark,
-        'RETAKE': retake,
-        'RECREDIT': recredit ? '1' : '0',
-      };
 }
