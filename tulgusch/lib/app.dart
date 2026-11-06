@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -56,9 +57,11 @@ class TulguschApp extends ConsumerWidget {
       theme: lightTheme,
       darkTheme: darkTheme,
       themeMode: themeMode,
-      // 200 мс дефолта — это двенадцать перестроек всего дерева; на плотном
-      // экране расписания переход цвета читался как подвисание.
-      themeAnimationDuration: const Duration(milliseconds: 120),
+      // Переход цвета не анимируется вовсе. Даже 120 мс — это семь кадров,
+      // каждый из которых перестраивает всё дерево (IndexedStack с тремя
+      // экранами), и смена темы читалась как зависание. Мгновенная подмена
+      // палитры стоит одной перестройки.
+      themeAnimationDuration: Duration.zero,
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
@@ -103,11 +106,22 @@ class _MainShellState extends ConsumerState<MainShell> {
   @override
   void initState() {
     super.initState();
-    // Ask for the notification permission once the first frame is up.
+    // Плашка автообновления живёт на результатах сетевых запросов, которые
+    // стартуют сами провайдеры: её можно вешать сразу после первого кадра.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _setupNotifications();
-      _checkForUpdate();
       _showStartupUpdateNotice();
+    });
+    // Плагин уведомлений тянет системный диалог разрешения, проверка
+    // обновлений — платформенный канал и сеть. Оба запускались сразу после
+    // первого кадра и отнимали главный поток у расписания, поэтому первый
+    // экран дёргался. Разносим их по времени.
+    Timer(const Duration(milliseconds: 900), () {
+      if (!mounted) return;
+      _setupNotifications();
+    });
+    Timer(const Duration(seconds: 2), () {
+      if (!mounted) return;
+      _checkForUpdate();
     });
   }
 
@@ -180,6 +194,14 @@ class _MainShellState extends ConsumerState<MainShell> {
   Widget build(BuildContext context) {
     final currentTab = ref.watch(currentTabProvider);
     final colorScheme = Theme.of(context).colorScheme;
+
+    // Вкладку переключает не только нижняя панель: кнопка «Открыть профиль»
+    // на пустых оценках пишет в провайдер напрямую. Без этой подписки такой
+    // переход не попадал в `_visited`, и IndexedStack честно показывал
+    // заглушку — пустой экран профиля.
+    ref.listen<int>(currentTabProvider, (_, next) {
+      if (_visited.add(next)) setState(() {});
+    });
 
     // Keep system bars aligned with the APP theme (the user may run the
     // app dark while the system is light): the gesture/system strip under

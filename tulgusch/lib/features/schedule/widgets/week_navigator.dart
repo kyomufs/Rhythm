@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
 import 'package:tulgusch/core/theme/shapes.dart';
 import 'package:tulgusch/core/theme/typography.dart';
 import 'package:tulgusch/core/utils/week_utils.dart';
+import 'package:tulgusch/shared/widgets/press_scale.dart';
 
 /// Навигатор недели в форме разрезной кнопки: `< неделя >`.
 ///
@@ -46,10 +48,11 @@ class WeekNavigatorBar extends StatelessWidget {
         ? colorScheme.onPrimaryContainer.withValues(alpha: 0.75)
         : colorScheme.onSurfaceVariant;
 
-    // Внешние углы — полные (таблетка), внутренние — 4dp из спеки split button
-    // для размера M; 2dp шва между сегментами.
+    // Внешние углы — полные (таблетка), внутренние — CornerMedium: 4dp из
+    // спеки split button выглядели почти прямыми стыками, и полоса читалась
+    // как три отдельных прямоугольника. 2dp шва между сегментами.
     const outer = Radius.circular(_height / 2);
-    const inner = Radius.circular(AppShapes.extraSmall);
+    const inner = Radius.circular(AppShapes.medium);
     const arrowWidth = _height;
     const arrowShape = BorderRadius.horizontal(left: outer, right: inner);
     const arrowShapeRight = BorderRadius.horizontal(left: inner, right: outer);
@@ -77,7 +80,12 @@ class WeekNavigatorBar extends StatelessWidget {
                 borderRadius: centerShape,
                 clipBehavior: Clip.antiAlias,
                 child: InkWell(
-                  onTap: onOpenCalendar,
+                  onTap: onOpenCalendar == null
+                      ? null
+                      : () {
+                          HapticFeedback.selectionClick();
+                          onOpenCalendar!();
+                        },
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     child: Column(
@@ -139,7 +147,8 @@ class WeekNavigatorBar extends StatelessWidget {
 
 /// Стрелка — отдельный сегмент разрезной кнопки: своя подложка, свой радиус,
 /// своя зона нажатия 56×56. Фоном служит тот же контейнер, что и у центра,
-/// поэтому полоса читается единым компонентом.
+/// поэтому полоса читается единым компонентом. Нажатие подтверждается
+/// тактильно (короткий отклик) и пружинным сжатием сегмента.
 class _WeekArrow extends StatelessWidget {
   final IconData icon;
   final String tooltip;
@@ -164,16 +173,19 @@ class _WeekArrow extends StatelessWidget {
     return SizedBox(
       width: width,
       height: width,
-      child: Material(
-        color: background,
+      child: PressScale(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
         borderRadius: borderRadius,
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: Tooltip(
-            message: tooltip,
-            child: Center(child: Icon(icon, color: color)),
-          ),
+        pressedScale: 0.92,
+        semanticLabel: tooltip,
+        child: Material(
+          color: background,
+          borderRadius: borderRadius,
+          clipBehavior: Clip.antiAlias,
+          child: Center(child: Icon(icon, color: color)),
         ),
       ),
     );

@@ -93,7 +93,7 @@ class TulguProfileFormState extends State<TulguProfileForm> {
   String? validate() {
     if (group == null) return 'Укажите группу';
     if (!RegExp(r'^\d{4,8}$').hasMatch(group!)) {
-      return 'Группа — цифры, например 221341 или 221341:01';
+      return 'Группа — цифры, например 121212 или 121212:00';
     }
     if (_separateMarksGroup) {
       final marks = marksGroup;
@@ -127,7 +127,7 @@ class TulguProfileFormState extends State<TulguProfileForm> {
           onChanged: changed,
           decoration: const InputDecoration(
             labelText: 'Группа',
-            hintText: '221341:01',
+            hintText: '121212:00',
             prefixIcon: Icon(Icons.groups_2_outlined),
             border: OutlineInputBorder(),
           ),
@@ -153,7 +153,7 @@ class TulguProfileFormState extends State<TulguProfileForm> {
             onChanged: changed,
             decoration: const InputDecoration(
               labelText: 'Группа для оценок',
-              hintText: '221341:01',
+              hintText: '121212:00',
               prefixIcon: Icon(Icons.assessment_outlined),
               border: OutlineInputBorder(),
             ),
@@ -168,7 +168,7 @@ class TulguProfileFormState extends State<TulguProfileForm> {
           onChanged: changed,
           decoration: const InputDecoration(
             labelText: 'Номер зачётки',
-            hintText: '123456',
+            hintText: '343434',
             prefixIcon: Icon(Icons.badge_outlined),
             border: OutlineInputBorder(),
           ),

@@ -247,7 +247,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         ),
         const Gap(8),
         Text(
-          'Можно с индексом подгруппы, например 111111:01',
+          'Можно с индексом подгруппы, например 121212:00',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: colorScheme.onSurfaceVariant,
@@ -262,7 +262,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           ],
           decoration: const InputDecoration(
             labelText: 'Номер группы',
-            hintText: '111111:01',
+            hintText: '121212:00',
             prefixIcon: Icon(Icons.group_outlined),
           ),
           keyboardType: TextInputType.text,
@@ -298,7 +298,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           focusNode: _studentIdFocus,
           decoration: const InputDecoration(
             labelText: 'Зачётная книжка',
-            hintText: '123456',
+            hintText: '343434',
             prefixIcon: Icon(Icons.badge_outlined),
           ),
           keyboardType: TextInputType.number,
