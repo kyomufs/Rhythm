@@ -9,7 +9,7 @@ on:
 
 defaults:
   run:
-    working-directory: rhythm
+    working-directory: tulgusch
 
 jobs:
   build-android:
@@ -65,7 +65,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: app-release-apk
-          path: rhythm/build/app/outputs/flutter-apk/app-release.apk
+          path: tulgusch/build/app/outputs/flutter-apk/app-release.apk
 
   build-ios:
     runs-on: macos-15
@@ -88,14 +88,14 @@ jobs:
         run: |
           mkdir -p Payload
           cp -r build/ios/iphoneos/Runner.app Payload/
-          zip -r Rhythm.ipa Payload
+          zip -r tulgusch.ipa Payload
           rm -rf Payload
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-release-ipa
-          path: rhythm/Rhythm.ipa
+          path: tulgusch/tulgusch.ipa
 
   release:
     needs: [build-android, build-ios]
@@ -121,21 +121,21 @@ jobs:
           name: app-release-ipa
 
       # GitHub shows artifacts under their file name: ship human-readable
-      # names (Rhythm-v1.0.0.apk) instead of the Flutter default
+      # names (tulgusch-v1.0.0.apk) instead of the Flutter default
       # "app-release.apk". Artifacts land in the workspace root, while
-      # run steps default to rhythm/ — override for this step.
+      # run steps default to tulgusch/ — override for this step.
       - name: Name release assets
         working-directory: ${{ github.workspace }}
         run: |
-          mv app-release.apk "Rhythm-${GITHUB_REF_NAME}.apk"
-          mv Rhythm.ipa "Rhythm-${GITHUB_REF_NAME}.ipa"
+          mv app-release.apk "tulgusch-${GITHUB_REF_NAME}.apk"
+          mv tulgusch.ipa "tulgusch-${GITHUB_REF_NAME}.ipa"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            Rhythm-*.apk
-            Rhythm-*.ipa
+            tulgusch-*.apk
+            tulgusch-*.ipa
           generate_release_notes: true
 
       # The SideStore source must point at this fresh release: rewrite
@@ -147,8 +147,8 @@ jobs:
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
           DATE="$(date -u +%F)"
-          URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/Rhythm-${GITHUB_REF_NAME}.ipa"
-          SIZE="$(stat -c%s "../Rhythm-${GITHUB_REF_NAME}.ipa")"
+          URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/tulgusch-${GITHUB_REF_NAME}.ipa"
+          SIZE="$(stat -c%s "../tulgusch-${GITHUB_REF_NAME}.ipa")"
           jq --arg v "$VERSION" --arg d "$DATE" --arg u "$URL" --argjson s "$SIZE" '
             .apps[0].version = $v
             | .apps[0].versionDate = $d

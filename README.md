@@ -1,6 +1,6 @@
 <div align="center">
 
-# Rhythm
+# tulgusch
 
 **Cross-platform schedule companion for Tula State University students**
 
@@ -12,7 +12,7 @@
 
 </div>
 
-Rhythm turns the open TulSU schedule API into a fast, local-first mobile
+tulgusch turns the open TulSU schedule API into a fast, local-first mobile
 app: live schedule with a change journal, subject notes, grades and task
 tracking — all wrapped in a Material You (MD3) UI with dynamic theming.
 
@@ -38,7 +38,7 @@ tracking — all wrapped in a Material You (MD3) UI with dynamic theming.
 
 Tap the link on a device with SideStore installed to add the source:
 
-**[Add Rhythm to SideStore](sidestore://source?url=https://raw.githubusercontent.com/kyomufs/Rhythm/main/sidestore/source.json)**
+**[Add tulgusch to SideStore](sidestore://source?url=https://raw.githubusercontent.com/kyomufs/Rhythm/main/sidestore/source.json)**
 
 Manual fallback (SideStore → Settings → Sources → `+` → paste):
 
@@ -53,7 +53,7 @@ https://raw.githubusercontent.com/kyomufs/Rhythm/main/sidestore/source.json
 
 ### Android
 
-Grab `Rhythm-<tag>.apk` from
+Grab `tulgusch-<tag>.apk` from
 [Releases](https://github.com/kyomufs/Rhythm/releases), or install an
 older build and let the in-app updater offer the new one.
 
@@ -73,7 +73,7 @@ older build and let the in-app updater offer the new one.
 ### Run
 
 ```bash
-cd rhythm
+cd tulgusch
 flutter pub get
 flutter run            # or: flutter run -d chrome / windows / linux
 ```
@@ -82,7 +82,7 @@ With Nix the toolchain comes from the repo:
 
 ```bash
 nix develop             # Flutter + JDK pinned by flake.lock
-cd rhythm && flutter run
+cd tulgusch && flutter run
 ```
 
 ### Build releases locally
@@ -116,7 +116,7 @@ base64 -w0 upload-keystore.jks > keystore.b64   # содержимое → в с
 | `ANDROID_KEY_ALIAS` | `rhythm` |
 | `ANDROID_KEY_PASSWORD` | пароль ключа |
 
-Локально те же четыре значения кладутся в `rhythm/android/key.properties`
+Локально те же четыре значения кладутся в `tulgusch/android/key.properties`
 (файл в `.gitignore`):
 
 ```properties
@@ -134,12 +134,12 @@ GitHub Actions builds both platforms on every push to `main`:
 |---|---|---|
 | `android-build.yml` | push to `main`, PRs | tests + downloadable APK artifact |
 | `ios-build.yml` | push to `main` | tests-free unsigned IPA artifact |
-| `release.yml` | tag `v*` | **GitHub Release** with `Rhythm-<tag>.apk` and `Rhythm-<tag>.ipa` |
+| `release.yml` | tag `v*` | **GitHub Release** with `tulgusch-<tag>.apk` and `tulgusch-<tag>.ipa` |
 
 Cut a release:
 
 ```bash
-git tag -a v1.1.0 -m "Rhythm v1.1.0"
+git tag -a v1.1.0 -m "tulgusch v1.1.0"
 git push origin v1.1.0
 ```
 
@@ -150,7 +150,7 @@ Installation above).
 ## Project structure
 
 ```
-rhythm/
+tulgusch/
 ├── lib/
 │   ├── core/                 # theme, storage, notifications, models
 │   ├── features/
@@ -166,7 +166,7 @@ rhythm/
 
 ## Design
 
-Rhythm follows [Material Design 3](https://m3.material.io):
+tulgusch follows [Material Design 3](https://m3.material.io):
 
 - color roles come from `ColorScheme.fromSeed()` (no hard-coded surfaces)
 - tonal surfaces instead of elevation shadows

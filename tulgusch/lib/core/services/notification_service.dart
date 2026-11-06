@@ -26,7 +26,7 @@ class NotificationService {
 
   static const AndroidNotificationDetails _androidDetails =
       AndroidNotificationDetails(
-    'rhythm_main',
+    'tulgusch_main',
     'tulgusch',
     channelDescription: 'Расписание, оценки и изменения',
     importance: Importance.high,

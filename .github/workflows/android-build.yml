@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'rhythm/**'
+      - 'tulgusch/**'
       - '.github/workflows/android-build.yml'
   pull_request:
     branches: [main]
@@ -12,7 +12,7 @@ on:
 
 defaults:
   run:
-    working-directory: rhythm
+    working-directory: tulgusch
 
 jobs:
   build-android:
@@ -64,5 +64,5 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Rhythm-Android
-          path: rhythm/build/app/outputs/flutter-apk/app-release.apk
+          name: tulgusch-Android
+          path: tulgusch/build/app/outputs/flutter-apk/app-release.apk

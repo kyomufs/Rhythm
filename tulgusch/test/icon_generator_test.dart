@@ -104,7 +104,7 @@ Future<void> writePng(
 
 void main() {
   test('generate launcher icons', () async {
-    if (Platform.environment['RHYTHM_GEN_ICONS'] != '1') {
+    if (Platform.environment['TULGUSCH_GEN_ICONS'] != '1') {
       // Not a real test run: just skip silently (guarded one-off tool).
       return;
     }
