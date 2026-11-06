@@ -121,14 +121,11 @@ class PerformanceScreen extends ConsumerWidget {
   Widget _buildEmpty(
       BuildContext context, WidgetRef ref, PerformanceState state) {
     final studentId = ref.watch(profileStudentIdProvider);
+    // Пара уже собрана провайдером: 221341 или 221341:01.
     final group = ref.watch(profileMarksGroupProvider);
-    final subgroup = ref.watch(profileSubgroupProvider);
-    // Вуз ждёт группу с подгруппой через двоеточие: 221341:01.
-    final groupLabel =
-        group == null || subgroup == null ? group : '$group:$subgroup';
     final facts = [
       if (studentId != null) 'зачётка $studentId',
-      if (groupLabel != null) 'группа $groupLabel',
+      if (group != null) 'группа $group',
     ].join(', ');
     final serverEmpty = state.serverEmpty;
 

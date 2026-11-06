@@ -31,18 +31,14 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
     }
 
     final storage = ref.read(storageServiceProvider);
-    await storage.setMyGroup(form.group);
-    final subgroup = form.subgroup;
-    if (subgroup == null) {
-      await storage.setMySubgroup('');
-    } else {
-      await storage.setMySubgroup(subgroup);
-    }
+    await storage.setMyGroup(form.group ?? '');
+    await storage.setMySubgroup(form.subgroup ?? '');
     final marksGroup = form.marksGroup;
     if (marksGroup == null) {
       await storage.clearMarksGroup();
     } else {
       await storage.setMarksGroup(marksGroup);
+      await storage.setMarksSubgroup(form.marksSubgroup ?? '');
     }
     final studentId = form.studentId;
     if (studentId == null) {
@@ -95,19 +91,13 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
                     ),
                   ],
                 ),
-                const Gap(8),
-                Text(
-                  'Номер группы приходит из API вуза: расписание строится по '
-                  'нему, остальные поля — уточнения.',
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: colorScheme.onSurfaceVariant),
-                ),
                 const Gap(16),
                 TulguProfileForm(
                   key: _formKey,
                   initialGroup: storage.getMyGroup(),
                   initialSubgroup: storage.getMySubgroup(),
                   initialMarksGroup: storage.getMarksGroup(),
+                  initialMarksSubgroup: storage.getMarksSubgroup(),
                   initialStudentId: storage.getStudentId(),
                   onChanged: () {
                     if (_error != null) setState(() => _error = null);

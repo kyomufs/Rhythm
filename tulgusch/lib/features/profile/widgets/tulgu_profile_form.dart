@@ -2,19 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
 import 'package:tulgusch/core/theme/spacing.dart';
-import 'package:tulgusch/features/profile/utils/subgroup_input.dart';
+import 'package:tulgusch/features/profile/utils/group_input.dart';
 
-/// Профиль ученика ТулГУ: группа, подгруппа и зачётка.
+/// Профиль ученика ТулГУ: группа, зачётка и необязательная группа для оценок.
 ///
-/// Группа обязательна — по ней строится расписание; подгруппа уточняет
-/// пары, зачётка нужна только итоговым оценкам. Одна форма на первый
-/// запуск и на редактирование профиля.
+/// Группа принимается с индексом подгруппы (`221341:01`): расписание берёт
+/// часть до двоеточия, успеваемость — всю пару. Отдельная группа для оценок
+/// включается тумблером и работает так же.
 class TulguProfileForm extends StatefulWidget {
   const TulguProfileForm({
     super.key,
     this.initialGroup,
     this.initialSubgroup,
     this.initialMarksGroup,
+    this.initialMarksSubgroup,
     this.initialStudentId,
     this.autofocus = false,
     this.onChanged,
@@ -25,6 +26,7 @@ class TulguProfileForm extends StatefulWidget {
 
   /// Группа для успеваемости, если она отличается от группы расписания.
   final String? initialMarksGroup;
+  final String? initialMarksSubgroup;
   final String? initialStudentId;
 
   /// Ставить ли курсор в поле группы сразу: на первом запуске — да,
@@ -40,11 +42,9 @@ class TulguProfileForm extends StatefulWidget {
 }
 
 class TulguProfileFormState extends State<TulguProfileForm> {
-  late final _group = TextEditingController(text: widget.initialGroup ?? '');
-  late final _subgroup =
-      TextEditingController(text: widget.initialSubgroup ?? '');
+  late final _group = TextEditingController(text: _initialGroupText);
   late final _marksGroup =
-      TextEditingController(text: widget.initialMarksGroup ?? '');
+      TextEditingController(text: _initialMarksGroupText);
   late final _studentId =
       TextEditingController(text: widget.initialStudentId ?? '');
 
@@ -53,28 +53,37 @@ class TulguProfileFormState extends State<TulguProfileForm> {
   late bool _separateMarksGroup =
       (widget.initialMarksGroup ?? '').trim().isNotEmpty;
 
-  String get group => _group.text.trim();
+  String get _initialGroupText => _join(
+        widget.initialGroup,
+        widget.initialSubgroup,
+      );
 
-  SubgroupInput get _subgroupInput => SubgroupInput.parse(_subgroup.text);
+  String get _initialMarksGroupText => _join(
+        widget.initialMarksGroup,
+        widget.initialMarksSubgroup,
+      );
 
-  /// Подгруппа нормализуется к двум цифрам: `1`, `01`, `111111:01` → `01`.
-  String? get subgroup => _subgroupInput.subgroup;
-
-  /// Группа для оценок: отдельная, если включена, иначе выведенная из
-  /// подгруппы в полном формате, иначе `null` — берётся группа расписания.
-  String? get marksGroup {
-    final explicit = _marksGroup.text.trim();
-    if (_separateMarksGroup && explicit.isNotEmpty) return explicit;
-    return _subgroupInput.group;
+  static String _join(String? group, String? subgroup) {
+    if (group == null || group.isEmpty) return '';
+    if (subgroup == null || subgroup.isEmpty) return group;
+    return '$group:$subgroup';
   }
 
+  GroupInput get _groupInput => GroupInput.parse(_group.text);
+  GroupInput get _marksInput => GroupInput.parse(_marksGroup.text);
+
+  String? get group => _groupInput.group;
+  String? get subgroup => _groupInput.subgroup;
+  String? get marksGroup =>
+      _separateMarksGroup ? _marksInput.group : null;
+  String? get marksSubgroup =>
+      _separateMarksGroup ? _marksInput.subgroup : null;
   String? get studentId =>
       _studentId.text.trim().isEmpty ? null : _studentId.text.trim();
 
   @override
   void dispose() {
     _group.dispose();
-    _subgroup.dispose();
     _marksGroup.dispose();
     _studentId.dispose();
     super.dispose();
@@ -82,22 +91,16 @@ class TulguProfileFormState extends State<TulguProfileForm> {
 
   /// Текст первой ошибки или `null`, если форма заполнена верно.
   String? validate() {
-    if (group.isEmpty) return 'Укажите номер группы';
-    if (!RegExp(r'^\d{4,8}$').hasMatch(group)) {
-      return 'Номер группы — только цифры, например 111111';
+    if (group == null) return 'Укажите группу';
+    if (!RegExp(r'^\d{4,8}$').hasMatch(group!)) {
+      return 'Группа — цифры, например 221341 или 221341:01';
     }
-    final marks = marksGroup;
     if (_separateMarksGroup) {
-      if (marks == null || marks.isEmpty) {
-        return 'Укажите группу для успеваемости или выключите отдельную группу';
-      }
+      final marks = marksGroup;
+      if (marks == null) return 'Укажите группу для оценок';
       if (!RegExp(r'^\d{4,8}$').hasMatch(marks)) {
-        return 'Группа для успеваемости — только цифры, например 111111';
+        return 'Группа для оценок — цифры, например 221341';
       }
-    }
-    final sub = subgroup;
-    if (sub != null && !RegExp(r'^[12]$|^0[12]$').hasMatch(sub)) {
-      return 'Подгруппа — 01 или 02 (можно в полном формате 111111:00)';
     }
     final id = studentId;
     if (id != null && !RegExp(r'^\d{4,12}$').hasMatch(id)) {
@@ -108,7 +111,6 @@ class TulguProfileFormState extends State<TulguProfileForm> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     void changed(String _) => widget.onChanged?.call();
 
     return Column(
@@ -117,47 +119,23 @@ class TulguProfileFormState extends State<TulguProfileForm> {
         TextField(
           controller: _group,
           autofocus: widget.autofocus,
-          keyboardType: TextInputType.number,
-          textInputAction: TextInputAction.next,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          onChanged: changed,
-          decoration: const InputDecoration(
-            labelText: 'Группа',
-            hintText: '111111',
-            helperText: 'Без подгруппы: по ней строится расписание',
-            helperMaxLines: 2,
-            prefixIcon: Icon(Icons.groups_2_outlined),
-            border: OutlineInputBorder(),
-          ),
-        ),
-        const Gap(AppSpacing.sm),
-        TextField(
-          controller: _subgroup,
           keyboardType: TextInputType.text,
           textInputAction: TextInputAction.next,
           inputFormatters: [
             FilteringTextInputFormatter.allow(RegExp(r'[0-9:]')),
           ],
-          onChanged: (value) {
-            // Полный формат задаёт и группу для оценок — перерисовываем
-            // подсказку, чтобы это было видно сразу.
-            setState(() {});
-            changed(value);
-          },
+          onChanged: changed,
           decoration: const InputDecoration(
-            labelText: 'Подгруппа при наличии',
-            hintText: '111111:00',
-            helperText: 'Можно в полном формате: группа:подгруппа',
-            helperMaxLines: 2,
-            prefixIcon: Icon(Icons.call_split_outlined),
+            labelText: 'Группа',
+            hintText: '221341:01',
+            prefixIcon: Icon(Icons.groups_2_outlined),
             border: OutlineInputBorder(),
           ),
         ),
         const Gap(AppSpacing.sm),
         SwitchListTile.adaptive(
           contentPadding: EdgeInsets.zero,
-          title: const Text('Отдельная группа для успеваемости'),
-          subtitle: const Text('Если оценки смотрят по другой группе'),
+          title: const Text('Отдельная группа для оценок'),
           value: _separateMarksGroup,
           onChanged: (value) {
             setState(() => _separateMarksGroup = value);
@@ -167,14 +145,15 @@ class TulguProfileFormState extends State<TulguProfileForm> {
         if (_separateMarksGroup) ...[
           TextField(
             controller: _marksGroup,
-            keyboardType: TextInputType.number,
+            keyboardType: TextInputType.text,
             textInputAction: TextInputAction.next,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[0-9:]')),
+            ],
             onChanged: changed,
             decoration: const InputDecoration(
               labelText: 'Группа для оценок',
-              hintText: '111111',
-              helperText: 'Расписание останется по группе выше',
+              hintText: '221341:01',
               prefixIcon: Icon(Icons.assessment_outlined),
               border: OutlineInputBorder(),
             ),
@@ -189,17 +168,10 @@ class TulguProfileFormState extends State<TulguProfileForm> {
           onChanged: changed,
           decoration: const InputDecoration(
             labelText: 'Номер зачётки',
-            hintText: 'из деканата',
-            helperText: 'Необязательно: нужен только итоговым оценкам',
+            hintText: '123456',
             prefixIcon: Icon(Icons.badge_outlined),
             border: OutlineInputBorder(),
           ),
-        ),
-        const Gap(AppSpacing.xs),
-        Text(
-          'Данные хранятся только на этом устройстве.',
-          style: theme.textTheme.bodySmall
-              ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
         ),
       ],
     );

@@ -83,37 +83,15 @@ class _Storage extends StorageService {
   }
 }
 
-PerformanceNotifier _notifier(_Api api, _Storage storage,
-        {String? subgroup}) =>
-    PerformanceNotifier(
+PerformanceNotifier _notifier(_Api api, _Storage storage) => PerformanceNotifier(
       api,
       storage,
       UpdateCoordinator(_OnlineConnectivity()),
       studentId: '000000',
       group: '221341',
-      subgroup: subgroup,
     );
 
 void main() {
-  test('подгруппа уходит в запрос оценок через двоеточие', () async {
-    final api = _Api([_finalMark('Оценка')]);
-
-    _notifier(api, _Storage(), subgroup: '01');
-    await _flush();
-
-    expect(api.lastGroup, '221341:01',
-        reason: 'вуз ищет оценки по паре «группа:подгруппа»');
-  });
-
-  test('без подгруппы запрос идёт по чистой группе', () async {
-    final api = _Api([_finalMark('Оценка')]);
-
-    _notifier(api, _Storage());
-    await _flush();
-
-    expect(api.lastGroup, '221341');
-  });
-
   test('пустой ответ не затирает сохранённые оценки', () async {
     final storage = _Storage(cached: [_mark('Из кэша')]);
     final api = _Api(const []);

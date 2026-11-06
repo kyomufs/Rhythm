@@ -13,13 +13,26 @@ final profileGroupProvider = Provider<String?>((ref) {
   return group == null || group.isEmpty ? null : group;
 });
 
-/// Группа для итоговых оценок: своя, если пользователь её указал, иначе
-/// та же, что и для расписания.
+/// Пара, по которой вуз ищет оценки: `221341` или `221341:01`.
+///
+/// Отдельная группа включается тумблером; иначе берётся группа расписания
+/// вместе с подгруппой, введённой прямо в её поле.
 final profileMarksGroupProvider = Provider<String?>((ref) {
   ref.watch(profileRevisionProvider);
-  final marksGroup = ref.watch(storageServiceProvider).getMarksGroup();
-  if (marksGroup != null && marksGroup.isNotEmpty) return marksGroup;
-  return ref.watch(profileGroupProvider);
+  final storage = ref.watch(storageServiceProvider);
+
+  final separate = storage.getMarksGroup();
+  if (separate != null && separate.isNotEmpty) {
+    final subgroup = storage.getMarksSubgroup();
+    return subgroup == null || subgroup.isEmpty
+        ? separate
+        : '$separate:$subgroup';
+  }
+
+  final group = storage.getMyGroup();
+  if (group == null || group.isEmpty) return null;
+  final subgroup = storage.getMySubgroup();
+  return subgroup == null || subgroup.isEmpty ? group : '$group:$subgroup';
 });
 
 /// Подгруппа: 01/02. Влияет только на запрос оценок, расписание — по группе.

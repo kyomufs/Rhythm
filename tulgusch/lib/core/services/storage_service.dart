@@ -15,6 +15,7 @@ class StorageKeys {
   static const String favoriteGroups = 'favorite_groups';
   static const String scheduleCache = 'schedule_cache';
   static const String marksGroup = 'marks_group';
+  static const String marksSubgroup = 'marks_subgroup';
   static const String studentId = 'student_id';
   static const String onboardingCompleted = 'onboarding_completed';
   static const String appSettings = 'app_settings';
@@ -119,12 +120,21 @@ class StorageService {
     await _box.put(StorageKeys.mySubgroup, subgroup);
   }
 
+  /// Подгруппа отдельной группы для оценок: `221341:01` → `01`.
+  String? getMarksSubgroup() =>
+      _opened ? _box.get(StorageKeys.marksSubgroup) as String? : null;
+
   Future<void> setMarksGroup(String groupNumber) async {
     await _box.put(StorageKeys.marksGroup, groupNumber);
   }
 
+  Future<void> setMarksSubgroup(String subgroup) async {
+    await _box.put(StorageKeys.marksSubgroup, subgroup);
+  }
+
   Future<void> clearMarksGroup() async {
     await _box.delete(StorageKeys.marksGroup);
+    await _box.delete(StorageKeys.marksSubgroup);
   }
   // ── Favorite Groups ───────────────────────────────────────
 

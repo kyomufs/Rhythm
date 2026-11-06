@@ -27,11 +27,11 @@ class ProfileScreen extends ConsumerWidget {
     final group = ref.watch(scheduleScreenProvider).currentGroup;
     final studentId = storage.getStudentId();
     final subgroup = storage.getMySubgroup();
-    // Успеваемость может смотреться по другой группе — показываем её пилюлей.
+    // Успеваемость может смотреться по другой паре — показываем её пилюлей.
     final marksGroup = ref.watch(profileMarksGroupProvider);
-    final marksTarget = marksGroup == null
+    final myPair = group == null
         ? null
-        : (subgroup == null ? marksGroup : '$marksGroup:$subgroup');
+        : (subgroup == null || subgroup.isEmpty ? group : '$group:$subgroup');
     final version = ref.watch(appVersionProvider).valueOrNull;
     final versionLabel = version == null ? 'О приложении' : 'tulgusch v$version';
 
@@ -46,8 +46,8 @@ class ProfileScreen extends ConsumerWidget {
           _IdentityCard(
             group: group,
             subgroup: subgroup,
-            // Только когда успеваемость правда смотрится по другой группе.
-            marksTarget: marksGroup == group ? null : marksTarget,
+            // Только когда успеваемость правда смотрится по другой паре.
+            marksTarget: marksGroup == myPair ? null : marksGroup,
             studentId: studentId,
             onTap: () {
               Navigator.of(context).push(

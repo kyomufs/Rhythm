@@ -8,10 +8,10 @@ import 'package:tulgusch/core/theme/shapes.dart';
 import 'package:tulgusch/core/theme/typography.dart';
 import 'package:tulgusch/app.dart';
 import 'package:tulgusch/features/profile/providers/profile_providers.dart';
-import 'package:tulgusch/features/profile/utils/subgroup_input.dart';
+import 'package:tulgusch/features/profile/utils/group_input.dart';
 
-/// Первый запуск: мастер из пяти шагов — приветствие, группа,
-/// подгруппа, зачётка и готово.
+/// Первый запуск: мастер из четырёх шагов — приветствие, группа,
+/// зачётка и готово. Подгруппа вводится прямо в номере группы.
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -22,27 +22,23 @@ class OnboardingScreen extends ConsumerStatefulWidget {
 class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final _pageController = PageController();
   final _groupController = TextEditingController();
-  final _subgroupController = TextEditingController();
   final _studentIdController = TextEditingController();
 
   // У каждой страницы ввода свой узел фокуса: поле получает курсор сразу,
   // как только страница доехала.
   final _groupFocus = FocusNode();
-  final _subgroupFocus = FocusNode();
   final _studentIdFocus = FocusNode();
 
   int _currentPage = 0;
 
-  static const _totalPages = 5;
+  static const _totalPages = 4;
 
   @override
   void dispose() {
     _pageController.dispose();
     _groupController.dispose();
-    _subgroupController.dispose();
     _studentIdController.dispose();
     _groupFocus.dispose();
-    _subgroupFocus.dispose();
     _studentIdFocus.dispose();
     super.dispose();
   }
@@ -78,9 +74,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         node = _groupFocus;
         break;
       case 2:
-        node = _subgroupFocus;
-        break;
-      case 3:
         node = _studentIdFocus;
         break;
       default:
@@ -95,14 +88,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   Future<void> _finish() async {
     final storage = ref.read(storageServiceProvider);
 
-    final group = _groupController.text.trim();
-    if (group.isNotEmpty) await storage.setMyGroup(group);
-
-    final parsed = SubgroupInput.parse(_subgroupController.text);
-    if (parsed.subgroup != null) await storage.setMySubgroup(parsed.subgroup!);
-    if (parsed.group != null) {
-      await storage.setMarksGroup(parsed.group!);
-    }
+    final parsed = GroupInput.parse(_groupController.text);
+    if (parsed.group != null) await storage.setMyGroup(parsed.group!);
+    await storage.setMySubgroup(parsed.subgroup ?? '');
+    await storage.clearMarksGroup();
 
     final studentId = _studentIdController.text.trim();
     if (studentId.isNotEmpty) await storage.setStudentId(studentId);
@@ -190,7 +179,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 children: [
                   _buildWelcomePage(colorScheme),
                   _buildGroupPage(colorScheme),
-                  _buildSubgroupPage(colorScheme),
                   _buildStudentIdPage(colorScheme),
                   _buildDonePage(colorScheme),
                 ],
@@ -259,7 +247,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         ),
         const Gap(8),
         Text(
-          'Номер группы без подгруппы, например 111111',
+          'Можно с индексом подгруппы, например 111111:01',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: colorScheme.onSurfaceVariant,
@@ -269,61 +257,17 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         TextField(
           controller: _groupController,
           focusNode: _groupFocus,
-          decoration: const InputDecoration(
-            labelText: 'Номер группы',
-            hintText: '111111',
-            prefixIcon: Icon(Icons.group_outlined),
-          ),
-          keyboardType: TextInputType.number,
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSubgroupPage(ColorScheme colorScheme) {
-    final theme = Theme.of(context);
-    return _PageBody(
-      children: [
-        const _HeroSpot(
-          icon: Icons.subdirectory_arrow_right,
-          size: 92,
-          iconSize: 40,
-          tone: _SpotTone.secondary,
-        ),
-        const Gap(24),
-        Text(
-          'Подгруппа при наличии',
-          style: AppTypography.emphasizedHeadlineSmall(
-            theme.textTheme.headlineSmall!,
-          ),
-        ),
-        const Gap(12),
-        Text(
-          'Нужна для успеваемости: укажите 01 или полный формат 111111:01.',
-          textAlign: TextAlign.center,
-          style: theme.textTheme.bodyMedium
-              ?.copyWith(color: colorScheme.onSurfaceVariant),
-        ),
-        const Gap(32),
-        TextField(
-          controller: _subgroupController,
-          focusNode: _subgroupFocus,
           inputFormatters: [
             FilteringTextInputFormatter.allow(RegExp(r'[0-9:]')),
           ],
           decoration: const InputDecoration(
-            labelText: 'Подгруппа при наличии',
-            hintText: '111111:00',
-            prefixIcon: Icon(Icons.subdirectory_arrow_right),
+            labelText: 'Номер группы',
+            hintText: '111111:01',
+            prefixIcon: Icon(Icons.group_outlined),
           ),
           keyboardType: TextInputType.text,
           style: Theme.of(context).textTheme.titleLarge,
         ),
-        const Gap(16),
-        Text('Можно пропустить',
-            style: theme.textTheme.labelSmall
-                ?.copyWith(color: colorScheme.onSurfaceVariant)),
       ],
     );
   }
@@ -382,7 +326,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         ),
         const Gap(16),
         Text(
-          'Группу и зачётку всегда можно\nпоменять в настройках.',
+          'Группу и зачётку всегда можно\nпоменять в профиле.',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                 color: colorScheme.onSurfaceVariant,

@@ -24,8 +24,8 @@ void main() {
     addTearDown(tester.view.resetViewInsets);
     await tester.pumpAndSettle();
 
-    // Три страницы с полями: группа, подгруппа, зачётка.
-    for (var page = 0; page < 3; page++) {
+    // Две страницы с полями: группа (с индексом подгруппы) и зачётка.
+    for (var page = 0; page < 2; page++) {
       await tester.tap(find.text('Далее'));
       await tester.pumpAndSettle();
 
@@ -35,5 +35,12 @@ void main() {
       expect(find.text('Далее'), findsOneWidget,
           reason: 'нижняя кнопка остаётся доступной');
     }
+
+    // Финальная страница без полей: кнопка меняется на «Начать».
+    await tester.tap(find.text('Далее'));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Начать'), findsOneWidget);
   });
 }
