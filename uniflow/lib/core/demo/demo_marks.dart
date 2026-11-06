@@ -1,4 +1,4 @@
-import 'package:uniflow/core/api/tulsu_api.dart';
+import 'package:uniflow/core/models/marks.dart';
 
 /// Fake marks shown in demo mode instead of calling the progress API.
 /// Tone matches the demo schedule: plausible subjects, joke teachers,
