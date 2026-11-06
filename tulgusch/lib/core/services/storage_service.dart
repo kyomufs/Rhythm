@@ -14,6 +14,7 @@ class StorageKeys {
   static const String mySubgroup = 'my_subgroup';
   static const String favoriteGroups = 'favorite_groups';
   static const String scheduleCache = 'schedule_cache';
+  static const String marksGroup = 'marks_group';
   static const String studentId = 'student_id';
   static const String onboardingCompleted = 'onboarding_completed';
   static const String appSettings = 'app_settings';
@@ -105,6 +106,11 @@ class StorageService {
 
   String? getMySubgroup() => _box.get(StorageKeys.mySubgroup) as String?;
 
+  /// Группа для итоговых оценок, если она отличается от группы расписания.
+  /// Читается на первом кадре до открытия ящика — отсюда проверка `_opened`.
+  String? getMarksGroup() =>
+      _opened ? _box.get(StorageKeys.marksGroup) as String? : null;
+
   Future<void> setMyGroup(String groupNumber) async {
     await _box.put(StorageKeys.myGroup, groupNumber);
   }
@@ -113,7 +119,13 @@ class StorageService {
     await _box.put(StorageKeys.mySubgroup, subgroup);
   }
 
-  /// Full academic group with subgroup: "221341:01"
+  Future<void> setMarksGroup(String groupNumber) async {
+    await _box.put(StorageKeys.marksGroup, groupNumber);
+  }
+
+  Future<void> clearMarksGroup() async {
+    await _box.delete(StorageKeys.marksGroup);
+  }
   // ── Favorite Groups ───────────────────────────────────────
 
   List<FavoriteGroup> getFavoriteGroups() {

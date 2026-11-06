@@ -237,7 +237,7 @@ final performanceProvider =
     ref.watch(updateCoordinatorProvider),
     demo: ref.watch(demoModeProvider),
     studentId: ref.watch(profileStudentIdProvider),
-    group: ref.watch(profileGroupProvider),
+    group: ref.watch(profileMarksGroupProvider),
     subgroup: ref.watch(profileSubgroupProvider),
   );
 });

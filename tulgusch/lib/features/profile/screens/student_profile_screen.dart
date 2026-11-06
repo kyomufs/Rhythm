@@ -38,6 +38,12 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
     } else {
       await storage.setMySubgroup(subgroup);
     }
+    final marksGroup = form.marksGroup;
+    if (marksGroup == null) {
+      await storage.clearMarksGroup();
+    } else {
+      await storage.setMarksGroup(marksGroup);
+    }
     final studentId = form.studentId;
     if (studentId == null) {
       await storage.clearStudentId();
@@ -101,6 +107,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
                   key: _formKey,
                   initialGroup: storage.getMyGroup(),
                   initialSubgroup: storage.getMySubgroup(),
+                  initialMarksGroup: storage.getMarksGroup(),
                   initialStudentId: storage.getStudentId(),
                   onChanged: () {
                     if (_error != null) setState(() => _error = null);

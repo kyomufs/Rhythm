@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:tulgusch/core/services/storage_service.dart';
@@ -7,6 +8,7 @@ import 'package:tulgusch/core/theme/shapes.dart';
 import 'package:tulgusch/core/theme/typography.dart';
 import 'package:tulgusch/app.dart';
 import 'package:tulgusch/features/profile/providers/profile_providers.dart';
+import 'package:tulgusch/features/profile/utils/subgroup_input.dart';
 
 /// Первый запуск: мастер из пяти шагов — приветствие, группа,
 /// подгруппа, зачётка и готово.
@@ -96,8 +98,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final group = _groupController.text.trim();
     if (group.isNotEmpty) await storage.setMyGroup(group);
 
-    final subgroup = _subgroupController.text.trim();
-    if (subgroup.isNotEmpty) await storage.setMySubgroup(subgroup);
+    final parsed = SubgroupInput.parse(_subgroupController.text);
+    if (parsed.subgroup != null) await storage.setMySubgroup(parsed.subgroup!);
+    if (parsed.group != null) {
+      await storage.setMarksGroup(parsed.group!);
+    }
 
     final studentId = _studentIdController.text.trim();
     if (studentId.isNotEmpty) await storage.setStudentId(studentId);
@@ -254,7 +259,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         ),
         const Gap(8),
         Text(
-          'Укажи номер группы для просмотра расписания',
+          'Номер группы без подгруппы, например 111111',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: colorScheme.onSurfaceVariant,
@@ -288,15 +293,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         ),
         const Gap(24),
         Text(
-          'Подгруппа',
+          'Подгруппа при наличии',
           style: AppTypography.emphasizedHeadlineSmall(
             theme.textTheme.headlineSmall!,
           ),
         ),
         const Gap(12),
         Text(
-          'Укажите номер подгруппы (например, 01).\n'
-          'Нужна для просмотра успеваемости.',
+          'Нужна для успеваемости: укажите 01 или полный формат 111111:01.',
           textAlign: TextAlign.center,
           style: theme.textTheme.bodyMedium
               ?.copyWith(color: colorScheme.onSurfaceVariant),
@@ -305,12 +309,15 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         TextField(
           controller: _subgroupController,
           focusNode: _subgroupFocus,
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[0-9:]')),
+          ],
           decoration: const InputDecoration(
-            labelText: 'Подгруппа',
-            hintText: '01',
+            labelText: 'Подгруппа при наличии',
+            hintText: '111111:00',
             prefixIcon: Icon(Icons.subdirectory_arrow_right),
           ),
-          keyboardType: TextInputType.number,
+          keyboardType: TextInputType.text,
           style: Theme.of(context).textTheme.titleLarge,
         ),
         const Gap(16),

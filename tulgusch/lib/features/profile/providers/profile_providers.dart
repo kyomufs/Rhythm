@@ -13,6 +13,15 @@ final profileGroupProvider = Provider<String?>((ref) {
   return group == null || group.isEmpty ? null : group;
 });
 
+/// Группа для итоговых оценок: своя, если пользователь её указал, иначе
+/// та же, что и для расписания.
+final profileMarksGroupProvider = Provider<String?>((ref) {
+  ref.watch(profileRevisionProvider);
+  final marksGroup = ref.watch(storageServiceProvider).getMarksGroup();
+  if (marksGroup != null && marksGroup.isNotEmpty) return marksGroup;
+  return ref.watch(profileGroupProvider);
+});
+
 /// Подгруппа: 01/02. Влияет только на запрос оценок, расписание — по группе.
 final profileSubgroupProvider = Provider<String?>((ref) {
   ref.watch(profileRevisionProvider);

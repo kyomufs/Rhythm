@@ -23,6 +23,9 @@ class _Storage extends StorageService {
   Future<void> saveAppSettings(AppSettings settings) async {}
 
   @override
+  String? getMarksGroup() => null;
+
+  @override
   String? getMyGroup() => '221341';
 
   @override

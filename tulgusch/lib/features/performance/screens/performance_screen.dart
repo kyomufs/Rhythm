@@ -121,7 +121,7 @@ class PerformanceScreen extends ConsumerWidget {
   Widget _buildEmpty(
       BuildContext context, WidgetRef ref, PerformanceState state) {
     final studentId = ref.watch(profileStudentIdProvider);
-    final group = ref.watch(profileGroupProvider);
+    final group = ref.watch(profileMarksGroupProvider);
     final subgroup = ref.watch(profileSubgroupProvider);
     // Вуз ждёт группу с подгруппой через двоеточие: 221341:01.
     final groupLabel =

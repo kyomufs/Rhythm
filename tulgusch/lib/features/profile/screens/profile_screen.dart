@@ -27,6 +27,11 @@ class ProfileScreen extends ConsumerWidget {
     final group = ref.watch(scheduleScreenProvider).currentGroup;
     final studentId = storage.getStudentId();
     final subgroup = storage.getMySubgroup();
+    // Успеваемость может смотреться по другой группе — показываем её пилюлей.
+    final marksGroup = ref.watch(profileMarksGroupProvider);
+    final marksTarget = marksGroup == null
+        ? null
+        : (subgroup == null ? marksGroup : '$marksGroup:$subgroup');
     final version = ref.watch(appVersionProvider).valueOrNull;
     final versionLabel = version == null ? 'О приложении' : 'tulgusch v$version';
 
@@ -41,6 +46,8 @@ class ProfileScreen extends ConsumerWidget {
           _IdentityCard(
             group: group,
             subgroup: subgroup,
+            // Только когда успеваемость правда смотрится по другой группе.
+            marksTarget: marksGroup == group ? null : marksTarget,
             studentId: studentId,
             onTap: () {
               Navigator.of(context).push(
@@ -122,12 +129,16 @@ class _IdentityCard extends StatelessWidget {
   const _IdentityCard({
     required this.group,
     required this.subgroup,
+    required this.marksTarget,
     required this.studentId,
     required this.onTap,
   });
 
   final String? group;
   final String? subgroup;
+
+  /// Пара, по которой ищутся оценки, если она отличается от группы.
+  final String? marksTarget;
   final String? studentId;
   final VoidCallback onTap;
 
@@ -216,6 +227,12 @@ class _IdentityCard extends StatelessWidget {
                         hasSubgroup ? 'Подгруппа $subgroup' : 'Без подгруппы',
                     muted: !hasSubgroup,
                   ),
+                  if (marksTarget != null)
+                    _FactPill(
+                      icon: Icons.assessment_outlined,
+                      label: 'Оценки $marksTarget',
+                      muted: false,
+                    ),
                   _FactPill(
                     icon: Icons.badge_outlined,
                     label: (studentId != null && studentId!.isNotEmpty)
