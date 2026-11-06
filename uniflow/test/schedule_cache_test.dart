@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:uniflow/core/api/endpoints.dart';
-import 'package:uniflow/core/api/tulsu_api.dart';
+import 'package:uniflow/core/api/api_exception.dart';
 import 'package:uniflow/core/models/schedule.dart';
+import 'package:uniflow/core/sources/source_api.dart';
 import 'package:uniflow/core/services/connectivity_service.dart';
 import 'package:uniflow/core/services/notification_service.dart';
 import 'package:uniflow/core/services/schedule_service.dart';
@@ -28,13 +28,13 @@ ScheduleData _data(List<ScheduleItem> items) => ScheduleData(
       dateRange: ApiDateRange(
         minDate: DateTime(2026, 9, 1),
         maxDate: DateTime(2027, 1, 25),
-        searchField: SearchFieldType.group,
+        searchField: SearchField.group,
       ),
       items: items,
       calendar: const [],
     );
 
-class _FakeApi extends TulsuApiClient {
+class _FakeApi extends ScheduleApi {
   _FakeApi({this.items = const [], this.fail = false});
 
   final List<ScheduleItem> items;
@@ -42,11 +42,38 @@ class _FakeApi extends TulsuApiClient {
   int calls = 0;
 
   @override
-  Future<ScheduleData> getFullSchedule(String searchValue) async {
+  Future<SourceSchedule> fullSchedule(String searchValue) async {
     calls++;
     if (fail) throw const ApiException('Нет подключения к интернету');
-    return _data(items);
+    final data = _data(items);
+    return SourceSchedule(
+      dateRange: SourceDateRange(
+        minDate: data.dateRange.minDate,
+        maxDate: data.dateRange.maxDate,
+        searchField: data.dateRange.searchField,
+      ),
+      lessons: data.items,
+      calendar: data.calendar,
+    );
   }
+
+  @override
+  Future<SourceDateRange> dateRange(String searchValue) async =>
+      throw UnimplementedError();
+
+  @override
+  Future<List<ScheduleItem>> lessons({
+    required String searchField,
+    required String searchValue,
+  }) async =>
+      throw UnimplementedError();
+
+  @override
+  Future<List<CalendarItem>> calendar(String searchValue) async =>
+      throw UnimplementedError();
+
+  @override
+  Future<List<SourceSuggestion>> search(String query) async => const [];
 }
 
 class _CacheStorage extends StorageService {

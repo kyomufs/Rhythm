@@ -1,11 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:uniflow/core/api/endpoints.dart';
-import 'package:uniflow/core/api/tulsu_api.dart';
+import 'package:uniflow/core/api/api_exception.dart';
 import 'package:uniflow/core/models/schedule.dart';
+import 'package:uniflow/core/sources/source_api.dart';
+import 'package:uniflow/core/sources/source_store.dart';
 
 /// Provider for the lesson group resolver
 final lessonGroupResolverProvider = Provider<LessonGroupResolver>((ref) {
-  return LessonGroupResolver(ref.watch(apiClientProvider));
+  return LessonGroupResolver(ref.watch(scheduleApiProvider));
 });
 
 /// Восстанавливает полный список групп пары.
@@ -18,7 +19,7 @@ final lessonGroupResolverProvider = Provider<LessonGroupResolver>((ref) {
 class LessonGroupResolver {
   LessonGroupResolver(this._api);
 
-  final TulsuApiClient _api;
+  final ScheduleApi _api;
   final Map<String, List<ScheduleItem>> _rooms = {};
 
   static const int _roomCacheLimit = 24;
@@ -150,8 +151,10 @@ class LessonGroupResolver {
     if (cached != null) return cached;
 
     try {
-      final items =
-          await _api.getSchedule(SearchFieldType.auditorium.value, classroom);
+      final items = await _api.lessons(
+        searchField: SearchField.auditorium.value,
+        searchValue: classroom,
+      );
       // Ручной LRU без зависимости: список аудиторий за сессию маленький,
       // важен лишь верхний предел памяти.
       if (_rooms.length >= _roomCacheLimit) {

@@ -1,7 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:intl/intl.dart';
+import 'package:uniflow/core/domain/journal.dart';
+import 'package:uniflow/core/journal/journal_store.dart';
 import 'package:uniflow/core/models/schedule.dart';
 import 'package:uniflow/core/providers/clock_provider.dart';
 import 'package:uniflow/core/services/lesson_group_resolver.dart';
@@ -10,8 +15,12 @@ import 'package:uniflow/core/theme/motion.dart';
 import 'package:uniflow/core/theme/shapes.dart';
 import 'package:uniflow/core/theme/typography.dart';
 import 'package:uniflow/features/schedule/providers/schedule_provider.dart';
+import 'package:uniflow/features/journal/widgets/score_scroller.dart';
+import 'package:uniflow/shared/widgets/expressive_button_group.dart';
+import 'package:uniflow/shared/widgets/split_button.dart';
+import 'package:uniflow/shared/widgets/wavy_progress.dart';
 
-/// Opens the MD3 lesson detail bottom sheet.
+/// Opens the lesson detail bottom sheet.
 ///
 /// Shared by the main schedule screen and the read-only preview
 /// (search results / favorites).
@@ -24,24 +33,66 @@ void showLessonDetailSheet(BuildContext context, ScheduleItem lesson) {
   );
 }
 
-/// Lesson Detail Sheet — layout: type=ЛВ, time=ПВ, date=ПН
+/// Расширенная карточка пары.
 ///
-/// Drag handle comes from the global `bottomSheetTheme.showDragHandle`,
-/// so it must not be drawn manually here.
-class LessonDetailSheet extends ConsumerWidget {
+/// Композиция сверху вниз: hero-блок с типом пары и живым прогрессом,
+/// предмет, баннер изменения, сетка фактов и разрезная кнопка «Скопировать».
+/// Факты разложены плитками, а не строками списка: две колонки на телефоне
+/// читаются быстрее, а «широкие» поля (преподаватель, группы) занимают
+/// всю ширину.
+class LessonDetailSheet extends ConsumerStatefulWidget {
   final ScheduleItem lesson;
 
   const LessonDetailSheet({super.key, required this.lesson});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<LessonDetailSheet> createState() => _LessonDetailSheetState();
+}
+
+class _LessonDetailSheetState extends ConsumerState<LessonDetailSheet> {
+  Timer? _resetCopied;
+  bool _copied = false;
+
+  @override
+  void dispose() {
+    _resetCopied?.cancel();
+    super.dispose();
+  }
+
+  ScheduleItem get lesson => widget.lesson;
+
+  Future<void> _copy(String text) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+    setState(() => _copied = true);
+    // Подтверждение живёт на самой кнопке: снекбар под модальной шторкой
+    // не видно, а всплывающая плашка перекрыла бы карточку.
+    _resetCopied?.cancel();
+    _resetCopied = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _copied = false);
+    });
+  }
+
+  /// Текст для буфера: короткий (предмет и время) или полный.
+  String _copyText({required bool full}) {
+    final parts = <String>[
+      lesson.subject,
+      lesson.time,
+      if (full && lesson.classroom.isNotEmpty) lesson.classroom,
+      if (full && lesson.teacher.isNotEmpty) lesson.teacher,
+      if (full && lesson.date.isNotEmpty) lesson.date,
+    ];
+    return parts.where((part) => part.isNotEmpty).join(' · ');
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final lessonColor = AppTheme.getColor(lesson.cssClass);
 
-    // Live clock: banner while the lesson is running. Minute resolution
-    // is enough to pick the banner; the exact seconds are rendered by the
-    // banner itself from the one-second clock.
+    // Live clock: minute resolution is enough to pick the hero state;
+    // the exact seconds are rendered by the live block itself.
     final now = ref.watch(
       clockProvider.select(
         (t) => DateTime(t.year, t.month, t.day, t.hour, t.minute),
@@ -127,81 +178,81 @@ class LessonDetailSheet extends ConsumerWidget {
     final typeName =
         lesson.type.isEmpty ? lesson.lessonType.displayName : lesson.type;
 
-    // Список групп пары бывает длинным (поток на несколько групп), поэтому
-    // содержимое листа живёт в прокрутке: иначе хвост чипов просто обрезался
-    // нижней кромкой шторки. Высота ограничена долей экрана — лист остаётся
-    // шторкой, а не разворачивается на весь экран.
+    final hasClassroom = lesson.classroom.isNotEmpty;
+    final hasTeacher = lesson.teacher.isNotEmpty;
+
     return _SheetReveal(
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(context).height * 0.85,
+          maxHeight: MediaQuery.sizeOf(context).height * 0.88,
         ),
         child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(
-              20, 0, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // ── Шапка: тип пары крупной плиткой, день и дата рядом. Одна
-              // тональная поверхность вместо трёх центрированных строк —
-              // взгляд сразу цепляется за то, что это за пара. ──
+              // ── Hero: тип пары, день и живой прогресс на одной поверхности.
+              // Пока пара идёт, блок становится главным элементом экрана:
+              // волна прогресса внутри hero-плашки. ──
               Container(
-                padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: colorScheme.surfaceContainerHigh,
-                  borderRadius: AppShapes.circular(AppShapes.extraLarge),
+                  borderRadius:
+                      AppShapes.circular(AppShapes.extraLargeIncreased),
                 ),
-                child: Row(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _TypeBadge(
-                      color: lessonColor,
-                      icon: _typeIcon(lesson.lessonType),
-                    ),
-                    const Gap(14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            [weekdayTitle, dateStr]
-                                .where((s) => s.isNotEmpty)
-                                .join(' · ')
-                                .toUpperCase(),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTypography.emphasizedLabelMedium(
-                              theme.textTheme.labelMedium!.copyWith(
-                                color: colorScheme.onSurfaceVariant,
+                    Row(
+                      children: [
+                        _TypeBadge(
+                          color: lessonColor,
+                          icon: _typeIcon(lesson.lessonType),
+                        ),
+                        const Gap(14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                [weekdayTitle, dateStr]
+                                    .where((s) => s.isNotEmpty)
+                                    .join(' · ')
+                                    .toUpperCase(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTypography.emphasizedLabelMedium(
+                                  theme.textTheme.labelMedium!.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
                               ),
-                            ),
+                              const Gap(2),
+                              Text(
+                                typeName,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTypography.emphasizedTitleLarge(
+                                  theme.textTheme.titleLarge!
+                                      .copyWith(color: lessonColor),
+                                ),
+                              ),
+                            ],
                           ),
-                          const Gap(2),
-                          Text(
-                            typeName,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTypography.emphasizedTitleLarge(
-                              theme.textTheme.titleLarge!
-                                  .copyWith(color: lessonColor),
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                    if (isOngoing || isUpcomingToday) ...[
-                      const Gap(10),
-                      _StatusPill(
-                        label: isOngoing
-                            ? 'Идёт'
-                            : 'Через ${lesson.timeUntilStartAt(now).inMinutes} мин',
-                        ongoing: isOngoing,
-                      ),
+                    if (isOngoing) ...[
+                      const Gap(16),
+                      _LiveProgress(lesson: lesson, color: lessonColor),
                     ],
                   ],
                 ),
               ),
-              const Gap(16),
+              const Gap(18),
 
               // ── Предмет ──
               Text(
@@ -210,14 +261,10 @@ class LessonDetailSheet extends ConsumerWidget {
                   theme.textTheme.headlineSmall!,
                 ),
               ),
-              // Вторая строка только когда она сообщает новое: тип пары уже
-              // стоит в шапке, повторять его под предметом — шум.
-              if (isOngoing || isUpcomingToday) ...[
+              if (isUpcomingToday) ...[
                 const Gap(6),
                 Text(
-                  isOngoing
-                      ? 'Идёт сейчас · до конца ${formatCountdown(lesson.timeLeftAt(now))}'
-                      : 'Начнётся через ${formatCountdown(lesson.timeUntilStartAt(now))}',
+                  'Начнётся через ${formatCountdown(lesson.timeUntilStartAt(now))}',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                     fontFeatures: const [FontFeature.tabularFigures()],
@@ -229,41 +276,61 @@ class LessonDetailSheet extends ConsumerWidget {
                 const Gap(14),
                 _ChangeBanner(note: changeNote),
               ],
-              const Gap(18),
+              const Gap(16),
 
-              // ── Факты пары: время / аудитория / препод / группы. Один
-              // столбец, одинаковые строки: подпись сверху, значение снизу. ──
-              _DetailRow(
-                icon: Icons.schedule,
-                label: 'Время',
-                child: Text(
-                  lesson.time,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
+              // ── Факты: две колонки, затем широкие поля во всю ширину. ──
+              // IntrinsicHeight: плитки должны быть одной высоты, а stretch
+              // в скроллящейся колонке упирается в бесконечную высоту.
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: _FactTile(
+                        icon: Icons.schedule,
+                        label: 'Время',
+                        child: Text(
+                          lesson.time,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (hasClassroom) ...[
+                      const Gap(10),
+                      Expanded(
+                        child: _FactTile(
+                          icon: Icons.place_outlined,
+                          label: 'Аудитория',
+                          child: Text(
+                            lesson.classroom,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-              if (lesson.classroom.isNotEmpty) ...[
-                const Gap(14),
-                _DetailRow(
-                  icon: Icons.place_outlined,
-                  label: 'Аудитория',
-                  child:
-                      Text(lesson.classroom, style: theme.textTheme.bodyLarge),
-                ),
-              ],
-              if (lesson.teacher.isNotEmpty) ...[
-                const Gap(14),
-                _DetailRow(
+              if (hasTeacher) ...[
+                const Gap(10),
+                _FactTile(
                   icon: Icons.person_outline,
                   label: 'Преподаватель',
-                  child: Text(lesson.teacher, style: theme.textTheme.bodyLarge),
+                  child: Text(
+                    lesson.teacher,
+                    style: theme.textTheme.titleSmall
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
                 ),
               ],
               if (visibleGroups.isNotEmpty) ...[
-                const Gap(14),
-                _DetailRow(
+                const Gap(10),
+                _FactTile(
                   icon: Icons.groups_outlined,
                   label: 'Группы',
                   child: Wrap(
@@ -282,9 +349,7 @@ class LessonDetailSheet extends ConsumerWidget {
                           color: isOwn
                               ? colorScheme.primaryContainer
                               : colorScheme.surfaceContainerHighest,
-                          borderRadius: AppShapes.circular(
-                            AppShapes.extraLarge,
-                          ),
+                          borderRadius: AppShapes.circular(AppShapes.small + 4),
                         ),
                         child: Text(
                           group.displayName,
@@ -301,6 +366,39 @@ class LessonDetailSheet extends ConsumerWidget {
                   ),
                 ),
               ],
+              const Gap(16),
+              _JournalBlock(lesson: lesson),
+              const Gap(20),
+
+              // ── Действие: разрезная кнопка. Основное — скопировать пару
+              // в коротком виде, меню — варианты. ──
+              Align(
+                alignment: Alignment.centerLeft,
+                child: ExpressiveSplitButton(
+                  label: _copied ? 'Скопировано' : 'Скопировать',
+                  icon: _copied ? Icons.check : Icons.copy_all_outlined,
+                  size: ExpressiveButtonSize.small,
+                  onPressed: () => _copy(_copyText(full: false)),
+                  actions: [
+                    ExpressiveSplitAction(
+                      label: 'Предмет и время',
+                      icon: Icons.short_text,
+                      onSelected: () => _copy(_copyText(full: false)),
+                    ),
+                    ExpressiveSplitAction(
+                      label: 'Всё занятие',
+                      icon: Icons.article_outlined,
+                      onSelected: () => _copy(_copyText(full: true)),
+                    ),
+                    if (hasClassroom)
+                      ExpressiveSplitAction(
+                        label: 'Только аудитория',
+                        icon: Icons.place_outlined,
+                        onSelected: () => _copy(lesson.classroom),
+                      ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -316,18 +414,83 @@ class LessonDetailSheet extends ConsumerWidget {
         return Icons.handyman_outlined;
       case LessonType.lab:
         return Icons.science_outlined;
+      case LessonType.seminar:
+        return Icons.forum_outlined;
       case LessonType.unknown:
         return Icons.school_outlined;
     }
   }
 }
 
+/// Живой прогресс идущей пары: точный остаток тикает раз в секунду, волна
+/// едет вместе с ним. Виджет сам подписан на секундные часы, поэтому тиканье
+/// не перестраивает всю карточку.
+class _LiveProgress extends ConsumerWidget {
+  const _LiveProgress({required this.lesson, required this.color});
+
+  final ScheduleItem lesson;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final now = ref.watch(clockProvider);
+    final left = lesson.timeLeftAt(now);
+
+    final start = lesson.startsAt;
+    final end = lesson.endsAt;
+    var progress = 0.0;
+    if (start != null && end != null) {
+      final total = end.difference(start).inSeconds;
+      if (total > 0) {
+        progress = ((total - left.inSeconds) / total).clamp(0.0, 1.0);
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.timer_outlined, size: 16, color: color),
+            const Gap(6),
+            Expanded(
+              child: Text(
+                'До конца пары — ${formatCountdown(left)}',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: colorScheme.onSurface,
+                  fontWeight: FontWeight.w700,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ),
+            Text(
+              '${(progress * 100).round()}%',
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ],
+        ),
+        const Gap(8),
+        WavyProgressIndicator(
+          value: progress,
+          color: color,
+          trackColor: color.withValues(alpha: 0.18),
+          height: 9,
+          strokeWidth: 3,
+          wavelength: 13,
+        ),
+      ],
+    );
+  }
+}
+
 /// Появление содержимого листа: подъём на spatial-пружине и проявление на
 /// effects-пружине. Шторка уже едет снизу сама — это второй, более быстрый
 /// слой, который делает появление «живым», а не механическим.
-///
-/// Решение моё, не из M3: спецификация не задаёт хореографию для контента
-/// внутри `bottom sheet`.
 class _SheetReveal extends StatefulWidget {
   final Widget child;
 
@@ -395,70 +558,30 @@ class _TypeBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 56dp плитка с радиусом 20: внутренний радиус = 20 − 0, тонкая заливка
-    // без обводки, поэтому форму задаёт только сам контейнер.
+    // 64dp с радиусом 22: на hero-поверхности (32dp) на неё смотрит
+    // вложенность 32 → 22 при отступе 10.
     return Container(
-      width: 56,
-      height: 56,
+      width: 64,
+      height: 64,
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.14),
-        borderRadius: AppShapes.circular(AppShapes.largeIncreased),
+        borderRadius: AppShapes.circular(22),
       ),
-      child: Icon(icon, size: 26, color: color),
+      child: Icon(icon, size: 30, color: color),
     );
   }
 }
 
-/// Короткий статус пары: «Идёт» / «Через N мин».
-class _StatusPill extends StatelessWidget {
-  final String label;
-  final bool ongoing;
-
-  const _StatusPill({required this.label, required this.ongoing});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final background =
-        ongoing ? colorScheme.primary : colorScheme.secondaryContainer;
-    final foreground =
-        ongoing ? colorScheme.onPrimary : colorScheme.onSecondaryContainer;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: AppShapes.circular(AppShapes.extraLarge),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            ongoing ? Icons.play_arrow_rounded : Icons.schedule,
-            size: 14,
-            color: foreground,
-          ),
-          const Gap(3),
-          Text(
-            label,
-            style: AppTypography.emphasizedLabelSmall(
-              theme.textTheme.labelSmall!.copyWith(color: foreground),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Строка-факт расширенной карточки: иконка в тональном кружке, подпись и
-/// значение. Иконка остаётся 18dp — по ней строки выравниваются в столбец.
-class _DetailRow extends StatelessWidget {
+/// Плитка факта: тональная поверхность, иконка с подписью сверху и значение.
+///
+/// Плитки вместо строк списка дают сетку 2×2 на телефоне: время и аудитория
+/// стоят рядом, потому что ищутся вместе.
+class _FactTile extends StatelessWidget {
   final IconData icon;
   final String label;
   final Widget child;
 
-  const _DetailRow({
+  const _FactTile({
     required this.icon,
     required this.label,
     required this.child,
@@ -468,39 +591,41 @@ class _DetailRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHigh,
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, size: 18, color: colorScheme.onSurfaceVariant),
-        ),
-        const Gap(12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: AppShapes.circular(AppShapes.largeIncreased),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
             children: [
-              Text(
-                label.toUpperCase(),
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  letterSpacing: 0.5,
+              Icon(icon, size: 16, color: colorScheme.onSurfaceVariant),
+              const Gap(6),
+              Expanded(
+                child: Text(
+                  label.toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    letterSpacing: 0.5,
+                  ),
                 ),
-              ),
-              const Gap(1),
-              DefaultTextStyle.merge(
-                style: TextStyle(color: colorScheme.onSurface),
-                child: child,
               ),
             ],
           ),
-        ),
-      ],
+          const Gap(8),
+          DefaultTextStyle.merge(
+            style: TextStyle(color: colorScheme.onSurface),
+            child: child,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -522,7 +647,7 @@ class _ChangeBanner extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
         color: colorScheme.errorContainer,
-        borderRadius: AppShapes.circular(AppShapes.large),
+        borderRadius: AppShapes.circular(AppShapes.largeIncreased),
       ),
       child: Row(
         children: [
@@ -539,6 +664,305 @@ class _ChangeBanner extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Посещение и балл за пару прямо в карточке расписания: журнал и расписание
+/// — два входа в одну запись, а не два независимых хранилища.
+class _JournalBlock extends ConsumerWidget {
+  const _JournalBlock({required this.lesson});
+
+  final ScheduleItem lesson;
+
+  Course? _courseOf(JournalData data) {
+    final title = lesson.subject.trim().toLowerCase();
+    if (title.isEmpty) return null;
+    for (final course in data.courses) {
+      if (course.title.toLowerCase() == title) return course;
+    }
+    return null;
+  }
+
+  void _open(BuildContext context, WidgetRef ref) {
+    final notifier = ref.read(journalProvider.notifier);
+    final course = notifier.courseForLesson(lesson);
+    final slot = lessonSlotFromTime(lesson.time);
+    final record = notifier.lessonFor(
+      course: course,
+      date: lesson.parsedDate,
+      slot: slot,
+      type: lessonTypeFromSchedule(lesson.type) ?? LessonType.unknown,
+    );
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => _JournalEditSheet(
+        recordId: record.id,
+        courseId: course.id,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final data = ref.watch(journalProvider).data;
+    final course = _courseOf(data);
+    final slot = lessonSlotFromTime(lesson.time);
+    LessonRecord? record;
+    if (course != null) {
+      try {
+        record = data.findLesson(
+          courseId: course.id,
+          date: lesson.parsedDate,
+          slot: slot,
+        );
+      } catch (_) {
+        record = null;
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 8, 8, 12),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        borderRadius: AppShapes.circular(AppShapes.medium),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.fact_check_outlined,
+                  size: 18, color: scheme.onSurfaceVariant),
+              const Gap(8),
+              Text('Журнал', style: theme.textTheme.labelLarge),
+              const Spacer(),
+              TextButton(
+                onPressed: () => _open(context, ref),
+                child: Text(record == null ? 'Отметить' : 'Изменить'),
+              ),
+            ],
+          ),
+          if (record == null)
+            Padding(
+              padding: const EdgeInsets.only(left: 26, bottom: 4),
+              child: Text(
+                'Посещение и балл за эту пару',
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: scheme.onSurfaceVariant),
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.only(left: 26, bottom: 4),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  _JournalChip(
+                    label: attendanceLabel(record.attendance),
+                    highlight: record.visited,
+                    icon: record.visited
+                        ? Icons.check_circle_outline
+                        : Icons.cancel_outlined,
+                  ),
+                  _JournalChip(
+                    label: record.points == null
+                        ? 'без балла'
+                        : '${_points(record.points!)} б.',
+                    icon: Icons.star_outline,
+                  ),
+                  if (record.comment != null && record.comment!.isNotEmpty)
+                    _JournalChip(
+                      label: record.comment!,
+                      icon: Icons.notes_outlined,
+                    ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  static String _points(double value) => value == value.roundToDouble()
+      ? value.round().toString()
+      : value.toStringAsFixed(1);
+}
+
+class _JournalChip extends StatelessWidget {
+  const _JournalChip({
+    required this.label,
+    required this.icon,
+    this.highlight = false,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool highlight;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final color = highlight ? scheme.primary : scheme.onSurfaceVariant;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest,
+        borderRadius: AppShapes.circular(AppShapes.small),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const Gap(4),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 200),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context)
+                  .textTheme
+                  .labelSmall
+                  ?.copyWith(color: color),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Правка записи журнала из расписания: был/не был (+причина) и балл.
+class _JournalEditSheet extends ConsumerStatefulWidget {
+  const _JournalEditSheet({required this.recordId, required this.courseId});
+
+  final String recordId;
+  final String courseId;
+
+  @override
+  ConsumerState<_JournalEditSheet> createState() => _JournalEditSheetState();
+}
+
+class _JournalEditSheetState extends ConsumerState<_JournalEditSheet> {
+  final _reason = TextEditingController();
+  bool _reasonFilled = false;
+
+  @override
+  void dispose() {
+    _reason.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final data = ref.watch(journalProvider).data;
+    LessonRecord? record;
+    for (final item in data.records) {
+      if (item.id == widget.recordId) {
+        record = item;
+        break;
+      }
+    }
+    final course =
+        data.courses.where((c) => c.id == widget.courseId).firstOrNull;
+    if (record == null || course == null) {
+      return const Padding(
+        padding: EdgeInsets.all(24),
+        child: Text('Запись не найдена'),
+      );
+    }
+
+    if (!_reasonFilled) {
+      _reason.text = record.reason ?? '';
+      _reasonFilled = true;
+    }
+
+    final category = course.scale.categoryForLesson(record.type);
+    final max = (category?.maxPoints ?? 10).round();
+    final absent = !record.visited;
+
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          0,
+          16,
+          16 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              '${DateFormat('d MMMM', 'ru').format(record.date)} · '
+              '${lessonTypeShortLabel(record.type)} · ${record.slot} пара',
+              style: theme.textTheme.titleSmall,
+            ),
+            const Gap(16),
+            SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(
+                  value: true,
+                  label: Text('Был'),
+                  icon: Icon(Icons.check),
+                ),
+                ButtonSegment(
+                  value: false,
+                  label: Text('Не был'),
+                  icon: Icon(Icons.close),
+                ),
+              ],
+              selected: {!absent},
+              onSelectionChanged: (values) {
+                final present = values.first;
+                ref.read(journalProvider.notifier).setAttendance(
+                      record!.id,
+                      present ? Attendance.present : Attendance.absent,
+                      reason: present ? null : _reason.text.trim(),
+                    );
+              },
+            ),
+            if (absent) ...[
+              const Gap(12),
+              TextField(
+                controller: _reason,
+                decoration: const InputDecoration(
+                  labelText: 'Причина',
+                  hintText: 'Болезнь, соревнования…',
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (value) => ref
+                    .read(journalProvider.notifier)
+                    .setAttendance(record!.id, Attendance.absent,
+                        reason: value.trim()),
+              ),
+            ],
+            const Gap(16),
+            ScoreScroller(
+              max: max,
+              value: record.points?.round(),
+              label: 'Баллы за пару',
+              onChanged: (value) => ref
+                  .read(journalProvider.notifier)
+                  .setPoints(record!.id, value?.toDouble()),
+            ),
+            const Gap(8),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Готово'),
+            ),
+          ],
+        ),
       ),
     );
   }

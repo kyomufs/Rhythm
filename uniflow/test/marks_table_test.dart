@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:uniflow/core/api/tulsu_api.dart';
+import 'package:uniflow/core/models/marks.dart';
 import 'package:uniflow/features/performance/widgets/marks_table.dart';
 
 MarksItem _mark(

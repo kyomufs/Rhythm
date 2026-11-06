@@ -6,6 +6,7 @@ import 'package:uniflow/app.dart';
 import 'package:uniflow/core/demo/demo_schedule.dart';
 import 'package:uniflow/core/models/schedule.dart';
 import 'package:uniflow/core/services/schedule_service.dart';
+import 'package:uniflow/core/theme/spacing.dart';
 import 'package:uniflow/core/theme/typography.dart';
 import 'package:uniflow/core/widgets/refresh_confirmation.dart';
 import 'package:uniflow/core/widgets/update_feedback.dart';
@@ -14,8 +15,11 @@ import 'package:uniflow/features/schedule/screens/schedule_changes_screen.dart';
 import 'package:uniflow/features/schedule/screens/schedule_preview_screen.dart';
 import 'package:uniflow/features/schedule/widgets/day_schedule.dart';
 import 'package:uniflow/features/schedule/widgets/lesson_detail_sheet.dart';
+import 'package:uniflow/features/sources/widgets/source_pill.dart';
 import 'package:uniflow/features/schedule/widgets/week_navigator.dart';
 import 'package:uniflow/shared/widgets/empty_state.dart';
+import 'package:uniflow/shared/widgets/wavy_progress.dart';
+import 'package:uniflow/shared/widgets/expressive_button_group.dart';
 import 'package:uniflow/shared/widgets/expressive_loading_indicator.dart';
 import 'package:uniflow/shared/widgets/loading_indicator.dart';
 
@@ -135,7 +139,14 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
         titleSpacing: 16,
         title: _ScheduleHeader(state: state),
         centerTitle: false,
-        actions: _buildActions(context, ref, state),
+        actions: [
+          SourcePill(
+            maxWidth:
+                MediaQuery.sizeOf(context).width < _compactWidth ? 96 : 150,
+          ),
+          const Gap(AppSpacing.xxs),
+          ..._buildActions(context, ref, state),
+        ],
       ),
       body: state.currentGroup == null && !state.isDemo
           ? _buildNoGroupView(context, ref)
@@ -197,46 +208,53 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
     }
 
     return [
-      // Change journal entry point — always visible (history
-      // survives refreshes; badge only marks unseen changes).
-      IconButton(
-        icon: Badge(
-          isLabelVisible: state.hasUnseenChanges,
-          label: state.changeRecords.isNotEmpty
-              ? Text('${state.changeRecords.length}')
-              : null,
-          child: const Icon(Icons.difference_outlined),
+      // Стандартная группа кнопок: нажатая раздувается пружиной, соседние
+      // ужимаются — панель действий отвечает на касание, а не просто
+      // подсвечивает иконку.
+      Padding(
+        padding: const EdgeInsets.only(right: 4),
+        child: ExpressiveActionGroup(
+          items: [
+            ExpressiveActionItem(
+              icon: Badge(
+                isLabelVisible: state.hasUnseenChanges,
+                label: state.changeRecords.isNotEmpty
+                    ? Text('${state.changeRecords.length}')
+                    : null,
+                child: const Icon(Icons.difference_outlined),
+              ),
+              tooltip: 'Изменения',
+              onPressed: () =>
+                  _handleAction(_ScheduleAction.changes, context, ref, state),
+            ),
+            if (hasGroup)
+              ExpressiveActionItem(
+                icon: state.schedule.isLoading
+                    ? const ExpressiveLoadingIndicator(size: 20)
+                    : const Icon(Icons.refresh),
+                tooltip: state.schedule.isLoading ? 'Обновление…' : 'Обновить',
+                onPressed: state.schedule.isLoading
+                    ? null
+                    : () => _handleAction(
+                        _ScheduleAction.refresh, context, ref, state),
+              ),
+            if (state.currentGroup != null)
+              ExpressiveActionItem(
+                icon: const Icon(Icons.search),
+                tooltip: 'Поиск',
+                onPressed: () =>
+                    _handleAction(_ScheduleAction.search, context, ref, state),
+              ),
+            if (!state.isCurrentWeek)
+              ExpressiveActionItem(
+                icon: const Icon(Icons.today),
+                tooltip: 'Сегодня',
+                onPressed: () =>
+                    _handleAction(_ScheduleAction.today, context, ref, state),
+              ),
+          ],
         ),
-        onPressed: () =>
-            _handleAction(_ScheduleAction.changes, context, ref, state),
-        tooltip: 'Изменения',
       ),
-      if (hasGroup) ...[
-        IconButton(
-          icon: state.schedule.isLoading
-              ? const ExpressiveLoadingIndicator(size: 20)
-              : const Icon(Icons.refresh),
-          onPressed: state.schedule.isLoading
-              ? null
-              : () =>
-                  _handleAction(_ScheduleAction.refresh, context, ref, state),
-          tooltip: 'Обновить',
-        ),
-      ],
-      if (state.currentGroup != null) ...[
-        IconButton(
-          icon: const Icon(Icons.search),
-          onPressed: () =>
-              _handleAction(_ScheduleAction.search, context, ref, state),
-          tooltip: 'Поиск',
-        ),
-      ],
-      if (!state.isCurrentWeek)
-        TextButton(
-          onPressed: () =>
-              _handleAction(_ScheduleAction.today, context, ref, state),
-          child: const Text('Сегодня'),
-        ),
     ];
   }
 
@@ -307,7 +325,16 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
           onOpenCalendar: () => _openCalendar(context, ref),
         ),
         if (schedule.isLoading && hasVisibleContent)
-          const LinearProgressIndicator(minHeight: 2),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 0, 16, 4),
+            child: WavyProgressIndicator(
+              value: null,
+              height: 4,
+              strokeWidth: 2,
+              wavelength: 12,
+              amplitude: 1.2,
+            ),
+          ),
         Expanded(
           child: schedule.isLoading && schedule.items.isEmpty
               ? const LoadingIndicator(message: 'Загрузка расписания...')
@@ -324,50 +351,28 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
 
   Widget _buildError(BuildContext context, WidgetRef ref,
       ScheduleState schedule, ColorScheme colorScheme) {
-    final theme = Theme.of(context);
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.error_outline,
-              size: 64, color: colorScheme.error.withValues(alpha: 0.5)),
-          const Gap(16),
-          Text('Ошибка загрузки', style: theme.textTheme.titleMedium),
-          const Gap(8),
-          Text(schedule.error!,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyLarge
-                  ?.copyWith(color: colorScheme.onSurfaceVariant)),
-          const Gap(16),
-          FilledButton.tonal(
-            onPressed: () async {
-              final result =
-                  await ref.read(scheduleScreenProvider.notifier).refresh();
-              if (!context.mounted) return;
-              showUpdateFeedback(context, result);
-            },
-            child: const Text('Повторить'),
-          ),
-        ],
+    return EmptyState(
+      icon: Icons.cloud_off_outlined,
+      title: 'Ошибка загрузки',
+      message: schedule.error!,
+      action: FilledButton.tonalIcon(
+        onPressed: () async {
+          final result =
+              await ref.read(scheduleScreenProvider.notifier).refresh();
+          if (!context.mounted) return;
+          showUpdateFeedback(context, result);
+        },
+        icon: const Icon(Icons.refresh),
+        label: const Text('Повторить'),
       ),
     );
   }
 
   Widget _buildEmpty(ColorScheme colorScheme) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.event_busy,
-              size: 64, color: colorScheme.primary.withValues(alpha: 0.3)),
-          const Gap(16),
-          Text('Нет занятий на эту неделю',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyLarge
-                  ?.copyWith(color: colorScheme.onSurfaceVariant)),
-        ],
-      ),
+    return const EmptyState(
+      icon: Icons.event_busy_outlined,
+      title: 'Нет занятий',
+      message: 'На эту неделю пар в расписании нет',
     );
   }
 

@@ -1,12 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:uniflow/core/api/tulsu_api.dart';
+import 'package:uniflow/core/models/marks.dart';
 import 'package:uniflow/core/demo/demo_marks.dart';
 import 'package:uniflow/core/providers/clock_provider.dart';
 import 'package:uniflow/core/utils/error_messages.dart';
 import 'package:uniflow/core/services/storage_service.dart';
 import 'package:uniflow/core/services/update_coordinator.dart';
+import 'package:uniflow/core/sources/source_api.dart';
+import 'package:uniflow/core/sources/source_store.dart';
 import 'package:uniflow/features/profile/providers/profile_providers.dart';
 
 /// Performance screen state
@@ -68,7 +70,7 @@ class PerformanceState {
 }
 
 class PerformanceNotifier extends StateNotifier<PerformanceState> {
-  final ProgressApiClient _api;
+  final FinalMarksApi? _api;
   final StorageService _storage;
   final UpdateCoordinator _updates;
   final bool _demo;
@@ -122,10 +124,14 @@ class PerformanceNotifier extends StateNotifier<PerformanceState> {
     return _updates.run(() async {
       state = state.copyWith(isLoading: true, clearError: true);
       try {
-        final marks = await _api.getMarks(
-          personalAffair: studentId,
-          groupTitle: group,
-        );
+        final api = _api;
+        if (api == null) {
+          return const UpdateResult(
+              UpdateOutcome.failed, 'Источник не отдаёт итоговые оценки');
+        }
+        final marks = (await api.finalMarks(studentId: studentId, group: group))
+            .map(MarksItem.fromFinalMark)
+            .toList();
         if (!mounted) {
           return const UpdateResult(
               UpdateOutcome.failed, 'Не удалось обновить оценки');
@@ -184,7 +190,7 @@ final performanceProvider =
   ref.watch(profileRevisionProvider);
   final demo = ref.watch(demoModeProvider);
   return PerformanceNotifier(
-    ref.watch(progressApiClientProvider),
+    ref.watch(finalMarksApiProvider),
     ref.watch(storageServiceProvider),
     ref.watch(updateCoordinatorProvider),
     demo: demo,

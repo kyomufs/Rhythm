@@ -3,9 +3,10 @@ import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:uniflow/core/api/tulsu_api.dart';
+import 'package:uniflow/core/models/marks.dart';
 import 'package:uniflow/core/theme/shapes.dart';
 import 'package:uniflow/core/utils/mark_labels.dart';
+import 'package:uniflow/shared/widgets/expressive_button_group.dart';
 
 /// Таблица успеваемости: липкая шапка, вертикальная прокрутка строк и
 /// горизонтальная прокрутка столбцов, ширины столбцов тянутся мышью или
@@ -217,10 +218,19 @@ class _ZoomBar extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
       child: Row(
         children: [
-          _ZoomButton(
-            icon: Icons.remove,
-            tooltip: 'Мельче',
-            onTap: onZoomOut,
+          ExpressiveActionGroup(
+            items: [
+              ExpressiveActionItem(
+                icon: const Icon(Icons.remove),
+                tooltip: 'Мельче',
+                onPressed: onZoomOut,
+              ),
+              ExpressiveActionItem(
+                icon: const Icon(Icons.add),
+                tooltip: 'Крупнее',
+                onPressed: onZoomIn,
+              ),
+            ],
           ),
           SizedBox(
             width: 52,
@@ -235,45 +245,18 @@ class _ZoomBar extends StatelessWidget {
               ),
             ),
           ),
-          _ZoomButton(
-            icon: Icons.add,
-            tooltip: 'Крупнее',
-            onTap: onZoomIn,
-          ),
           const Spacer(),
-          _ZoomButton(
-            icon: Icons.restart_alt,
-            tooltip: 'Сбросить масштаб',
-            onTap: onReset,
+          // Сброс живёт отдельной группой: это не шаг масштаба.
+          ExpressiveActionGroup(
+            items: [
+              ExpressiveActionItem(
+                icon: const Icon(Icons.restart_alt),
+                tooltip: 'Сбросить масштаб',
+                onPressed: onReset,
+              ),
+            ],
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _ZoomButton extends StatelessWidget {
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
-
-  const _ZoomButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      onPressed: onTap,
-      icon: Icon(icon),
-      iconSize: 18,
-      tooltip: tooltip,
-      visualDensity: VisualDensity.compact,
-      style: IconButton.styleFrom(
-        minimumSize: const Size(36, 32),
-        padding: EdgeInsets.zero,
       ),
     );
   }

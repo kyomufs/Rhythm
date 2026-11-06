@@ -4,14 +4,14 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:uniflow/core/api/endpoints.dart';
-import 'package:uniflow/core/api/tulsu_api.dart';
+import 'package:uniflow/core/models/marks.dart';
 import 'package:uniflow/core/models/schedule.dart';
 import 'package:uniflow/core/services/connectivity_service.dart';
 import 'package:uniflow/core/services/notification_service.dart';
 import 'package:uniflow/core/services/schedule_service.dart';
 import 'package:uniflow/core/services/storage_service.dart';
 import 'package:uniflow/core/services/update_coordinator.dart';
+import 'package:uniflow/core/sources/source_api.dart';
 import 'package:uniflow/features/performance/providers/performance_provider.dart';
 import 'package:uniflow/features/schedule/providers/schedule_provider.dart';
 
@@ -40,13 +40,20 @@ MarksItem _mark(String discipline, {String term = '3'}) => MarksItem(
       recredit: false,
     );
 
+FinalMark _finalMark(String discipline) => FinalMark(
+      term: '3',
+      discipline: discipline,
+      markTitle: 'отлично',
+      teacherMark: '5',
+    );
+
 CachedSchedule _cachedSchedule(List<ScheduleItem> items) => CachedSchedule(
       searchValue: '221341',
       data: ScheduleData(
         dateRange: ApiDateRange(
           minDate: DateTime(2026, 9, 21),
           maxDate: DateTime(2026, 10, 25),
-          searchField: SearchFieldType.group,
+          searchField: SearchField.group,
         ),
         items: items,
         calendar: const [],
@@ -180,23 +187,23 @@ ScheduleScreenNotifier _scheduleNotifier({
 
 // ── Performance fakes ──────────────────────────────────────────
 
-class FakeProgressApi implements ProgressApiClient {
+class FakeProgressApi implements FinalMarksApi {
   FakeProgressApi(
-      {Completer<List<MarksItem>>? pending, List<MarksItem>? result})
+      {Completer<List<FinalMark>>? pending, List<FinalMark>? result})
       : _pending = pending,
         _result = result;
 
-  final Completer<List<MarksItem>>? _pending;
-  final List<MarksItem>? _result;
+  final Completer<List<FinalMark>>? _pending;
+  final List<FinalMark>? _result;
   int calls = 0;
 
   @override
-  Future<List<MarksItem>> getMarks({
-    required String personalAffair,
-    required String groupTitle,
+  Future<List<FinalMark>> finalMarks({
+    required String studentId,
+    required String group,
   }) {
     calls++;
-    return _pending?.future ?? Future.value(_result ?? const <MarksItem>[]);
+    return _pending?.future ?? Future.value(_result ?? const <FinalMark>[]);
   }
 }
 
@@ -313,7 +320,7 @@ void main() {
 
   group('marks stale-while-revalidate', () {
     test('warm marks cache paints before the network answer arrives', () async {
-      final pending = Completer<List<MarksItem>>();
+      final pending = Completer<List<FinalMark>>();
       final api = FakeProgressApi(pending: pending);
       final storage = FakeMarkStorage()..cachedMarks = [_mark('Из кэша')];
       final connectivity = FakeConnectivity();
@@ -332,7 +339,7 @@ void main() {
           reason: 'background revalidation is still running');
       expect(notifier.state.marks.single.discipline, 'Из кэша');
 
-      pending.complete([_mark('Свежее из API')]);
+      pending.complete([_finalMark('Свежее из API')]);
       await _flush();
       expect(notifier.state.marks.single.discipline, 'Свежее из API');
       expect(notifier.state.isLoading, isFalse);
@@ -341,7 +348,7 @@ void main() {
 
     test('offline keeps the painted marks instead of an error screen',
         () async {
-      final pending = Completer<List<MarksItem>>();
+      final pending = Completer<List<FinalMark>>();
       final api = FakeProgressApi(pending: pending);
       final storage = FakeMarkStorage()..cachedMarks = [_mark('Из кэша')];
       final connectivity = FakeConnectivity()..online = false;

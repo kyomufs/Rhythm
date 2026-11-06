@@ -1,26 +1,40 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:uniflow/core/api/endpoints.dart';
-import 'package:uniflow/core/api/tulsu_api.dart';
 import 'package:uniflow/core/models/schedule.dart';
+import 'package:uniflow/core/sources/source_api.dart';
 import 'package:uniflow/core/services/lesson_group_resolver.dart';
 
 /// API-заглушка: расписание группы отдаёт одну свою группу, расписание
 /// аудитории — все группы пары. Второй ответ и есть источник полного списка.
-class _FakeApi extends TulsuApiClient {
+class _FakeApi extends ScheduleApi {
   _FakeApi({required this.roomItems});
 
   final List<ScheduleItem> roomItems;
   int roomCalls = 0;
 
   @override
-  Future<List<ScheduleItem>> getSchedule(
-      String searchField, String searchValue) async {
-    if (searchField == SearchFieldType.auditorium.value) {
+  Future<List<ScheduleItem>> lessons({
+    required String searchField,
+    required String searchValue,
+  }) async {
+    if (searchField == SearchField.auditorium.value) {
       roomCalls++;
       return roomItems;
     }
     return const [];
   }
+
+  @override
+  Future<SourceDateRange> dateRange(String searchValue) async => SourceDateRange(
+        minDate: DateTime(2026, 9, 1),
+        maxDate: DateTime(2027, 1, 25),
+        searchField: SearchField.group,
+      );
+
+  @override
+  Future<List<CalendarItem>> calendar(String searchValue) async => [];
+
+  @override
+  Future<List<SourceSuggestion>> search(String query) async => [];
 }
 
 ScheduleItem _item({

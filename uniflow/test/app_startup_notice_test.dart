@@ -9,9 +9,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'package:uniflow/app.dart';
-import 'package:uniflow/core/api/endpoints.dart';
-import 'package:uniflow/core/api/tulsu_api.dart';
+import 'package:uniflow/core/api/api_exception.dart';
 import 'package:uniflow/core/models/app_settings.dart';
+import 'package:uniflow/core/models/marks.dart';
 import 'package:uniflow/core/models/note_models.dart';
 import 'package:uniflow/core/models/schedule.dart';
 import 'package:uniflow/core/providers/clock_provider.dart';
@@ -19,6 +19,8 @@ import 'package:uniflow/core/services/connectivity_service.dart';
 import 'package:uniflow/core/services/notification_service.dart';
 import 'package:uniflow/core/services/schedule_service.dart';
 import 'package:uniflow/core/services/storage_service.dart';
+import 'package:uniflow/core/sources/source_api.dart';
+import 'package:uniflow/core/sources/source_store.dart';
 
 final _now = DateTime.now();
 
@@ -36,52 +38,51 @@ ScheduleItem _lesson(String subject) => ScheduleItem(
       cssClass: 'lecture',
     );
 
-MarksItem _mark(String discipline) => MarksItem(
-      term: '3',
-      discipline: discipline,
-      mark: '5',
-      markTitle: 'отлично',
-      teacherMark: '5',
-      retake: '',
-      recredit: false,
-    );
-
-class _FakeApi extends TulsuApiClient {
+class _FakeApi extends ScheduleApi {
   _FakeApi(this.items);
 
   final List<ScheduleItem> items;
 
   @override
-  Future<ApiDateRange> getDateRange(String searchValue) async => ApiDateRange(
+  Future<SourceDateRange> dateRange(String searchValue) async => SourceDateRange(
         minDate: DateTime(2026, 9, 1),
         maxDate: DateTime(2027, 1, 25),
-        searchField: SearchFieldType.group,
+        searchField: SearchField.group,
       );
 
   @override
-  Future<List<ScheduleItem>> getSchedule(
-          String searchField, String searchValue) async =>
+  Future<List<ScheduleItem>> lessons({
+    required String searchField,
+    required String searchValue,
+  }) async =>
       items;
 
   @override
-  Future<List<CalendarItem>> getCalendar(String searchValue) async => [];
+  Future<List<CalendarItem>> calendar(String searchValue) async => [];
 
   @override
-  Future<List<SearchSuggestion>> search(String query) async => [];
+  Future<List<SourceSuggestion>> search(String query) async => [];
 }
 
-class _FakeProgress implements ProgressApiClient {
+class _FakeProgress implements FinalMarksApi {
   _FakeProgress({this.fail = false});
 
   final bool fail;
 
   @override
-  Future<List<MarksItem>> getMarks({
-    required String personalAffair,
-    required String groupTitle,
+  Future<List<FinalMark>> finalMarks({
+    required String studentId,
+    required String group,
   }) async {
     if (fail) throw const ApiException('нет связи');
-    return [_mark('Математический анализ')];
+    return [
+      const FinalMark(
+        term: '3',
+        discipline: 'Математический анализ',
+        markTitle: 'отлично',
+        teacherMark: '5',
+      ),
+    ];
   }
 }
 
@@ -195,8 +196,8 @@ Widget _app({_FakeProgress? progress}) {
   return ProviderScope(
     overrides: [
       demoModeProvider.overrideWithValue(false),
-      apiClientProvider.overrideWithValue(api),
-      progressApiClientProvider.overrideWithValue(progress ?? _FakeProgress()),
+      scheduleApiProvider.overrideWithValue(api),
+      finalMarksApiProvider.overrideWithValue(progress ?? _FakeProgress()),
       scheduleServiceProvider.overrideWithValue(
         ScheduleService(api: api, storage: _FakeStorage()),
       ),

@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:uniflow/core/api/endpoints.dart';
-import 'package:uniflow/core/api/tulsu_api.dart';
 import 'package:uniflow/core/models/app_settings.dart';
 import 'package:uniflow/core/models/schedule.dart';
 import 'package:uniflow/core/providers/clock_provider.dart';
@@ -10,6 +8,8 @@ import 'package:uniflow/core/services/connectivity_service.dart';
 import 'package:uniflow/core/services/notification_service.dart';
 import 'package:uniflow/core/services/schedule_service.dart';
 import 'package:uniflow/core/services/storage_service.dart';
+import 'package:uniflow/core/sources/source_api.dart';
+import 'package:uniflow/core/sources/source_store.dart';
 import 'package:uniflow/core/widgets/background_sync_host.dart';
 import 'package:uniflow/features/schedule/providers/schedule_provider.dart';
 
@@ -26,31 +26,33 @@ ScheduleItem _item(String subject) => ScheduleItem(
       cssClass: 'lecture',
     );
 
-class _CountingApi extends TulsuApiClient {
+class _CountingApi extends ScheduleApi {
   _CountingApi(this.items);
 
   List<ScheduleItem> items;
   int scheduleCalls = 0;
 
   @override
-  Future<ApiDateRange> getDateRange(String searchValue) async => ApiDateRange(
+  Future<SourceDateRange> dateRange(String searchValue) async => SourceDateRange(
         minDate: DateTime(2026, 9, 1),
         maxDate: DateTime(2027, 1, 25),
-        searchField: SearchFieldType.group,
+        searchField: SearchField.group,
       );
 
   @override
-  Future<List<ScheduleItem>> getSchedule(
-      String searchField, String searchValue) async {
+  Future<List<ScheduleItem>> lessons({
+    required String searchField,
+    required String searchValue,
+  }) async {
     scheduleCalls++;
     return items;
   }
 
   @override
-  Future<List<CalendarItem>> getCalendar(String searchValue) async => [];
+  Future<List<CalendarItem>> calendar(String searchValue) async => [];
 
   @override
-  Future<List<SearchSuggestion>> search(String query) async => [];
+  Future<List<SourceSuggestion>> search(String query) async => [];
 }
 
 class _FakeStorage extends StorageService {
@@ -150,7 +152,7 @@ Widget _host({
   return ProviderScope(
     overrides: [
       demoModeProvider.overrideWithValue(false),
-      apiClientProvider.overrideWithValue(api),
+      scheduleApiProvider.overrideWithValue(api),
       scheduleServiceProvider.overrideWithValue(
         ScheduleService(api: api, storage: storage),
       ),
@@ -175,22 +177,23 @@ void main() {
       (tester) async {
     final api = _CountingApi([_item('Алгебра')]);
     final storage = _FakeStorage(
-      const AppSettings(backgroundCheckMinutes: 15),
+      const AppSettings(backgroundCheckMinutes: 60),
     );
 
     await tester.pumpWidget(_host(api: api, storage: storage));
     await tester.pumpAndSettle();
     final afterLoad = api.scheduleCalls;
-    expect(afterLoad, greaterThan(0), reason: 'первый запрос — обычная загрузка');
+    expect(afterLoad, greaterThan(0),
+        reason: 'первый запрос — обычная загрузка');
 
-    await tester.pump(const Duration(minutes: 14));
+    await tester.pump(const Duration(minutes: 59));
     await tester.pumpAndSettle();
     expect(api.scheduleCalls, afterLoad, reason: 'период ещё не истёк');
 
     await tester.pump(const Duration(minutes: 1));
     await tester.pumpAndSettle();
     expect(api.scheduleCalls, greaterThan(afterLoad),
-        reason: 'через 15 минут пришёл фоновый опрос');
+        reason: 'через час пришёл фоновый опрос');
 
     // Снимаем виджет, иначе периодический таймер останется на teardown.
     await tester.pumpWidget(const SizedBox.shrink());

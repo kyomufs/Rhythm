@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:uniflow/core/input/desktop_input.dart';
 import 'package:uniflow/core/services/notification_service.dart';
 import 'package:uniflow/core/services/storage_service.dart';
 import 'package:uniflow/core/services/update_service.dart';
@@ -12,7 +13,7 @@ import 'package:uniflow/core/theme/theme_provider.dart';
 import 'package:uniflow/core/widgets/background_sync_host.dart';
 import 'package:uniflow/core/widgets/update_dialog.dart';
 import 'package:uniflow/core/widgets/update_feedback.dart';
-import 'package:uniflow/features/notes/screens/notes_screen.dart';
+import 'package:uniflow/features/journal/screens/journal_screen.dart';
 import 'package:uniflow/features/performance/providers/performance_provider.dart';
 import 'package:uniflow/features/performance/screens/performance_screen.dart';
 import 'package:uniflow/features/profile/screens/onboarding_screen.dart';
@@ -33,7 +34,11 @@ class UniFlowApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final settings = ref.watch(appSettingsProvider);
+    // Только то, от чего зависит MaterialApp: тема и режим. Раньше здесь
+    // читались настройки целиком, поэтому любая галочка в настройках
+    // пересобирала MaterialApp с обеими темами.
+    final themeMode =
+        ref.watch(appSettingsProvider.select((s) => s.parsedThemeMode));
     final lightTheme = ref.watch(themeDataProvider);
     final darkTheme = ref.watch(themeDataProviderDark);
 
@@ -42,7 +47,10 @@ class UniFlowApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       theme: lightTheme,
       darkTheme: darkTheme,
-      themeMode: settings.parsedThemeMode,
+      themeMode: themeMode,
+      // 200 мс дефолта — это двенадцать перестроек всего дерева; на плотном
+      // экране расписания переход цвета читался как подвисание.
+      themeAnimationDuration: const Duration(milliseconds: 120),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
@@ -64,7 +72,7 @@ class MainShell extends ConsumerStatefulWidget {
 
   static const _screens = <Widget>[
     ScheduleScreen(),
-    NotesScreen(),
+    JournalScreen(),
     PerformanceScreen(),
     ProfileScreen(),
   ];
@@ -75,6 +83,11 @@ class MainShell extends ConsumerStatefulWidget {
 
 class _MainShellState extends ConsumerState<MainShell> {
   final _updateService = UpdateService();
+
+  /// Вкладки строятся при первом показе. IndexedStack держал в дереве все
+  /// четыре экрана с первого кадра — расписание, заметки, таблицу оценок и
+  /// профиль, — хотя виден один.
+  final Set<int> _visited = {0};
 
   @override
   void initState() {
@@ -169,46 +182,62 @@ class _MainShellState extends ConsumerState<MainShell> {
               : Brightness.light,
     ));
 
+    void selectTab(int index) {
+      if (index < 0 || index >= MainShell._screens.length) return;
+      HapticFeedback.lightImpact();
+      if (_visited.add(index)) setState(() {});
+      ref.read(currentTabProvider.notifier).state = index;
+    }
+
+    // Ctrl+1…4 переключают вкладки: клики по нижней панели — путь для
+    // планшета, но на ПК это медленно.
     return BackgroundSyncHost(
-      child: Scaffold(
-        body: IndexedStack(
-          index: currentTab,
-          children: MainShell._screens,
-        ),
-        // Solid bar, no floating rounded container: full-width surface color
-        // with a tonal indicator pill, like Gmail's bottom navigation.
-        // NavigationBar wraps its content in SafeArea itself, and its
-        // Material paints the gesture inset (iOS home indicator) with the
-        // bar color — adding padding/transform here would double the inset
-        // and float the menu high above the bottom edge.
-        bottomNavigationBar: AppNavBar(
-          selectedIndex: currentTab,
-          onSelected: (index) {
-            HapticFeedback.lightImpact();
-            ref.read(currentTabProvider.notifier).state = index;
-          },
-          destinations: const [
-            AppNavDestination(
-              icon: Icons.calendar_today_outlined,
-              selectedIcon: Icons.calendar_today,
-              label: 'Расписание',
-            ),
-            AppNavDestination(
-              icon: Icons.note_alt_outlined,
-              selectedIcon: Icons.note_alt,
-              label: 'Заметки',
-            ),
-            AppNavDestination(
-              icon: Icons.assessment_outlined,
-              selectedIcon: Icons.assessment,
-              label: 'Оценки',
-            ),
-            AppNavDestination(
-              icon: Icons.person_outline,
-              selectedIcon: Icons.person,
-              label: 'Профиль',
-            ),
-          ],
+      child: AppShortcuts(
+        tabCount: MainShell._screens.length,
+        onTab: selectTab,
+        onEscape: () => Navigator.of(context).maybePop(),
+        child: Scaffold(
+          body: IndexedStack(
+            index: currentTab,
+            children: [
+              for (var i = 0; i < MainShell._screens.length; i++)
+                _visited.contains(i)
+                    ? MainShell._screens[i]
+                    : const SizedBox.shrink(),
+            ],
+          ),
+          // Solid bar, no floating rounded container: full-width surface color
+          // with a tonal indicator pill, like Gmail's bottom navigation.
+          // NavigationBar wraps its content in SafeArea itself, and its
+          // Material paints the gesture inset (iOS home indicator) with the
+          // bar color — adding padding/transform here would double the inset
+          // and float the menu high above the bottom edge.
+          bottomNavigationBar: AppNavBar(
+            selectedIndex: currentTab,
+            onSelected: selectTab,
+            destinations: const [
+              AppNavDestination(
+                icon: Icons.calendar_today_outlined,
+                selectedIcon: Icons.calendar_today,
+                label: 'Расписание',
+              ),
+              AppNavDestination(
+                icon: Icons.menu_book_outlined,
+                selectedIcon: Icons.menu_book,
+                label: 'Журнал',
+              ),
+              AppNavDestination(
+                icon: Icons.assessment_outlined,
+                selectedIcon: Icons.assessment,
+                label: 'Оценки',
+              ),
+              AppNavDestination(
+                icon: Icons.person_outline,
+                selectedIcon: Icons.person,
+                label: 'Профиль',
+              ),
+            ],
+          ),
         ),
       ),
     );

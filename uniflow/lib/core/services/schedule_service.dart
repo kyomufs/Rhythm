@@ -1,23 +1,25 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:uniflow/core/api/tulsu_api.dart';
+import 'package:uniflow/core/api/api_exception.dart';
 import 'package:uniflow/core/models/schedule.dart';
 import 'package:uniflow/core/services/storage_service.dart';
+import 'package:uniflow/core/sources/source_api.dart';
+import 'package:uniflow/core/sources/source_store.dart';
 
 /// Schedule service provider
 final scheduleServiceProvider = Provider<ScheduleService>((ref) {
   return ScheduleService(
-    api: ref.watch(apiClientProvider),
+    api: ref.watch(scheduleApiProvider),
     storage: ref.watch(storageServiceProvider),
   );
 });
 
 /// Service for fetching and caching schedule data
 class ScheduleService {
-  final TulsuApiClient _api;
+  final ScheduleApi _api;
   final StorageService _storage;
 
   ScheduleService({
-    required TulsuApiClient api,
+    required ScheduleApi api,
     required StorageService storage,
   })  : _api = api,
         _storage = storage;
@@ -48,10 +50,21 @@ class ScheduleService {
 
     // Fetch from API
     try {
-      final data = await _api.getFullSchedule(searchValue);
+      final data = await _api.fullSchedule(searchValue);
 
       // Cache the result
-      await _storage.cacheSchedule(searchValue, data);
+      await _storage.cacheSchedule(
+        searchValue,
+        ScheduleData(
+          dateRange: ApiDateRange(
+            minDate: data.dateRange.minDate,
+            maxDate: data.dateRange.maxDate,
+            searchField: data.dateRange.searchField,
+          ),
+          items: data.lessons,
+          calendar: data.calendar,
+        ),
+      );
 
       // Save as last search
       await _storage.saveLastSearch(searchValue);
@@ -62,7 +75,7 @@ class ScheduleService {
           start: data.dateRange.minDate,
           end: data.dateRange.maxDate,
         ),
-        items: data.items,
+        items: data.lessons,
       );
     } on ApiException catch (e) {
       return ScheduleState(
@@ -77,8 +90,19 @@ class ScheduleService {
   /// офлайн из снимка.
   Future<bool> prefetch(String searchValue) async {
     try {
-      final data = await _api.getFullSchedule(searchValue);
-      await _storage.cacheSchedule(searchValue, data);
+      final data = await _api.fullSchedule(searchValue);
+      await _storage.cacheSchedule(
+        searchValue,
+        ScheduleData(
+          dateRange: ApiDateRange(
+            minDate: data.dateRange.minDate,
+            maxDate: data.dateRange.maxDate,
+            searchField: data.dateRange.searchField,
+          ),
+          items: data.lessons,
+          calendar: data.calendar,
+        ),
+      );
       return true;
     } on ApiException {
       return false;

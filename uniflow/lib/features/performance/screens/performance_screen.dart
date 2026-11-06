@@ -7,9 +7,12 @@ import 'package:uniflow/app.dart';
 import 'package:uniflow/core/widgets/refresh_confirmation.dart';
 import 'package:uniflow/core/widgets/update_feedback.dart';
 import 'package:uniflow/features/performance/providers/performance_provider.dart';
+import 'package:uniflow/features/sources/widgets/source_pill.dart';
 import 'package:uniflow/features/performance/widgets/marks_table.dart';
 import 'package:uniflow/shared/widgets/empty_state.dart';
 import 'package:uniflow/shared/widgets/loading_indicator.dart';
+import 'package:uniflow/shared/widgets/morph_chip.dart';
+import 'package:uniflow/shared/widgets/wavy_progress.dart';
 
 /// Performance (academic marks) screen
 class PerformanceScreen extends ConsumerWidget {
@@ -24,7 +27,13 @@ class PerformanceScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Успеваемость'),
+        title: Row(
+          children: [
+            const SourcePill(),
+            const Gap(AppSpacing.xs),
+            Text('Успеваемость', style: theme.textTheme.titleLarge),
+          ],
+        ),
         centerTitle: false,
         actions: [
           if (isConfigured)
@@ -61,8 +70,19 @@ class PerformanceScreen extends ConsumerWidget {
                       ? _buildEmpty(context, ref, colorScheme, theme)
                       : Column(
                           children: [
+                            // Тонкая волна вместо прямой полосы: тот же
+                            // индикатор фоновой загрузки, но в языке темы.
                             if (state.isLoading)
-                              const LinearProgressIndicator(minHeight: 2),
+                              const Padding(
+                                padding: EdgeInsets.fromLTRB(16, 0, 16, 4),
+                                child: WavyProgressIndicator(
+                                  value: null,
+                                  height: 4,
+                                  strokeWidth: 2,
+                                  wavelength: 12,
+                                  amplitude: 1.2,
+                                ),
+                              ),
                             Expanded(
                               child: _buildMarksView(context, ref, state),
                             ),
@@ -88,53 +108,38 @@ class PerformanceScreen extends ConsumerWidget {
 
   Widget _buildError(BuildContext context, WidgetRef ref,
       PerformanceState state, ColorScheme colorScheme, ThemeData theme) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline,
-                size: 64, color: colorScheme.error.withValues(alpha: 0.5)),
-            const Gap(16),
-            Text(state.error!,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(color: colorScheme.onSurfaceVariant)),
-            const Gap(16),
-            FilledButton.tonal(
-              onPressed: () => ref.read(currentTabProvider.notifier).state = 3,
-              child: const Text('Настроить профиль'),
-            ),
-          ],
-        ),
+    return EmptyState(
+      icon: Icons.sync_problem_outlined,
+      title: 'Не удалось загрузить',
+      message: state.error!,
+      action: FilledButton.tonalIcon(
+        onPressed: () async {
+          final result =
+              await ref.read(performanceProvider.notifier).loadMarks();
+          if (!context.mounted) return;
+          showUpdateFeedback(context, result);
+        },
+        icon: const Icon(Icons.refresh),
+        label: const Text('Повторить'),
       ),
     );
   }
 
   Widget _buildEmpty(BuildContext context, WidgetRef ref,
       ColorScheme colorScheme, ThemeData theme) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.event_busy,
-              size: 64, color: colorScheme.primary.withValues(alpha: 0.3)),
-          const Gap(16),
-          Text('Нет данных об успеваемости',
-              style: theme.textTheme.bodyLarge
-                  ?.copyWith(color: colorScheme.onSurfaceVariant)),
-          const Gap(16),
-          FilledButton.tonal(
-            onPressed: () async {
-              final result =
-                  await ref.read(performanceProvider.notifier).loadMarks();
-              if (!context.mounted) return;
-              showUpdateFeedback(context, result);
-            },
-            child: const Text('Загрузить'),
-          ),
-        ],
+    return EmptyState(
+      icon: Icons.assistant_navigation,
+      title: 'Нет данных об успеваемости',
+      message: 'Оценки за семестр ещё не подгружены',
+      action: FilledButton.tonalIcon(
+        onPressed: () async {
+          final result =
+              await ref.read(performanceProvider.notifier).loadMarks();
+          if (!context.mounted) return;
+          showUpdateFeedback(context, result);
+        },
+        icon: const Icon(Icons.download_outlined),
+        label: const Text('Загрузить'),
       ),
     );
   }
@@ -150,27 +155,28 @@ class PerformanceScreen extends ConsumerWidget {
           SizedBox(
             height: 56,
             child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              // 2dp шва внутри ленты и 2dp до гуттера: связка читается
+              // одной лентой, как у группы кнопок.
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
               scrollDirection: Axis.horizontal,
               itemCount: semesters.length,
-              separatorBuilder: (_, __) => const Gap(8),
+              separatorBuilder: (_, __) => const Gap(2),
               itemBuilder: (context, index) {
                 final sem = semesters[index];
                 final isSelected = state.selectedSemester == sem;
                 // Map actual term number to display: "1 семестр", "2 семестр"...
                 final displayIndex = index + 1;
-                return Semantics(
-                  // Чип — переключатель одного выбора: без selected скринридер
-                  // читает только подпись и не сообщает текущий семестр.
+                // Лента связная: круглые торцы только у крайних семестров,
+                // поэтому флаги зависят от позиции в списке.
+                return MorphChip(
+                  label: '$displayIndex семестр',
                   selected: isSelected,
-                  inMutuallyExclusiveGroup: true,
-                  child: FilterChip(
-                    label: Text('$displayIndex семестр'),
-                    selected: isSelected,
-                    onSelected: (_) => ref
-                        .read(performanceProvider.notifier)
-                        .selectSemester(sem),
-                  ),
+                  isFirst: index == 0,
+                  isLast: index == semesters.length - 1,
+                  semanticLabel: 'Семестр $displayIndex',
+                  onTap: () => ref
+                      .read(performanceProvider.notifier)
+                      .selectSemester(sem),
                 );
               },
             ),

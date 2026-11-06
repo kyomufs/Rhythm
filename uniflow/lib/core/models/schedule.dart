@@ -186,6 +186,7 @@ enum LessonType {
   lecture,
   practice,
   lab,
+  seminar,
   unknown;
 
   String get displayName {
@@ -196,6 +197,8 @@ enum LessonType {
         return 'Практика';
       case LessonType.lab:
         return 'Лабораторная';
+      case LessonType.seminar:
+        return 'Семинар';
       case LessonType.unknown:
         return 'Другое';
     }
@@ -209,6 +212,8 @@ enum LessonType {
         return '💻';
       case LessonType.lab:
         return '🔬';
+      case LessonType.seminar:
+        return '🗣';
       case LessonType.unknown:
         return '📚';
     }
@@ -392,4 +397,40 @@ String formatCountdown(Duration remaining) {
   }
   if (minutes > 0) return '$minutes мин ${two(seconds)} с';
   return '$seconds с';
+}
+
+/// Поле поиска расписания: группа, преподаватель, аудитория.
+enum SearchField {
+  group('GROUP_P'),
+  teacher('PREP'),
+  auditorium('AUD');
+
+  final String value;
+  const SearchField(this.value);
+}
+
+/// Диапазон дат, в котором источник отдаёт расписание.
+class ApiDateRange {
+  final DateTime minDate;
+  final DateTime maxDate;
+  final SearchField searchField;
+
+  const ApiDateRange({
+    required this.minDate,
+    required this.maxDate,
+    required this.searchField,
+  });
+}
+
+/// Снимок расписания: диапазон, пары и академический календарь.
+class ScheduleData {
+  final ApiDateRange dateRange;
+  final List<ScheduleItem> items;
+  final List<CalendarItem> calendar;
+
+  const ScheduleData({
+    required this.dateRange,
+    required this.items,
+    required this.calendar,
+  });
 }

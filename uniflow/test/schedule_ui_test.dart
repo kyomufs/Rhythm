@@ -4,9 +4,9 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:uniflow/core/api/endpoints.dart';
-import 'package:uniflow/core/api/tulsu_api.dart';
 import 'package:uniflow/core/models/schedule.dart';
+import 'package:uniflow/core/sources/source_api.dart';
+import 'package:uniflow/core/sources/source_store.dart';
 import 'package:uniflow/core/providers/clock_provider.dart';
 import 'package:uniflow/core/services/connectivity_service.dart';
 import 'package:uniflow/core/services/notification_service.dart';
@@ -40,7 +40,7 @@ ScheduleItem _item({
   );
 }
 
-class _FakeApi extends TulsuApiClient {
+class _FakeApi extends ScheduleApi {
   _FakeApi(this.items, {this.auditoriumItems});
 
   final List<ScheduleItem> items;
@@ -52,16 +52,18 @@ class _FakeApi extends TulsuApiClient {
   int auditoriumCalls = 0;
 
   @override
-  Future<ApiDateRange> getDateRange(String searchValue) async => ApiDateRange(
+  Future<SourceDateRange> dateRange(String searchValue) async => SourceDateRange(
         minDate: DateTime(2026, 9, 1),
         maxDate: DateTime(2027, 1, 25),
-        searchField: SearchFieldType.group,
+        searchField: SearchField.group,
       );
 
   @override
-  Future<List<ScheduleItem>> getSchedule(
-      String searchField, String searchValue) async {
-    if (searchField == SearchFieldType.auditorium.value) {
+  Future<List<ScheduleItem>> lessons({
+    required String searchField,
+    required String searchValue,
+  }) async {
+    if (searchField == SearchField.auditorium.value) {
       auditoriumCalls++;
       return auditoriumItems ?? items;
     }
@@ -69,10 +71,10 @@ class _FakeApi extends TulsuApiClient {
   }
 
   @override
-  Future<List<CalendarItem>> getCalendar(String searchValue) async => [];
+  Future<List<CalendarItem>> calendar(String searchValue) async => [];
 
   @override
-  Future<List<SearchSuggestion>> search(String query) async => [];
+  Future<List<SourceSuggestion>> search(String query) async => [];
 }
 
 class _FakeStorage extends StorageService {
@@ -184,7 +186,7 @@ Widget _app({
   return ProviderScope(
     overrides: [
       demoModeProvider.overrideWithValue(false),
-      apiClientProvider.overrideWithValue(client),
+      scheduleApiProvider.overrideWithValue(client),
       scheduleServiceProvider.overrideWithValue(
         ScheduleService(
           api: client,
@@ -341,7 +343,7 @@ void main() {
     expect(find.byKey(const ValueKey('lesson-group-$_group')), findsOneWidget);
   });
 
-  testWidgets('в карточке время, аудитория, препод и группы — один список',
+  testWidgets('в карточке время и аудитория — плитки в ряд, препод и группы ниже',
       (tester) async {
     await tester.pumpWidget(_app(items: [
       _item(
@@ -358,23 +360,17 @@ void main() {
     await tester.tap(find.byType(LessonTile).first);
     await tester.pumpAndSettle();
 
-    // Время и аудитория больше не в отдельной тональной полосе: все четыре
-    // факта — одинаковые строки с иконкой в одном столбце. Иконка той же
-    // пары есть и в плитке под листом, поэтому берём иконки строк листа —
-    // они 18dp, как в _DetailRow.
-    Finder rowIcon(IconData icon) => find
-        .byWidgetPredicate((w) => w is Icon && w.icon == icon && w.size == 18);
+    // Факты разложены плитками: время и аудитория делят строку, широкие
+    // поля (преподаватель, группы) идут во всю ширину под ними.
+    final time = tester.getTopLeft(find.text('ВРЕМЯ'));
+    final room = tester.getTopLeft(find.text('АУДИТОРИЯ'));
+    final teacher = tester.getTopLeft(find.text('ПРЕПОДАВАТЕЛЬ'));
+    final groups = tester.getTopLeft(find.text('ГРУППЫ'));
 
-    final time = tester.getTopLeft(rowIcon(Icons.schedule));
-    final room = tester.getTopLeft(rowIcon(Icons.place_outlined));
-    final teacher = tester.getTopLeft(rowIcon(Icons.person_outline));
-    final groups = tester.getTopLeft(rowIcon(Icons.groups_outlined));
-
-    expect(room.dx, time.dx, reason: 'иконки стоят в общем столбце');
-    expect(teacher.dx, time.dx);
-    expect(groups.dx, time.dx);
-    expect(room.dy, greaterThan(time.dy));
-    expect(teacher.dy, greaterThan(room.dy));
+    expect(room.dy, time.dy, reason: 'время и аудитория стоят в одной строке');
+    expect(room.dx, greaterThan(time.dx));
+    expect(teacher.dy, greaterThan(time.dy));
+    expect(teacher.dx, lessThan(room.dx));
     expect(groups.dy, greaterThan(teacher.dy));
   });
 

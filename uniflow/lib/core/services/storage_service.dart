@@ -1,8 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:uniflow/core/api/endpoints.dart';
-import 'package:uniflow/core/api/tulsu_api.dart';
+import 'package:uniflow/core/domain/journal.dart';
+import 'package:uniflow/core/domain/source.dart';
 import 'package:uniflow/core/models/app_settings.dart';
+import 'package:uniflow/core/models/marks.dart';
 import 'package:uniflow/core/models/note_models.dart';
 import 'package:uniflow/core/models/schedule.dart';
 
@@ -29,6 +30,9 @@ class StorageKeys {
   static const String scheduleChangeLog = 'schedule_changes_log';
   static const String changesSeenAt = 'schedule_changes_seen_at';
   static const String marksCache = 'marks_cache';
+  static const String sources = 'sources';
+  static const String activeSourceId = 'active_source_id';
+  static const String journalPrefix = 'journal_v1';
 }
 
 // ============================================================
@@ -85,10 +89,16 @@ final storageServiceProvider = Provider<StorageService>((ref) {
 // ============================================================
 class StorageService {
   late Box<dynamic> _box;
+  bool _opened = false;
+
+  /// Доступен ли ящик. Провайдеры читают настройки на первом кадре — до
+  /// этого момента обращение к ящику бросало бы LateError.
+  bool get isInitialized => _opened;
 
   Future<void> init() async {
     await Hive.initFlutter();
     _box = await Hive.openBox('uniflow');
+    _opened = true;
   }
 
   // ── My Group ──────────────────────────────────────────────
@@ -324,7 +334,7 @@ class StorageService {
           dateRange: ApiDateRange(
             minDate: DateTime.parse(map['minDate'] as String),
             maxDate: DateTime.parse(map['maxDate'] as String),
-            searchField: SearchFieldType.group,
+            searchField: SearchField.group,
           ),
           items: items,
           calendar: calendar,
@@ -521,6 +531,67 @@ class StorageService {
     } catch (_) {
       return null;
     }
+  }
+
+  // ── Sources ──────────────────────────────────────────────
+
+  List<Source> getSources() {
+    if (!_opened) return const [];
+    final raw = _box.get(StorageKeys.sources);
+    if (raw == null) return const [];
+    try {
+      return (raw as List)
+          .map((e) => Source.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<void> saveSources(List<Source> sources) async {
+    if (!_opened) return;
+    await _box.put(
+      StorageKeys.sources,
+      sources.map((s) => s.toJson()).toList(),
+    );
+  }
+
+  String? getActiveSourceId() =>
+      _opened ? _box.get(StorageKeys.activeSourceId) as String? : null;
+
+  Future<void> setActiveSourceId(String? id) async {
+    if (!_opened) return;
+    if (id == null) {
+      await _box.delete(StorageKeys.activeSourceId);
+    } else {
+      await _box.put(StorageKeys.activeSourceId, id);
+    }
+  }
+
+  // ── Journal ──────────────────────────────────────────────
+
+  JournalData getJournal(String sourceId) {
+    if (!_opened) return const JournalData();
+    final raw = _box.get('${StorageKeys.journalPrefix}_$sourceId');
+    if (raw == null) return const JournalData();
+    try {
+      return JournalData.fromJson(Map<String, dynamic>.from(raw as Map));
+    } catch (_) {
+      return const JournalData();
+    }
+  }
+
+  Future<void> saveJournal(String sourceId, JournalData data) async {
+    if (!_opened) return;
+    await _box.put(
+      '${StorageKeys.journalPrefix}_$sourceId',
+      data.toJson(),
+    );
+  }
+
+  Future<void> deleteJournal(String sourceId) async {
+    if (!_opened) return;
+    await _box.delete('${StorageKeys.journalPrefix}_$sourceId');
   }
 
   // ── Onboarding ───────────────────────────────────────────
