@@ -9,11 +9,13 @@ import 'package:rhythm/core/domain/journal.dart';
 import 'package:rhythm/core/journal/journal_store.dart';
 import 'package:rhythm/core/models/schedule.dart';
 import 'package:rhythm/core/providers/clock_provider.dart';
+import 'package:rhythm/core/domain/source.dart';
 import 'package:rhythm/core/services/lesson_group_resolver.dart';
 import 'package:rhythm/core/theme/app_theme.dart';
 import 'package:rhythm/core/theme/motion.dart';
 import 'package:rhythm/core/theme/shapes.dart';
 import 'package:rhythm/core/theme/typography.dart';
+import 'package:rhythm/core/sources/source_store.dart';
 import 'package:rhythm/features/schedule/providers/schedule_provider.dart';
 import 'package:rhythm/features/journal/widgets/score_scroller.dart';
 import 'package:rhythm/shared/widgets/expressive_button_group.dart';
@@ -116,8 +118,11 @@ class _LessonDetailSheetState extends ConsumerState<LessonDetailSheet> {
     final ownGroup = ref.watch(
       scheduleScreenProvider.select((s) => s.currentGroup),
     );
+    final canResolve = ref
+        .watch(activeSourceCapabilitiesProvider)
+        .contains(SourceCapability.directory);
     final needsResolve =
-        lesson.groups.length <= 1 && lesson.classroom.isNotEmpty;
+        canResolve && lesson.groups.length <= 1 && lesson.classroom.isNotEmpty;
     // Прогретое расписание аудитории отдаёт группы синхронно — первый кадр
     // карточки уже с полным списком, без «появляются через полсекунды».
     final cachedGroups = needsResolve

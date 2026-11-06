@@ -33,7 +33,8 @@ class _CountingApi extends ScheduleApi {
   int scheduleCalls = 0;
 
   @override
-  Future<SourceDateRange> dateRange(String searchValue) async => SourceDateRange(
+  Future<SourceDateRange> dateRange(String searchValue) async =>
+      SourceDateRange(
         minDate: DateTime(2026, 9, 1),
         maxDate: DateTime(2027, 1, 25),
         searchField: SearchField.group,
@@ -88,10 +89,13 @@ class _FakeStorage extends StorageService {
   }
 
   @override
-  CachedSchedule? getCachedSchedule(String searchValue) => null;
+  CachedSchedule? getCachedSchedule(String searchValue,
+          {String namespace = ''}) =>
+      null;
 
   @override
-  Future<void> cacheSchedule(String searchValue, ScheduleData data) async {}
+  Future<void> cacheSchedule(String searchValue, ScheduleData data,
+      {String namespace = ''}) async {}
 
   @override
   String? getLastSearch() => null;

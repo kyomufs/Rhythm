@@ -1,15 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
+import 'package:rhythm/app.dart';
+import 'package:rhythm/core/domain/source.dart';
 import 'package:rhythm/core/services/storage_service.dart';
+import 'package:rhythm/core/sources/source_store.dart';
 import 'package:rhythm/core/theme/motion.dart';
 import 'package:rhythm/core/theme/shapes.dart';
 import 'package:rhythm/core/theme/typography.dart';
-import 'package:rhythm/app.dart';
 import 'package:rhythm/features/profile/providers/profile_providers.dart';
-import 'package:rhythm/features/schedule/providers/schedule_provider.dart';
+import 'package:rhythm/features/sources/widgets/connector_field_form.dart';
+import 'package:rhythm/integrations/catalog.dart';
+import 'package:rhythm/integrations/contract/connector.dart';
 
-/// First-launch onboarding guide
+/// First-launch onboarding guide.
+///
+/// Порядок как в Дневаче и Кампусе: сначала способ получения данных, потом
+/// учреждение, потом то, по чему строится расписание. Экраны не знают, какой
+/// вуз выбран, — список источников приходит из каталога.
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -19,36 +27,59 @@ class OnboardingScreen extends ConsumerStatefulWidget {
 
 class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final _pageController = PageController();
-  final _groupController = TextEditingController();
-  final _subgroupController = TextEditingController();
-  final _studentIdController = TextEditingController();
+  final _titleController = TextEditingController();
 
-  // Focus nodes so each input page can auto-focus its field.
-  final _groupFocus = FocusNode();
-  final _subgroupFocus = FocusNode();
-  final _studentIdFocus = FocusNode();
-
+  late ScheduleConnector _connector;
+  ConnectorKind _method = ConnectorKind.api;
+  var _formKey = GlobalKey<ConnectorFieldFormState>();
+  String? _error;
   int _currentPage = 0;
 
   static const _totalPages = 5;
 
+  /// Способы получения, которые реально есть в каталоге.
+  List<ConnectorKind> get _methods {
+    final methods = selectableConnectors
+        .map((connector) => connector.descriptor.kind)
+        .toSet()
+        .toList();
+    methods.add(ConnectorKind.manual);
+    return methods;
+  }
+
+  List<ScheduleConnector> get _institutions {
+    if (_method == ConnectorKind.manual) return const [manualConnector];
+    return selectableConnectors
+        .where((connector) => connector.descriptor.kind == _method)
+        .toList();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _connector = selectableConnectors.isEmpty
+        ? manualConnector
+        : selectableConnectors.first;
+    _method = _connector.descriptor.kind;
+    _titleController.text = _connector.label;
+  }
+
   @override
   void dispose() {
     _pageController.dispose();
-    _groupController.dispose();
-    _subgroupController.dispose();
-    _studentIdController.dispose();
-    _groupFocus.dispose();
-    _subgroupFocus.dispose();
-    _studentIdFocus.dispose();
+    _titleController.dispose();
     super.dispose();
   }
 
   void _nextPage() {
+    final error = _validatePage();
+    if (error != null) {
+      setState(() => _error = error);
+      return;
+    }
+    setState(() => _error = null);
     if (_currentPage < _totalPages - 1) {
       _pageController.nextPage(
-        // PageView принимает только Duration + Curve, поэтому длительность
-        // берётся из времени затухания slow-пружины, а не из «400 мс».
         duration: springDuration(MotionScheme.of(context).slowSpatial),
         curve: Curves.easeOutCubic,
       );
@@ -56,66 +87,82 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   void _prevPage() {
-    if (_currentPage > 0) {
-      // Dismiss the keyboard before sliding back.
-      FocusManager.instance.primaryFocus?.unfocus();
-      _pageController.previousPage(
-        duration: springDuration(MotionScheme.of(context).slowSpatial),
-        curve: Curves.easeOutCubic,
-      );
-    }
+    if (_currentPage == 0) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+    _pageController.previousPage(
+      duration: springDuration(MotionScheme.of(context).slowSpatial),
+      curve: Curves.easeOutCubic,
+    );
   }
 
-  /// Auto-focus the input field of the page that just became active.
-  void _focusFieldOfPage(int index) {
-    FocusNode? node;
-    switch (index) {
-      case 1:
-        node = _groupFocus;
-        break;
-      case 2:
-        node = _subgroupFocus;
-        break;
-      case 3:
-        node = _studentIdFocus;
-        break;
-      default:
-        return; // Welcome / done pages have no input.
+  /// Проверка страницы перед переходом: пустая группа дальше не пускает.
+  String? _validatePage() {
+    if (_currentPage == 2 && _titleController.text.trim().isEmpty) {
+      return 'Укажите название источника';
     }
-    // Wait a frame so the page transition doesn't steal focus back.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) node?.requestFocus();
+    if (_currentPage == 3 && _connector.descriptor.fields.isNotEmpty) {
+      return _formKey.currentState?.validate();
+    }
+    return null;
+  }
+
+  void _selectMethod(ConnectorKind method) {
+    setState(() {
+      _method = method;
+      final institutions = _institutions;
+      _connector = institutions.isEmpty ? manualConnector : institutions.first;
+      _formKey = GlobalKey<ConnectorFieldFormState>();
+      _titleController.text = _connector.label;
+      _error = null;
     });
   }
 
-  void _finish() {
-    final storage = ref.read(storageServiceProvider);
+  void _selectConnector(ScheduleConnector connector) {
+    setState(() {
+      _connector = connector;
+      _formKey = GlobalKey<ConnectorFieldFormState>();
+      _titleController.text = connector.label;
+      _error = null;
+    });
+  }
 
-    // Save group if entered
-    if (_groupController.text.isNotEmpty) {
-      ref
-          .read(scheduleScreenProvider.notifier)
-          .setMyGroup(_groupController.text);
-    }
+  Future<void> _finish() async {
+    final descriptor = _connector.descriptor;
+    final config = descriptor.fields.isEmpty
+        ? const <String, String>{}
+        : _formKey.currentState?.config ?? const <String, String>{};
+    final source = Source(
+      id: '${descriptor.id}-${DateTime.now().millisecondsSinceEpoch}',
+      kind: descriptor.defaultKind,
+      title: _titleController.text.trim().isEmpty
+          ? descriptor.title
+          : _titleController.text.trim(),
+      subtitle: _subtitleFor(config),
+      providerId: descriptor.id,
+      config: config,
+      createdAt: DateTime.now(),
+    );
 
-    // Save subgroup if entered
-    if (_subgroupController.text.isNotEmpty) {
-      storage.setMySubgroup(_subgroupController.text);
-    }
-
-    // Save student ID if entered
-    if (_studentIdController.text.isNotEmpty) {
-      storage.setStudentId(_studentIdController.text);
-    }
-
-    // Let dependent providers (marks, profile card) pick up new values.
+    await ref.read(sourcesProvider.notifier).add(source);
     ref.read(profileRevisionProvider.notifier).state++;
+    await ref.read(storageServiceProvider).setOnboardingCompleted();
 
-    storage.setOnboardingCompleted();
-
+    if (!mounted) return;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(builder: (_) => const MainShell()),
     );
+  }
+
+  /// Подпись источника — то, по чему он отличается от соседнего: группа.
+  String? _subtitleFor(Map<String, String> config) {
+    final descriptor = _connector.descriptor;
+    final field = descriptor.field(descriptor.targetField);
+    final displayKey = field?.displayKey;
+    if (displayKey != null && (config[displayKey] ?? '').isNotEmpty) {
+      return config[displayKey];
+    }
+    final target = config[descriptor.targetField];
+    return (target == null || target.isEmpty) ? null : target;
   }
 
   void _skip() {
@@ -132,7 +179,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        // Back button (hidden on the first page).
         leading: _currentPage > 0
             ? IconButton(
                 icon: const Icon(Icons.arrow_back),
@@ -151,7 +197,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Page indicator
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Row(
@@ -159,7 +204,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   final isActive = i == _currentPage;
                   return Expanded(
                     child: AnimatedContainer(
-                      // Меняется только цвет — значит effects-пружина.
                       duration: springDuration(
                         MotionScheme.of(context).defaultEffects,
                       ),
@@ -177,29 +221,32 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 }),
               ),
             ),
-
-            // Pages
             Expanded(
               child: PageView(
                 controller: _pageController,
                 physics: const NeverScrollableScrollPhysics(),
-                onPageChanged: (index) {
-                  setState(() => _currentPage = index);
-                  _focusFieldOfPage(index);
-                },
+                onPageChanged: (index) => setState(() => _currentPage = index),
                 children: [
                   _buildWelcomePage(colorScheme),
-                  _buildGroupPage(colorScheme),
-                  _buildSubgroupPage(colorScheme),
-                  _buildStudentIdPage(colorScheme),
+                  _buildMethodPage(colorScheme),
+                  _buildInstitutionPage(colorScheme),
+                  _buildTargetPage(colorScheme),
                   _buildDonePage(colorScheme),
                 ],
               ),
             ),
-
-            // Bottom buttons
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Text(
+                  _error!,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(color: colorScheme.error),
+                ),
+              ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
               child: SizedBox(
                 width: double.infinity,
                 height: 56,
@@ -245,13 +292,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     );
   }
 
-  Widget _buildGroupPage(ColorScheme colorScheme) {
+  Widget _buildMethodPage(ColorScheme colorScheme) {
     return _PageBody(
       children: [
-        const _HeroSpot(icon: Icons.group_add, size: 92, iconSize: 40),
+        const _HeroSpot(
+            icon: Icons.cloud_download_outlined, size: 92, iconSize: 40),
         const Gap(24),
         Text(
-          'Какая у тебя группа?',
+          'Откуда данные?',
           textAlign: TextAlign.center,
           style: AppTypography.emphasizedHeadlineSmall(
             Theme.of(context).textTheme.headlineSmall!,
@@ -259,105 +307,120 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         ),
         const Gap(8),
         Text(
-          'Укажи номер группы для просмотра расписания',
+          'Способ получения определяет, что придётся чинить, если вуз '
+          'обновит сайт.',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
         ),
         const Gap(24),
-        TextField(
-          controller: _groupController,
-          focusNode: _groupFocus,
-          decoration: const InputDecoration(
-            labelText: 'Номер группы',
-            hintText: '111111',
-            prefixIcon: Icon(Icons.group_outlined),
-          ),
-          keyboardType: TextInputType.number,
-          style: Theme.of(context).textTheme.titleLarge,
+        Wrap(
+          alignment: WrapAlignment.center,
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final method in _methods)
+              ChoiceChip(
+                label: Text(method.label),
+                selected: _method == method,
+                onSelected: (_) => _selectMethod(method),
+              ),
+          ],
         ),
       ],
     );
   }
 
-  Widget _buildSubgroupPage(ColorScheme colorScheme) {
+  Widget _buildInstitutionPage(ColorScheme colorScheme) {
     final theme = Theme.of(context);
+    final institutions = _institutions;
+
     return _PageBody(
       children: [
-        const _HeroSpot(
-          icon: Icons.subdirectory_arrow_right,
-          size: 92,
-          iconSize: 40,
-          tone: _SpotTone.secondary,
-        ),
+        const _HeroSpot(icon: Icons.account_balance, size: 92, iconSize: 40),
         const Gap(24),
         Text(
-          'Подгруппа',
+          'Учреждение',
           style: AppTypography.emphasizedHeadlineSmall(
             theme.textTheme.headlineSmall!,
           ),
         ),
-        const Gap(12),
+        const Gap(8),
         Text(
-          'Укажите номер подгруппы (например, 01).\n'
-          'Нужна для просмотра успеваемости.',
+          _method == ConnectorKind.manual
+              ? 'Назовите источник — расписание будете вести сами.'
+              : 'Выберите из списка поддерживаемых.',
           textAlign: TextAlign.center,
           style: theme.textTheme.bodyMedium
               ?.copyWith(color: colorScheme.onSurfaceVariant),
         ),
-        const Gap(32),
-        TextField(
-          controller: _subgroupController,
-          focusNode: _subgroupFocus,
-          decoration: const InputDecoration(
-            labelText: 'Подгруппа',
-            hintText: '01',
-            prefixIcon: Icon(Icons.subdirectory_arrow_right),
+        const Gap(24),
+        if (institutions.length > 1)
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final connector in institutions)
+                ChoiceChip(
+                  label: Text(
+                    '${connector.label} · ${connector.descriptor.kind.badge}',
+                  ),
+                  selected: _connector.id == connector.id,
+                  onSelected: (_) => _selectConnector(connector),
+                ),
+            ],
           ),
-          keyboardType: TextInputType.number,
-          style: Theme.of(context).textTheme.titleLarge,
+        if (institutions.length > 1) const Gap(16),
+        TextField(
+          controller: _titleController,
+          textAlign: TextAlign.center,
+          textCapitalization: TextCapitalization.sentences,
+          style: theme.textTheme.titleLarge,
+          decoration: const InputDecoration(
+            labelText: 'Название',
+            hintText: 'ТулГУ, Школа №8, Работа',
+          ),
         ),
-        const Gap(16),
-        Text('Можно пропустить',
-            style: theme.textTheme.labelSmall
-                ?.copyWith(color: colorScheme.onSurfaceVariant)),
       ],
     );
   }
 
-  Widget _buildStudentIdPage(ColorScheme colorScheme) {
+  Widget _buildTargetPage(ColorScheme colorScheme) {
+    final theme = Theme.of(context);
+    final descriptor = _connector.descriptor;
+    final field = descriptor.field(descriptor.targetField);
+
     return _PageBody(
       children: [
-        const _HeroSpot(icon: Icons.badge_outlined, size: 92, iconSize: 40),
+        const _HeroSpot(icon: Icons.group_outlined, size: 92, iconSize: 40),
         const Gap(24),
         Text(
-          'Номер зачётки',
-          textAlign: TextAlign.center,
+          field?.label ?? 'Почти готово',
           style: AppTypography.emphasizedHeadlineSmall(
-            Theme.of(context).textTheme.headlineSmall!,
+            theme.textTheme.headlineSmall!,
           ),
         ),
         const Gap(8),
         Text(
-          'Необязательно. Можно указать позже\nв настройках.',
+          field == null
+              ? 'У этого источника нет сетевого расписания: '
+                  'занятия и оценки вносятся вручную.'
+              : 'По этому значению будет строиться расписание.',
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
+          style: theme.textTheme.bodyMedium
+              ?.copyWith(color: colorScheme.onSurfaceVariant),
         ),
-        const Gap(24),
-        TextField(
-          controller: _studentIdController,
-          focusNode: _studentIdFocus,
-          decoration: const InputDecoration(
-            labelText: 'Зачётная книжка',
-            hintText: '123456',
-            prefixIcon: Icon(Icons.badge_outlined),
+        if (descriptor.fields.isNotEmpty) ...[
+          const Gap(24),
+          ConnectorFieldForm(
+            key: _formKey,
+            connector: _connector,
+            onlyTargetField: true,
+            autofocus: true,
           ),
-          keyboardType: TextInputType.number,
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
+        ],
       ],
     );
   }
@@ -380,7 +443,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         ),
         const Gap(16),
         Text(
-          'Группу и зачётку всегда можно\nпоменять в настройках.',
+          'Источник добавлен. Его всегда можно\nпоменять в настройках.',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                 color: colorScheme.onSurfaceVariant,
@@ -393,10 +456,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
 /// Тело страницы онбординга.
 ///
-/// Контент по-прежнему центрируется по вертикали, но живёт в прокручиваемой
-/// области: при поднятой клавиатуре Scaffold сжимает тело, и страница с
-/// заголовком, подсказкой и полем ввода не влезала — RenderFlex ломался
-/// полосой переполнения прямо над нижней кнопкой.
+/// Контент центрируется по вертикали, но живёт в прокручиваемой области:
+/// при поднятой клавиатуре Scaffold сжимает тело, и страница с заголовком,
+/// подсказкой и полем ввода не влезала — RenderFlex ломался полосой
+/// переполнения прямо над нижней кнопкой.
 class _PageBody extends StatelessWidget {
   const _PageBody({required this.children});
 
@@ -412,8 +475,6 @@ class _PageBody extends StatelessWidget {
             (constraints.maxHeight - _padding.vertical).clamp(0.0, 1e6);
         return SingleChildScrollView(
           padding: _padding,
-          // Тянуть страницу вниз — значит убрать клавиатуру: иначе поле
-          // ввода остаётся в фокусе и экран не вернуть целиком.
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           child: ConstrainedBox(
             constraints: BoxConstraints(minHeight: minHeight),
@@ -429,10 +490,6 @@ class _PageBody extends StatelessWidget {
 }
 
 /// Тональное «пятно» с иконкой: появляется пружиной с перелётом.
-///
-/// Голые цветные иконки на пустом экране читались как заглушки; пятно даёт
-/// странице точку опоры, а масштаб при появлении — ощущение, что экран
-/// собрался, а не просто отрисовался.
 enum _SpotTone { primary, secondary, tertiary }
 
 class _HeroSpot extends StatelessWidget {

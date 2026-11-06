@@ -1,8 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rhythm/core/domain/source.dart';
 import 'package:rhythm/core/services/storage_service.dart';
-import 'package:rhythm/core/sources/registry.dart';
 import 'package:rhythm/core/sources/source_api.dart';
+import 'package:rhythm/integrations/catalog.dart';
 
 /// Список источников и один активный. Активный ровно один: так проще
 /// объяснить, куда попадут баллы, и не размывать статистику.
@@ -80,19 +80,26 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
     if (!valid) _storage.setActiveSourceId(stored.first.id);
   }
 
-  /// Первый запуск: источников ещё нет, но группа в профиле может быть —
-  /// тогда ТулГУ становится источником по умолчанию.
+  /// Первый запуск после обновления: источников ещё нет, но группа в старом
+  /// профиле может быть — переносим её в конфиг источника, а не теряем.
   List<Source> _bootstrap() {
     final group = _storage.getMyGroup();
     if (group == null || group.isEmpty) return const [];
+    final config = <String, String>{'group': group};
+    final subgroup = _storage.getMySubgroup();
+    if (subgroup != null && subgroup.isNotEmpty) config['subgroup'] = subgroup;
+    final studentId = _storage.getStudentId();
+    if (studentId != null && studentId.isNotEmpty) {
+      config['studentId'] = studentId;
+    }
     return [
       Source(
         id: 'tulsu-${DateTime.now().millisecondsSinceEpoch}',
         kind: SourceKind.university,
-        title: 'ТулГУ',
+        title: tulsuConnector.label,
         subtitle: group,
-        providerId: tulsuSourceProvider.id,
-        config: {'group': _storage.getFullAcademicGroup() ?? group},
+        providerId: tulsuConnector.id,
+        config: config,
         createdAt: DateTime.now(),
       ),
     ];
@@ -149,14 +156,33 @@ final activeSourceProvider = Provider<Source?>((ref) {
 /// заглушку, которая отвечает понятной ошибкой вместо падения.
 final scheduleApiProvider = Provider<ScheduleApi>((ref) {
   final source = ref.watch(activeSourceProvider);
-  return providerFor(source).scheduleApi(source ?? _fallbackSource);
+  return connectorFor(source).scheduleApi(source ?? _fallbackSource);
 });
 
 /// Итоговые оценки активного источника; null — источник их не отдаёт.
 final finalMarksApiProvider = Provider<FinalMarksApi?>((ref) {
   final source = ref.watch(activeSourceProvider);
   if (source == null) return null;
-  return providerFor(source).marksApi(source);
+  return connectorFor(source).marksApi(source);
+});
+
+/// Пространство имён снимков расписания: id источника.
+final activeSourceNamespaceProvider = Provider<String>((ref) {
+  return ref.watch(activeSourceProvider)?.providerId ?? manualConnector.id;
+});
+
+/// Группа/uuid, по которой строится расписание активного источника.
+final activeSourceTargetProvider = Provider<String?>((ref) {
+  final source = ref.watch(activeSourceProvider);
+  if (source == null) return null;
+  return connectorFor(source).targetValue(source);
+});
+
+/// Возможности активного источника: экраны спрашивают их, а не коннектор.
+final activeSourceCapabilitiesProvider = Provider<Set<SourceCapability>>((ref) {
+  final source = ref.watch(activeSourceProvider);
+  if (source == null) return const {};
+  return connectorFor(source).capabilities;
 });
 
 /// Заглушка нужна только пока источников нет: провайдер требует объект.
@@ -164,6 +190,6 @@ final _fallbackSource = Source(
   id: '_none',
   kind: SourceKind.other,
   title: '',
-  providerId: manualSourceProvider.id,
+  providerId: manualConnector.id,
   createdAt: DateTime.fromMillisecondsSinceEpoch(0),
 );

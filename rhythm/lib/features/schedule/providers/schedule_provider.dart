@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rhythm/core/demo/demo_schedule.dart';
+import 'package:rhythm/core/domain/source.dart';
 import 'package:rhythm/core/models/change_record.dart';
 import 'package:rhythm/core/models/schedule.dart';
 import 'package:rhythm/core/providers/clock_provider.dart';
@@ -12,8 +13,10 @@ import 'package:rhythm/core/services/lesson_group_resolver.dart';
 import 'package:rhythm/core/services/notification_service.dart';
 import 'package:rhythm/core/services/schedule_service.dart';
 import 'package:rhythm/core/services/storage_service.dart';
+import 'package:rhythm/core/sources/source_store.dart';
 import 'package:rhythm/core/services/update_coordinator.dart';
 import 'package:rhythm/core/utils/week_utils.dart';
+import 'package:rhythm/integrations/catalog.dart';
 
 /// Schedule screen state
 class ScheduleScreenState {
@@ -173,6 +176,10 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
   final LessonGroupResolver? _resolver;
   final bool _demo;
 
+  /// Группа/uuid активного источника и пространство имён его снимков.
+  final String? _target;
+  final String _namespace;
+
   /// Journal size and age limits (plan: cap 50, TTL 14 days).
   static const _journalLimit = 50;
   static const _journalTtl = Duration(days: 14);
@@ -185,8 +192,12 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
     this._updates, {
     LessonGroupResolver? resolver,
     bool demo = false,
+    String? target,
+    String namespace = '',
   })  : _resolver = resolver,
         _demo = demo,
+        _target = target,
+        _namespace = namespace,
         super(ScheduleScreenState(
           currentWeekStart: getCurrentWeekStart(),
         )) {
@@ -208,7 +219,9 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
       _bootRefresh.complete(false);
       return;
     }
-    final myGroup = _storage.getMyGroup();
+    // Цель источника главнее: у каждого вуза своя группа. Старая группа
+    // из хранилища остаётся запасным путём, пока источников нет.
+    final myGroup = _target ?? _storage.getMyGroup();
     final journal = _loadJournal();
     final seenAt = _storage.getChangesSeenAt();
     state = state.copyWith(
@@ -274,7 +287,8 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
   /// is shown regardless of its age: stale content beats a blank screen
   /// when the revalidation cannot run.
   bool _applyCachedSchedule(String searchValue) {
-    final cached = _storage.getCachedSchedule(searchValue);
+    final cached =
+        _storage.getCachedSchedule(searchValue, namespace: _namespace);
     if (cached == null || cached.data.items.isEmpty) return false;
     state = state.copyWith(schedule: _stateFromCache(searchValue, cached));
     return true;
@@ -660,32 +674,6 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
     if (!_demo) await _storage.clearChangeLog();
   }
 
-  Future<void> setMyGroup(String groupNumber) async {
-    await _storage.setMyGroup(groupNumber);
-    state = state.copyWith(currentGroup: groupNumber);
-    if (_demo) return; // Demo keeps its schedule: no API, no fingerprint.
-    await loadSchedule(groupNumber);
-    // Reset the change baseline for the new group.
-    if (state.schedule.error == null && state.schedule.items.isNotEmpty) {
-      await _storage.setScheduleFingerprint(_fingerprint(state.schedule.items));
-    } else {
-      await _storage.setScheduleFingerprint(null);
-    }
-  }
-
-  Future<void> clearMyGroup() async {
-    await _storage.clearMyGroup();
-    await _storage.setScheduleFingerprint(null);
-    if (_demo) {
-      state = state.copyWith(clearGroup: true);
-      return;
-    }
-    state = state.copyWith(
-      clearGroup: true,
-      schedule: const ScheduleState(searchValue: ''),
-    );
-  }
-
   Future<void> addFavoriteGroup(String groupNumber) async {
     await _storage.addFavoriteGroup(groupNumber);
     state = state.copyWith(favoriteGroups: _storage.getFavoriteGroups());
@@ -735,7 +723,8 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
 
       // If the API returned an error, try cache as fallback
       if (result.error != null) {
-        final cached = _storage.getCachedSchedule(searchValue);
+        final cached =
+            _storage.getCachedSchedule(searchValue, namespace: _namespace);
         if (cached != null && cached.data.items.isNotEmpty) {
           state =
               state.copyWith(schedule: _stateFromCache(searchValue, cached));
@@ -748,7 +737,8 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
       return null;
     } catch (e) {
       // Unexpected error — try cache
-      final cached = _storage.getCachedSchedule(searchValue);
+      final cached =
+          _storage.getCachedSchedule(searchValue, namespace: _namespace);
       if (cached != null && cached.data.items.isNotEmpty) {
         state = state.copyWith(schedule: _stateFromCache(searchValue, cached));
         return await _fallbackNote(ErrorMessages.fromException(e));
@@ -901,14 +891,22 @@ class ScheduleScreenNotifier extends StateNotifier<ScheduleScreenState> {
 final scheduleScreenProvider =
     StateNotifierProvider<ScheduleScreenNotifier, ScheduleScreenState>((ref) {
   final demo = ref.watch(demoModeProvider);
+  final source = ref.watch(activeSourceProvider);
+  // Добор групп пар — только для источников, которые умеют искать по
+  // аудитории. У остальных resolver молча выключен.
+  final canResolve = ref.watch(activeSourceCapabilitiesProvider).contains(
+        SourceCapability.directory,
+      );
   return ScheduleScreenNotifier(
     ref.watch(scheduleServiceProvider),
     ref.watch(storageServiceProvider),
     ref.watch(connectivityServiceProvider),
     ref.watch(notificationServiceProvider),
     ref.watch(updateCoordinatorProvider),
-    resolver: ref.watch(lessonGroupResolverProvider),
+    resolver: canResolve ? ref.watch(lessonGroupResolverProvider) : null,
     demo: demo,
+    target: source == null ? null : connectorFor(source).targetValue(source),
+    namespace: ref.watch(activeSourceNamespaceProvider),
   );
 });
 

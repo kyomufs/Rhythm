@@ -24,14 +24,17 @@ void main() {
     addTearDown(tester.view.resetViewInsets);
     await tester.pumpAndSettle();
 
-    // Три страницы с полями: группа, подгруппа, зачётка.
+    // Страница способа получения — без поля; учреждение и цель — с полями.
     for (var page = 0; page < 3; page++) {
       await tester.tap(find.text('Далее'));
       await tester.pumpAndSettle();
 
       expect(tester.takeException(), isNull,
           reason: 'страница ${page + 1} не должна переполняться');
-      expect(find.byType(TextField), findsOneWidget);
+      if (page > 0) {
+        expect(find.byType(TextField), findsOneWidget,
+            reason: 'страница ${page + 1} показывает поле ввода');
+      }
       expect(find.text('Далее'), findsOneWidget,
           reason: 'нижняя кнопка остаётся доступной');
     }

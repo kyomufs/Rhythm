@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:rhythm/core/domain/source.dart';
-import 'package:rhythm/core/sources/registry.dart';
+import 'package:rhythm/integrations/catalog.dart';
 import 'package:rhythm/core/sources/source_store.dart';
 import 'package:rhythm/core/theme/spacing.dart';
 import 'package:rhythm/features/sources/screens/source_edit_screen.dart';
@@ -184,8 +184,9 @@ class _SourceTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final provider = providerFor(source);
-    final caps = provider.capabilities;
+    final connector = connectorFor(source);
+    final caps = connector.capabilities;
+    final kind = connector.descriptor.kind;
 
     return ListTile(
       leading: _SourceBadge(source: source),
@@ -193,9 +194,15 @@ class _SourceTile extends ConsumerWidget {
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (source.subtitle != null && source.subtitle!.isNotEmpty)
-            Text(source.subtitle!,
-                maxLines: 1, overflow: TextOverflow.ellipsis),
+          Text(
+            [
+              kind.label,
+              if (source.subtitle != null && source.subtitle!.isNotEmpty)
+                source.subtitle!,
+            ].join(' · '),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
           if (caps.isNotEmpty) ...[
             const Gap(AppSpacing.xxs),
             Wrap(

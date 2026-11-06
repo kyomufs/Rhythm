@@ -9,6 +9,7 @@ import 'package:rhythm/core/services/storage_service.dart';
 import 'package:rhythm/core/services/update_coordinator.dart';
 import 'package:rhythm/core/sources/source_api.dart';
 import 'package:rhythm/core/sources/source_store.dart';
+import 'package:rhythm/integrations/catalog.dart';
 import 'package:rhythm/features/profile/providers/profile_providers.dart';
 
 /// Performance screen state
@@ -74,6 +75,8 @@ class PerformanceNotifier extends StateNotifier<PerformanceState> {
   final StorageService _storage;
   final UpdateCoordinator _updates;
   final bool _demo;
+  final String? _studentId;
+  final String? _group;
 
   /// Автообновление при входе: завершается `true`, если оценки реально
   /// подтянулись из API. По этому флагу оболочка показывает плашку без
@@ -81,9 +84,18 @@ class PerformanceNotifier extends StateNotifier<PerformanceState> {
   final Completer<bool> _bootRefresh = Completer<bool>();
   Future<bool> get bootRefresh => _bootRefresh.future;
 
-  PerformanceNotifier(this._api, this._storage, this._updates,
-      {bool demo = false})
-      : _demo = demo,
+  /// Профиль ученика берётся из активного источника: у каждого вуза
+  /// своя зачётка, глобальной больше нет.
+  PerformanceNotifier(
+    this._api,
+    this._storage,
+    this._updates, {
+    bool demo = false,
+    String? studentId,
+    String? group,
+  })  : _demo = demo,
+        _studentId = studentId,
+        _group = group,
         super(const PerformanceState()) {
     loadMarks().then(
       (result) => _bootRefresh.complete(result.isSuccess && !_demo),
@@ -101,8 +113,8 @@ class PerformanceNotifier extends StateNotifier<PerformanceState> {
       return const UpdateResult(UpdateOutcome.updated, marksUpdatedText);
     }
 
-    final studentId = _storage.getStudentId();
-    final group = _storage.getFullAcademicGroup();
+    final studentId = _studentId;
+    final group = _group;
 
     if (studentId == null || group == null) {
       final msg = studentId == null
@@ -149,8 +161,8 @@ class PerformanceNotifier extends StateNotifier<PerformanceState> {
         // API ответил ошибкой — сохранённые оценки остаются на экране.
         final servedCache = cached != null && cached.isNotEmpty;
         if (servedCache) {
-          state = state.copyWith(
-              marks: cached, isLoading: false, clearError: true);
+          state =
+              state.copyWith(marks: cached, isLoading: false, clearError: true);
           _autoSelectSemester();
         } else {
           state = state.copyWith(
@@ -179,9 +191,11 @@ final isPerformanceConfiguredProvider = Provider<bool>((ref) {
   if (ref.watch(demoModeProvider)) return true;
   // Re-evaluate when profile fields change (group/subgroup/student ID).
   ref.watch(profileRevisionProvider);
-  final storage = ref.watch(storageServiceProvider);
-  return storage.getStudentId() != null &&
-      storage.getFullAcademicGroup() != null;
+  final source = ref.watch(activeSourceProvider);
+  if (source == null) return false;
+  final connector = connectorFor(source);
+  return connector.studentId(source) != null &&
+      connector.academicGroup(source) != null;
 });
 
 final performanceProvider =
@@ -189,10 +203,14 @@ final performanceProvider =
   // Recreate the notifier (and reload marks) whenever profile data changes.
   ref.watch(profileRevisionProvider);
   final demo = ref.watch(demoModeProvider);
+  final source = ref.watch(activeSourceProvider);
+  final connector = connectorFor(source);
   return PerformanceNotifier(
     ref.watch(finalMarksApiProvider),
     ref.watch(storageServiceProvider),
     ref.watch(updateCoordinatorProvider),
     demo: demo,
+    studentId: source == null ? null : connector.studentId(source),
+    group: source == null ? null : connector.academicGroup(source),
   );
 });

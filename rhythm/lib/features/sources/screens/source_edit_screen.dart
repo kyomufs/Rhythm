@@ -2,15 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:rhythm/core/domain/source.dart';
-import 'package:rhythm/core/sources/registry.dart';
-import 'package:rhythm/core/sources/source_provider.dart';
 import 'package:rhythm/core/sources/source_store.dart';
 import 'package:rhythm/core/theme/spacing.dart';
+import 'package:rhythm/features/sources/widgets/connector_field_form.dart';
+import 'package:rhythm/integrations/catalog.dart';
+import 'package:rhythm/integrations/contract/connector.dart';
 
 /// Добавление и правка источника.
 ///
-/// Провайдер выбирается первым: от него зависит, какие поля вообще есть.
-/// Источник без провайдера (школа, работа, курсы) сразу живёт по ручному вводу.
+/// Экран ничего не знает про конкретный вуз: список полей приходит из
+/// дескриптора коннектора, подсказки — из его `search`. Новый источник
+/// требует правки только в `integrations/`.
 class SourceEditScreen extends ConsumerStatefulWidget {
   const SourceEditScreen({super.key, this.source});
 
@@ -23,9 +25,9 @@ class SourceEditScreen extends ConsumerStatefulWidget {
 class _SourceEditScreenState extends ConsumerState<SourceEditScreen> {
   late final TextEditingController _title;
   late final TextEditingController _subtitle;
-  late final TextEditingController _group;
-  late SourceProvider _provider;
+  late ScheduleConnector _connector;
   late SourceKind _kind;
+  var _formKey = GlobalKey<ConnectorFieldFormState>();
   String? _error;
 
   bool get _isEdit => widget.source != null;
@@ -34,63 +36,71 @@ class _SourceEditScreenState extends ConsumerState<SourceEditScreen> {
   void initState() {
     super.initState();
     final source = widget.source;
-    _provider = source == null
-        ? (selectableProviders.isEmpty
-            ? manualSourceProvider
-            : selectableProviders.first)
-        : providerFor(source);
-    _kind = source?.kind ?? _kindForProvider(_provider);
-    _title = TextEditingController(text: source?.title ?? _provider.label);
+    _connector = source == null
+        ? (selectableConnectors.isEmpty
+            ? manualConnector
+            : selectableConnectors.first)
+        : connectorFor(source);
+    _kind = source?.kind ?? _connector.descriptor.defaultKind;
+    _title = TextEditingController(text: source?.title ?? _connector.label);
     _subtitle = TextEditingController(text: source?.subtitle ?? '');
-    _group = TextEditingController(text: source?.config['group'] ?? '');
-  }
-
-  SourceKind _kindForProvider(SourceProvider provider) {
-    return provider.id == 'tulsu' ? SourceKind.university : SourceKind.other;
   }
 
   @override
   void dispose() {
     _title.dispose();
     _subtitle.dispose();
-    _group.dispose();
     super.dispose();
   }
 
+  void _selectConnector(ScheduleConnector connector) {
+    setState(() {
+      _connector = connector;
+      _kind = connector.descriptor.defaultKind;
+      // Поля нового коннектора другие — форма создаётся заново.
+      _formKey = GlobalKey<ConnectorFieldFormState>();
+      if (_title.text.isEmpty ||
+          _title.text == manualConnector.label ||
+          selectableConnectors.any((c) => c.label == _title.text)) {
+        _title.text = connector.label;
+      }
+    });
+  }
+
   Future<void> _save() async {
+    final descriptor = _connector.descriptor;
     final title = _title.text.trim();
     if (title.isEmpty) {
       setState(() => _error = 'Название не может быть пустым');
       return;
     }
-    final needsGroup =
-        _provider.capabilities.contains(SourceCapability.schedule);
-    final group = _group.text.trim();
-    if (needsGroup && group.isEmpty) {
-      setState(() => _error = 'Укажите группу — по ней строится расписание');
+    final form = _formKey.currentState;
+    final formError = form?.validate();
+    if (formError != null) {
+      setState(() => _error = formError);
       return;
     }
 
-    final config = <String, String>{
-      if (_provider.id == 'tulsu') 'group': group,
-    };
+    final config = form?.config ?? const <String, String>{};
     final notifier = ref.read(sourcesProvider.notifier);
+    final subtitle =
+        _subtitle.text.trim().isEmpty ? null : _subtitle.text.trim();
 
     if (_isEdit) {
       await notifier.update(widget.source!.copyWith(
         kind: _kind,
         title: title,
-        subtitle: _subtitle.text.trim().isEmpty ? null : _subtitle.text.trim(),
+        subtitle: subtitle,
+        providerId: descriptor.id,
         config: config,
       ));
     } else {
       final source = Source(
-        id: '${_provider.id}-${DateTime.now().millisecondsSinceEpoch}',
+        id: '${descriptor.id}-${DateTime.now().millisecondsSinceEpoch}',
         kind: _kind,
         title: title,
-        subtitle: _subtitle.text.trim().isEmpty ? null : _subtitle.text.trim(),
-        providerId:
-            _provider.id == manualSourceProvider.id ? null : _provider.id,
+        subtitle: subtitle,
+        providerId: descriptor.id,
         config: config,
         colorIndex: ref.read(sourcesProvider).sources.length,
         createdAt: DateTime.now(),
@@ -103,6 +113,7 @@ class _SourceEditScreenState extends ConsumerState<SourceEditScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final descriptor = _connector.descriptor;
 
     return Scaffold(
       appBar: AppBar(
@@ -133,31 +144,24 @@ class _SourceEditScreenState extends ConsumerState<SourceEditScreen> {
           ),
           const Gap(AppSpacing.lg),
           if (!_isEdit) ...[
-            Text('Провайдер', style: theme.textTheme.labelLarge),
+            Text('Откуда данные', style: theme.textTheme.labelLarge),
             const Gap(AppSpacing.xs),
             Wrap(
               spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
               children: [
-                for (final provider in selectableProviders)
+                for (final connector in selectableConnectors)
                   ChoiceChip(
-                    label: Text(provider.label),
-                    selected: _provider.id == provider.id,
-                    onSelected: (_) => setState(() {
-                      _provider = provider;
-                      _kind = _kindForProvider(provider);
-                      if (_title.text == manualSourceProvider.label ||
-                          _title.text.isEmpty) {
-                        _title.text = provider.label;
-                      }
-                    }),
+                    label: Text(
+                      '${connector.label} · ${connector.descriptor.kind.badge}',
+                    ),
+                    selected: _connector.id == connector.id,
+                    onSelected: (_) => _selectConnector(connector),
                   ),
                 ChoiceChip(
-                  label: const Text('Без API'),
-                  selected: _provider.id == manualSourceProvider.id,
-                  onSelected: (_) => setState(() {
-                    _provider = manualSourceProvider;
-                    if (_title.text.isEmpty) _title.text = '';
-                  }),
+                  label: Text('${manualConnector.label} · без API'),
+                  selected: _connector.id == manualConnector.id,
+                  onSelected: (_) => _selectConnector(manualConnector),
                 ),
               ],
             ),
@@ -181,16 +185,12 @@ class _SourceEditScreenState extends ConsumerState<SourceEditScreen> {
               border: OutlineInputBorder(),
             ),
           ),
-          if (_provider.capabilities.contains(SourceCapability.schedule)) ...[
+          if (descriptor.fields.isNotEmpty) ...[
             const Gap(AppSpacing.md),
-            TextField(
-              controller: _group,
-              decoration: const InputDecoration(
-                labelText: 'Группа',
-                hintText: '221341',
-                helperText: 'По номеру группы загружается расписание',
-                border: OutlineInputBorder(),
-              ),
+            ConnectorFieldForm(
+              key: _formKey,
+              connector: _connector,
+              initialConfig: widget.source?.config ?? const {},
             ),
           ],
           if (_error != null) ...[
@@ -203,9 +203,9 @@ class _SourceEditScreenState extends ConsumerState<SourceEditScreen> {
           ],
           const Gap(AppSpacing.lg),
           Text(
-            _provider.id == manualSourceProvider.id
+            descriptor.capabilities.isEmpty
                 ? 'Источник без API: расписание и оценки вносятся вручную.'
-                : 'Возможности: ${_provider.capabilities.map(sourceCapabilityLabel).join(', ')}',
+                : 'Возможности: ${descriptor.capabilities.map(sourceCapabilityLabel).join(', ')}',
             style: theme.textTheme.bodySmall
                 ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),

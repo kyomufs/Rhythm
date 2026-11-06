@@ -121,10 +121,13 @@ class _CacheStorage extends StorageService {
   Future<void> setChangesSeenAt(DateTime value) async {}
 
   @override
-  CachedSchedule? getCachedSchedule(String searchValue) => cached[searchValue];
+  CachedSchedule? getCachedSchedule(String searchValue,
+          {String namespace = ''}) =>
+      cached[searchValue];
 
   @override
-  Future<void> cacheSchedule(String searchValue, ScheduleData data) async {
+  Future<void> cacheSchedule(String searchValue, ScheduleData data,
+      {String namespace = ''}) async {
     written[searchValue] = data;
   }
 
@@ -176,7 +179,8 @@ CachedSchedule _snapshot(String group, {required Duration age}) =>
 void main() {
   test('свежий кэш отдаётся без обращения к API', () async {
     final api = _FakeApi(items: [_item('Из API')]);
-    final storage = _CacheStorage(cached: {_group: _snapshot(_group, age: const Duration(hours: 2))});
+    final storage = _CacheStorage(
+        cached: {_group: _snapshot(_group, age: const Duration(hours: 2))});
     final service = ScheduleService(api: api, storage: storage);
 
     final state = await service.getSchedule(_group);
@@ -202,8 +206,10 @@ void main() {
     );
     await _flush();
 
-    expect(api.calls, 0, reason: 'офлайн не дёргает API даже за свежими данными');
-    expect(notifier.state.schedule.items.single.subject, 'Математический анализ',
+    expect(api.calls, 0,
+        reason: 'офлайн не дёргает API даже за свежими данными');
+    expect(
+        notifier.state.schedule.items.single.subject, 'Математический анализ',
         reason: 'снимок недельной давности всё равно показывается');
     expect(notifier.state.schedule.error, isNull,
         reason: 'вместо ошибки — сохранённое расписание');

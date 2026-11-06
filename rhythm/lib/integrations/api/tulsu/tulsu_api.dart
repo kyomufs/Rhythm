@@ -1,12 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:rhythm/core/api/api_exception.dart';
-import 'package:rhythm/core/domain/source.dart';
 import 'package:rhythm/core/models/schedule.dart';
 import 'package:rhythm/core/sources/source_api.dart';
-import 'package:rhythm/core/sources/source_provider.dart';
 import 'package:rhythm/core/utils/error_messages.dart';
 
-/// Эндпоинты ТулГУ. Всё, что знает про конкретный вуз, живёт здесь.
+/// Эндпоинты ТулГУ. Всё, что знает про конкретный вуз, живёт в этой папке.
 class TulsuEndpoints {
   TulsuEndpoints._();
 
@@ -20,7 +18,7 @@ class TulsuEndpoints {
   static const String marks = '/GetMarks.php';
 }
 
-Dio _newDio(String baseUrl) => Dio(BaseOptions(
+Dio newDio(String baseUrl) => Dio(BaseOptions(
       baseUrl: baseUrl,
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 10),
@@ -33,7 +31,7 @@ class TulsuScheduleApi extends ScheduleApi {
   final String baseUrl;
 
   TulsuScheduleApi({this.baseUrl = TulsuEndpoints.baseUrl})
-      : _dio = _newDio(baseUrl);
+      : _dio = newDio(baseUrl);
 
   @override
   Future<List<SourceSuggestion>> search(String query) async {
@@ -88,7 +86,7 @@ class TulsuScheduleApi extends ScheduleApi {
     );
     return (response.data ?? const [])
         .cast<Map<String, dynamic>>()
-        .map(_parseLesson)
+        .map(parseTulsuLesson)
         .toList();
   }
 
@@ -102,7 +100,7 @@ class TulsuScheduleApi extends ScheduleApi {
     );
     return (response.data ?? const [])
         .cast<Map<String, dynamic>>()
-        .map(_parseCalendar)
+        .map((json) => CalendarItem.fromJson(json))
         .toList();
   }
 
@@ -115,7 +113,9 @@ class TulsuScheduleApi extends ScheduleApi {
   }
 }
 
-ScheduleItem _parseLesson(Map<String, dynamic> json) {
+/// Разбор пары ТулГУ. Вынесен наружу: тем же разбором пользуется
+/// подгрузка групп аудитории.
+ScheduleItem parseTulsuLesson(Map<String, dynamic> json) {
   return ScheduleItem(
     date: '${json['DATE_Z'] ?? ''}',
     time: '${json['TIME_Z'] ?? ''}',
@@ -124,15 +124,12 @@ ScheduleItem _parseLesson(Map<String, dynamic> json) {
     classroom: '${json['AUD'] ?? ''}',
     teacher: '${json['PREP'] ?? ''}',
     groups: (json['GROUPS'] as List?)
-            ?.map((g) => GroupInfo.fromJson(Map<String, dynamic>.from(g as Map)))
+            ?.map(
+                (g) => GroupInfo.fromJson(Map<String, dynamic>.from(g as Map)))
             .toList() ??
         const [],
     cssClass: '${json['CLASS'] ?? ''}',
   );
-}
-
-CalendarItem _parseCalendar(Map<String, dynamic> json) {
-  return CalendarItem.fromJson(json);
 }
 
 /// Итоговые оценки ТулГУ.
@@ -140,7 +137,7 @@ class TulsuFinalMarksApi implements FinalMarksApi {
   final Dio _dio;
 
   TulsuFinalMarksApi({String baseUrl = TulsuEndpoints.progressBaseUrl})
-      : _dio = _newDio(baseUrl);
+      : _dio = newDio(baseUrl);
 
   @override
   Future<List<FinalMark>> finalMarks({
@@ -168,54 +165,6 @@ class TulsuFinalMarksApi implements FinalMarksApi {
           .toList();
     } on DioException catch (e) {
       throw ApiException(ErrorMessages.fromException(e));
-    }
-  }
-}
-
-/// Возможности источника ТулГУ — единственное место, где перечислены
-/// его API-поверхности.
-class TulsuSourceProvider extends SourceProvider {
-  const TulsuSourceProvider();
-
-  @override
-  String get id => 'tulsu';
-
-  @override
-  String get label => 'ТулГУ';
-
-  @override
-  Set<SourceCapability> get capabilities => const {
-        SourceCapability.directory,
-        SourceCapability.schedule,
-        SourceCapability.calendar,
-        SourceCapability.finalMarks,
-        SourceCapability.profile,
-      };
-
-  @override
-  ScheduleApi scheduleApi(Source source) => TulsuScheduleApi(
-        baseUrl: source.config['baseUrl'] ?? TulsuEndpoints.baseUrl,
-      );
-
-  @override
-  FinalMarksApi? marksApi(Source source) => TulsuFinalMarksApi(
-        baseUrl: source.config['progressBaseUrl'] ?? TulsuEndpoints.progressBaseUrl,
-      );
-
-  @override
-  String? groupOf(Source source) =>
-      source.config['group'] ?? source.config['groupId'];
-
-  @override
-  Future<bool> ping() async {
-    try {
-      await _newDio(TulsuEndpoints.baseUrl).get<dynamic>(
-        TulsuEndpoints.dates,
-        queryParameters: {'search_value': ''},
-      );
-      return true;
-    } on DioException {
-      return false;
     }
   }
 }

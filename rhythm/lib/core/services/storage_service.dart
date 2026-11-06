@@ -314,9 +314,16 @@ class StorageService {
 
   // ── Schedule Cache ────────────────────────────────────────
 
-  CachedSchedule? getCachedSchedule(String searchValue) {
+  /// Ключ снимка. Пространство имён — id источника: номера групп в разных
+  /// вузах совпадают, и без него снимки перетирают друг друга.
+  String _cacheKey(String searchValue, String namespace) => namespace.isEmpty
+      ? '${StorageKeys.scheduleCache}_$searchValue'
+      : '${StorageKeys.scheduleCache}_${namespace}_$searchValue';
+
+  CachedSchedule? getCachedSchedule(String searchValue,
+      {String namespace = ''}) {
     try {
-      final raw = _box.get('${StorageKeys.scheduleCache}_$searchValue');
+      final raw = _box.get(_cacheKey(searchValue, namespace));
       if (raw == null) return null;
       final map = Map<String, dynamic>.from(raw as Map);
       final items = (map['items'] as List)
@@ -343,7 +350,7 @@ class StorageService {
       );
     } catch (_) {
       // Corrupted cache — delete and return null so API fetches fresh data
-      _box.delete('${StorageKeys.scheduleCache}_$searchValue');
+      _box.delete(_cacheKey(searchValue, namespace));
       return null;
     }
   }
@@ -354,9 +361,10 @@ class StorageService {
   /// целиком ради них незачем — берём сохранённый и меняем только пары.
   Future<void> cacheScheduleGroups(
     String searchValue,
-    List<ScheduleItem> items,
-  ) async {
-    final cached = getCachedSchedule(searchValue);
+    List<ScheduleItem> items, {
+    String namespace = '',
+  }) async {
+    final cached = getCachedSchedule(searchValue, namespace: namespace);
     if (cached == null) return;
     await cacheSchedule(
       searchValue,
@@ -365,12 +373,17 @@ class StorageService {
         items: items,
         calendar: cached.data.calendar,
       ),
+      namespace: namespace,
     );
   }
 
-  Future<void> cacheSchedule(String searchValue, ScheduleData data) async {
+  Future<void> cacheSchedule(
+    String searchValue,
+    ScheduleData data, {
+    String namespace = '',
+  }) async {
     await _box.put(
-      '${StorageKeys.scheduleCache}_$searchValue',
+      _cacheKey(searchValue, namespace),
       {
         'minDate': data.dateRange.minDate.toIso8601String(),
         'maxDate': data.dateRange.maxDate.toIso8601String(),

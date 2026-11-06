@@ -37,6 +37,9 @@ class FakeScheduleService implements ScheduleService {
   List<ScheduleItem> data;
   int getScheduleCalls = 0;
 
+  @override
+  String get namespace => '';
+
   FakeScheduleService(this.data);
 
   @override
@@ -90,7 +93,9 @@ class FakeStorage extends StorageService {
   }
 
   @override
-  CachedSchedule? getCachedSchedule(String searchValue) => null;
+  CachedSchedule? getCachedSchedule(String searchValue,
+          {String namespace = ''}) =>
+      null;
 
   // The base class keeps these in an uninitialized Hive box; tests use
   // an in-memory journal instead.
@@ -346,7 +351,8 @@ void main() {
     expect(notifications.shownIds, isEmpty);
   });
 
-  test('teacher-only change is reported as a field-level modification',      () async {
+  test('teacher-only change is reported as a field-level modification',
+      () async {
     final storage = FakeStorage();
     final notifications = FakeNotifications();
 
@@ -535,8 +541,8 @@ void main() {
     expect(notifier.state.schedule.items, isNotEmpty);
     expect(notifier.state.schedule.searchValue, demoGroup);
     expect(
-      notifier.state.schedule.items.every(
-          (i) => i.groups.single.number == demoGroup),
+      notifier.state.schedule.items
+          .every((i) => i.groups.single.number == demoGroup),
       isTrue,
       reason: 'every demo row is marked with the fake group',
     );

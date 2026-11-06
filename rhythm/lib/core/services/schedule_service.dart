@@ -10,6 +10,7 @@ final scheduleServiceProvider = Provider<ScheduleService>((ref) {
   return ScheduleService(
     api: ref.watch(scheduleApiProvider),
     storage: ref.watch(storageServiceProvider),
+    namespace: ref.watch(activeSourceNamespaceProvider),
   );
 });
 
@@ -18,9 +19,13 @@ class ScheduleService {
   final ScheduleApi _api;
   final StorageService _storage;
 
+  /// id источника: снимки разных вузов не должны перетираться.
+  final String namespace;
+
   ScheduleService({
     required ScheduleApi api,
     required StorageService storage,
+    this.namespace = '',
   })  : _api = api,
         _storage = storage;
 

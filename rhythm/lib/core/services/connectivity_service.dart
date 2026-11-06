@@ -1,17 +1,17 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:rhythm/core/sources/registry.dart';
-import 'package:rhythm/core/sources/source_provider.dart';
+import 'package:rhythm/integrations/catalog.dart';
+import 'package:rhythm/integrations/contract/connector.dart';
 import 'package:rhythm/core/sources/source_store.dart';
 
 /// Provider for connectivity service
 final connectivityServiceProvider = Provider<ConnectivityService>((ref) {
-  return ConnectivityService(providerFor(ref.watch(activeSourceProvider)));
+  return ConnectivityService(connectorFor(ref.watch(activeSourceProvider)));
 });
 
 /// Проверка доступности API активного источника с кэшем на полминуты:
 /// один сбой сети не должен запирать приложение в офлайне.
 class ConnectivityService {
-  final SourceProvider _provider;
+  final ScheduleConnector _provider;
 
   ConnectivityService(this._provider);
 

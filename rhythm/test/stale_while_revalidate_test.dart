@@ -74,6 +74,9 @@ class FakeScheduleService implements ScheduleService {
   List<ScheduleItem> data;
   int getScheduleCalls = 0;
 
+  @override
+  String get namespace => '';
+
   FakeScheduleService(this.data);
 
   @override
@@ -125,7 +128,9 @@ class WarmStorage extends StorageService {
   }
 
   @override
-  CachedSchedule? getCachedSchedule(String searchValue) => cached;
+  CachedSchedule? getCachedSchedule(String searchValue,
+          {String namespace = ''}) =>
+      cached;
 
   // The base class keeps these in an uninitialized Hive box; tests use
   // an in-memory journal instead.
@@ -325,8 +330,13 @@ void main() {
       final storage = FakeMarkStorage()..cachedMarks = [_mark('Из кэша')];
       final connectivity = FakeConnectivity();
 
-      final notifier =
-          PerformanceNotifier(api, storage, UpdateCoordinator(connectivity));
+      final notifier = PerformanceNotifier(
+        api,
+        storage,
+        UpdateCoordinator(connectivity),
+        studentId: storage.getStudentId(),
+        group: storage.getFullAcademicGroup(),
+      );
 
       // Кэш отрисован синхронно, до проверки доступности и запроса.
       expect(notifier.state.marks.single.discipline, 'Из кэша');
@@ -353,8 +363,13 @@ void main() {
       final storage = FakeMarkStorage()..cachedMarks = [_mark('Из кэша')];
       final connectivity = FakeConnectivity()..online = false;
 
-      final notifier =
-          PerformanceNotifier(api, storage, UpdateCoordinator(connectivity));
+      final notifier = PerformanceNotifier(
+        api,
+        storage,
+        UpdateCoordinator(connectivity),
+        studentId: storage.getStudentId(),
+        group: storage.getFullAcademicGroup(),
+      );
       expect(notifier.state.marks.single.discipline, 'Из кэша');
       await _flush();
 

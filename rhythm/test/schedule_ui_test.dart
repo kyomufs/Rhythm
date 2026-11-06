@@ -4,6 +4,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:rhythm/core/domain/source.dart';
 import 'package:rhythm/core/models/schedule.dart';
 import 'package:rhythm/core/sources/source_api.dart';
 import 'package:rhythm/core/sources/source_store.dart';
@@ -52,7 +53,8 @@ class _FakeApi extends ScheduleApi {
   int auditoriumCalls = 0;
 
   @override
-  Future<SourceDateRange> dateRange(String searchValue) async => SourceDateRange(
+  Future<SourceDateRange> dateRange(String searchValue) async =>
+      SourceDateRange(
         minDate: DateTime(2026, 9, 1),
         maxDate: DateTime(2027, 1, 25),
         searchField: SearchField.group,
@@ -110,10 +112,13 @@ class _FakeStorage extends StorageService {
   }
 
   @override
-  CachedSchedule? getCachedSchedule(String searchValue) => null;
+  CachedSchedule? getCachedSchedule(String searchValue,
+          {String namespace = ''}) =>
+      null;
 
   @override
-  Future<void> cacheSchedule(String searchValue, ScheduleData data) async {}
+  Future<void> cacheSchedule(String searchValue, ScheduleData data,
+      {String namespace = ''}) async {}
 
   @override
   String? getLastSearch() => null;
@@ -176,6 +181,17 @@ final _now = DateTime.now();
 String _fmt(DateTime d) => '${d.day.toString().padLeft(2, '0')}.'
     '${d.month.toString().padLeft(2, '0')}.${d.year}';
 
+/// Источник, от лица которого идёт тест: экран берёт группу и возможности
+/// из него, а не из глобального хранилища.
+Source _source(String group) => Source(
+      id: 'tulsu',
+      kind: SourceKind.university,
+      title: 'ТулГУ',
+      providerId: 'tulsu',
+      config: {'group': group, 'subgroup': '01'},
+      createdAt: DateTime(2026, 9, 1),
+    );
+
 Widget _app({
   required List<ScheduleItem> items,
   List<ScheduleItem>? auditoriumItems,
@@ -186,6 +202,7 @@ Widget _app({
   return ProviderScope(
     overrides: [
       demoModeProvider.overrideWithValue(false),
+      activeSourceProvider.overrideWithValue(_source(_group)),
       scheduleApiProvider.overrideWithValue(client),
       scheduleServiceProvider.overrideWithValue(
         ScheduleService(
@@ -343,7 +360,8 @@ void main() {
     expect(find.byKey(const ValueKey('lesson-group-$_group')), findsOneWidget);
   });
 
-  testWidgets('в карточке время и аудитория — плитки в ряд, препод и группы ниже',
+  testWidgets(
+      'в карточке время и аудитория — плитки в ряд, препод и группы ниже',
       (tester) async {
     await tester.pumpWidget(_app(items: [
       _item(

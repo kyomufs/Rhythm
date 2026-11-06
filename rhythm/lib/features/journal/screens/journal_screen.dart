@@ -7,7 +7,6 @@ import 'package:rhythm/core/domain/source.dart';
 import 'package:rhythm/core/input/desktop_input.dart';
 import 'package:rhythm/core/journal/journal_store.dart';
 import 'package:rhythm/core/services/schedule_service.dart';
-import 'package:rhythm/core/services/storage_service.dart';
 import 'package:rhythm/core/sources/source_store.dart';
 import 'package:rhythm/core/theme/shapes.dart';
 import 'package:rhythm/core/theme/spacing.dart';
@@ -18,6 +17,7 @@ import 'package:rhythm/features/journal/widgets/journal_editors.dart';
 import 'package:rhythm/features/schedule/providers/schedule_provider.dart';
 import 'package:rhythm/features/sources/screens/source_edit_screen.dart';
 import 'package:rhythm/features/sources/widgets/source_pill.dart';
+import 'package:rhythm/integrations/catalog.dart';
 import 'package:rhythm/shared/widgets/empty_state.dart';
 import 'package:rhythm/shared/widgets/morph_chip.dart';
 import 'package:rhythm/shared/widgets/wavy_progress.dart';
@@ -105,7 +105,9 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
     try {
       var items = ref.read(scheduleScreenProvider).schedule.items;
       if (items.isEmpty) {
-        final group = ref.read(storageServiceProvider).getFullAcademicGroup();
+        final active = ref.read(activeSourceProvider);
+        final group =
+            active == null ? null : connectorFor(active).targetValue(active);
         if (group != null) {
           final state =
               await ref.read(scheduleServiceProvider).getSchedule(group);
@@ -201,7 +203,8 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
                 ),
               const PopupMenuItem(
                 value: _JournalAction.newTerm,
-                child: _MenuRow(icon: Icons.event_repeat, label: 'Новый семестр'),
+                child:
+                    _MenuRow(icon: Icons.event_repeat, label: 'Новый семестр'),
               ),
               if (term != null) ...[
                 const PopupMenuItem(
@@ -210,7 +213,8 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
                 ),
                 const PopupMenuItem(
                   value: _JournalAction.deleteTerm,
-                  child: _MenuRow(icon: Icons.delete_outline, label: 'Удалить семестр'),
+                  child: _MenuRow(
+                      icon: Icons.delete_outline, label: 'Удалить семестр'),
                 ),
               ],
             ],
@@ -321,8 +325,8 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
                         onPressed: term == null
                             ? () => _newTerm(source)
                             : () => _addCourse(term),
-                        icon: Icon(
-                            term == null ? Icons.event_repeat : Icons.add),
+                        icon:
+                            Icon(term == null ? Icons.event_repeat : Icons.add),
                         label: Text(term == null
                             ? 'Начать семестр'
                             : 'Добавить дисциплину'),
@@ -403,7 +407,8 @@ class _SectionHeader extends StatelessWidget {
       children: [
         Text(
           title,
-          style: AppTypography.emphasizedTitleMedium(theme.textTheme.titleMedium!),
+          style:
+              AppTypography.emphasizedTitleMedium(theme.textTheme.titleMedium!),
         ),
         const Spacer(),
         if (trailing != null)
@@ -698,8 +703,7 @@ class _CourseCard extends ConsumerWidget {
                     height: 44,
                     decoration: BoxDecoration(
                       color: accent.withValues(alpha: 0.16),
-                      borderRadius:
-                          BorderRadius.circular(AppShapes.medium),
+                      borderRadius: BorderRadius.circular(AppShapes.medium),
                     ),
                     child: Icon(Icons.menu_book_outlined, color: accent),
                   ),
@@ -768,7 +772,9 @@ class _CourseCard extends ConsumerWidget {
               const Gap(AppSpacing.xs),
               Row(
                 children: [
-                  _Meta(icon: Icons.fact_check_outlined, text: courseKindLabel(course.kind)),
+                  _Meta(
+                      icon: Icons.fact_check_outlined,
+                      text: courseKindLabel(course.kind)),
                   if (stats.lessons > 0) ...[
                     const Gap(AppSpacing.sm),
                     _Meta(

@@ -10,6 +10,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'package:rhythm/app.dart';
 import 'package:rhythm/core/api/api_exception.dart';
+import 'package:rhythm/core/domain/source.dart';
 import 'package:rhythm/core/models/app_settings.dart';
 import 'package:rhythm/core/models/marks.dart';
 import 'package:rhythm/core/models/note_models.dart';
@@ -44,7 +45,8 @@ class _FakeApi extends ScheduleApi {
   final List<ScheduleItem> items;
 
   @override
-  Future<SourceDateRange> dateRange(String searchValue) async => SourceDateRange(
+  Future<SourceDateRange> dateRange(String searchValue) async =>
+      SourceDateRange(
         minDate: DateTime(2026, 9, 1),
         maxDate: DateTime(2027, 1, 25),
         searchField: SearchField.group,
@@ -87,7 +89,6 @@ class _FakeProgress implements FinalMarksApi {
 }
 
 class _FakeStorage extends StorageService {
-
   @override
   String? getMyGroup() => '221341';
 
@@ -104,10 +105,13 @@ class _FakeStorage extends StorageService {
   List<FavoriteGroup> getFavoriteGroups() => const [];
 
   @override
-  CachedSchedule? getCachedSchedule(String searchValue) => null;
+  CachedSchedule? getCachedSchedule(String searchValue,
+          {String namespace = ''}) =>
+      null;
 
   @override
-  Future<void> cacheSchedule(String searchValue, ScheduleData data) async {}
+  Future<void> cacheSchedule(String searchValue, ScheduleData data,
+      {String namespace = ''}) async {}
 
   @override
   String? getLastSearch() => null;
@@ -191,11 +195,22 @@ class _FakeNotifications implements NotificationService {
       {String? payload}) async {}
 }
 
+/// Источник, от лица которого идёт тест: группа и зачётка принадлежат ему.
+Source _source() => Source(
+      id: 'tulsu',
+      kind: SourceKind.university,
+      title: 'ТулГУ',
+      providerId: 'tulsu',
+      config: const {'group': '221341', 'subgroup': '01', 'studentId': '12345'},
+      createdAt: DateTime(2026, 9, 1),
+    );
+
 Widget _app({_FakeProgress? progress}) {
   final api = _FakeApi([_lesson('Математический анализ')]);
   return ProviderScope(
     overrides: [
       demoModeProvider.overrideWithValue(false),
+      activeSourceProvider.overrideWithValue(_source()),
       scheduleApiProvider.overrideWithValue(api),
       finalMarksApiProvider.overrideWithValue(progress ?? _FakeProgress()),
       scheduleServiceProvider.overrideWithValue(
