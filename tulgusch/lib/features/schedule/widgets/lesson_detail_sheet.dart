@@ -227,12 +227,11 @@ class _LessonDetailSheetState extends ConsumerState<LessonDetailSheet> {
         ),
         child: SingleChildScrollView(
           controller: _scroll,
-          padding: const EdgeInsets.fromLTRB(16, 6, 16, 20),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const _SheetGrabber(),
               // ── Hero: тип пары, день и живой прогресс на одной поверхности.
               // Пока пара идёт, блок становится главным элементом экрана:
               // волна прогресса внутри hero-плашки. ──
@@ -602,30 +601,6 @@ class _SheetRevealState extends State<_SheetReveal>
           );
         },
         child: widget.child,
-      ),
-    );
-  }
-}
-
-/// Маркер-«ручка» сверху листа: без него непонятно, что карточку можно
-/// утянуть вниз.
-class _SheetGrabber extends StatelessWidget {
-  const _SheetGrabber();
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Center(
-        child: Container(
-          width: 32,
-          height: 4,
-          decoration: BoxDecoration(
-            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
-            borderRadius: AppShapes.circular(AppShapes.extraSmall),
-          ),
-        ),
       ),
     );
   }
