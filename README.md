@@ -61,7 +61,7 @@ older build and let the in-app updater offer the new one.
 
 | Android | iOS | Web | Windows | Linux |
 |:---:|:---:|:---:|:---:|:---:|
-| ✅ | ✅ | ✅ | ✅ | ✅ |
+| ✅ | ✅ | ❌ | ❌ | ❌ |
 
 ## Getting started
 
