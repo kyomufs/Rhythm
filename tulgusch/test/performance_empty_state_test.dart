@@ -93,7 +93,11 @@ void main() {
       findsOneWidget,
       reason: 'пользователь должен видеть, какие данные ушли в запрос',
     );
-    expect(find.textContaining('группа 221341'), findsOneWidget);
+    expect(
+      find.textContaining('группа 221341:01'),
+      findsOneWidget,
+      reason: 'в запрос уходит группа с подгруппой через двоеточие',
+    );
     expect(find.text('Загрузить'), findsOneWidget);
     expect(find.text('Профиль'), findsOneWidget);
   });

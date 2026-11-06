@@ -13,6 +13,13 @@ final profileGroupProvider = Provider<String?>((ref) {
   return group == null || group.isEmpty ? null : group;
 });
 
+/// Подгруппа: 01/02. Влияет только на запрос оценок, расписание — по группе.
+final profileSubgroupProvider = Provider<String?>((ref) {
+  ref.watch(profileRevisionProvider);
+  final subgroup = ref.watch(storageServiceProvider).getMySubgroup();
+  return subgroup == null || subgroup.isEmpty ? null : subgroup;
+});
+
 /// Номер зачётки: без него нет итоговых оценок.
 final profileStudentIdProvider = Provider<String?>((ref) {
   ref.watch(profileRevisionProvider);

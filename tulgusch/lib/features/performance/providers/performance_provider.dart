@@ -81,6 +81,7 @@ class PerformanceNotifier extends StateNotifier<PerformanceState> {
   final bool _demo;
   final String? _studentId;
   final String? _group;
+  final String? _subgroup;
 
   /// Автообновление при входе: завершается `true`, если оценки реально
   /// подтянулись из API. По этому флагу оболочка показывает плашку без
@@ -95,9 +96,11 @@ class PerformanceNotifier extends StateNotifier<PerformanceState> {
     bool demo = false,
     String? studentId,
     String? group,
+    String? subgroup,
   })  : _demo = demo,
         _studentId = studentId,
         _group = group,
+        _subgroup = subgroup,
         super(const PerformanceState()) {
     loadMarks().then(
       (result) => _bootRefresh.complete(result.isSuccess && !_demo),
@@ -116,7 +119,7 @@ class PerformanceNotifier extends StateNotifier<PerformanceState> {
     }
 
     final studentId = _studentId;
-    final group = _group;
+    final group = _marksGroup;
 
     if (studentId == null || group == null) {
       final msg = studentId == null
@@ -196,6 +199,16 @@ class PerformanceNotifier extends StateNotifier<PerformanceState> {
     });
   }
 
+  /// Вуз ищет оценки по паре «зачётка + группа:подгруппа», а расписание —
+  /// по одной группе. Подгруппа необязательна: без неё шлём чистую группу.
+  String? get _marksGroup {
+    final group = _group;
+    if (group == null) return null;
+    final subgroup = _subgroup?.trim();
+    if (subgroup == null || subgroup.isEmpty) return group;
+    return '$group:$subgroup';
+  }
+
   void _autoSelectSemester() {
     if (state.availableSemesters.isNotEmpty) {
       state = state.copyWith(selectedSemester: state.availableSemesters.last);
@@ -225,5 +238,6 @@ final performanceProvider =
     demo: ref.watch(demoModeProvider),
     studentId: ref.watch(profileStudentIdProvider),
     group: ref.watch(profileGroupProvider),
+    subgroup: ref.watch(profileSubgroupProvider),
   );
 });
