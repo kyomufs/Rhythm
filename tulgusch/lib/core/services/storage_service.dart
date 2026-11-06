@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:tulgusch/core/domain/journal.dart';
 import 'package:tulgusch/core/models/app_settings.dart';
 import 'package:tulgusch/core/models/marks.dart';
 import 'package:tulgusch/core/models/note_models.dart';
@@ -30,7 +29,6 @@ class StorageKeys {
   static const String scheduleChangeLog = 'schedule_changes_log';
   static const String changesSeenAt = 'schedule_changes_seen_at';
   static const String marksCache = 'marks_cache';
-  static const String journalPrefix = 'journal_v1';
 }
 
 // ============================================================
@@ -552,32 +550,6 @@ class StorageService {
     } catch (_) {
       return null;
     }
-  }
-
-  // ── Journal ──────────────────────────────────────────────
-
-  JournalData getJournal() {
-    if (!_opened) return const JournalData();
-    final raw = _box.get(StorageKeys.journalPrefix);
-    if (raw == null) return const JournalData();
-    try {
-      return JournalData.fromJson(Map<String, dynamic>.from(raw as Map));
-    } catch (_) {
-      return const JournalData();
-    }
-  }
-
-  Future<void> saveJournal(JournalData data) async {
-    if (!_opened) return;
-    await _box.put(
-      StorageKeys.journalPrefix,
-      data.toJson(),
-    );
-  }
-
-  Future<void> deleteJournal() async {
-    if (!_opened) return;
-    await _box.delete(StorageKeys.journalPrefix);
   }
 
   // ── Onboarding ───────────────────────────────────────────

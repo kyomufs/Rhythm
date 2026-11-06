@@ -13,7 +13,6 @@ import 'package:tulgusch/core/theme/theme_provider.dart';
 import 'package:tulgusch/core/widgets/background_sync_host.dart';
 import 'package:tulgusch/core/widgets/update_dialog.dart';
 import 'package:tulgusch/core/widgets/update_feedback.dart';
-import 'package:tulgusch/features/journal/screens/journal_screen.dart';
 import 'package:tulgusch/features/performance/providers/performance_provider.dart';
 import 'package:tulgusch/features/performance/screens/performance_screen.dart';
 import 'package:tulgusch/features/profile/screens/onboarding_screen.dart';
@@ -72,7 +71,6 @@ class MainShell extends ConsumerStatefulWidget {
 
   static const _screens = <Widget>[
     ScheduleScreen(),
-    JournalScreen(),
     PerformanceScreen(),
     ProfileScreen(),
   ];
@@ -85,8 +83,8 @@ class _MainShellState extends ConsumerState<MainShell> {
   final _updateService = UpdateService();
 
   /// Вкладки строятся при первом показе. IndexedStack держал в дереве все
-  /// четыре экрана с первого кадра — расписание, заметки, таблицу оценок и
-  /// профиль, — хотя виден один.
+  /// экраны с первого кадра — расписание, таблицу оценок и профиль, — хотя
+  /// виден один.
   final Set<int> _visited = {0};
 
   @override
@@ -140,8 +138,8 @@ class _MainShellState extends ConsumerState<MainShell> {
     final service = ref.read(notificationServiceProvider);
     final storage = ref.read(storageServiceProvider);
     await service.init();
-    // Тап по уведомлению «Расписание изменилось» ведёт прямо в журнал:
-    // плашка поверх чужого экрана была бы тупиком.
+    // Тап по уведомлению «Расписание изменилось» ведёт прямо в список
+    // изменений: плашка поверх чужого экрана была бы тупиком.
     service.onTap = (payload) {
       if (!mounted) return;
       ref.read(currentTabProvider.notifier).state = 0;
@@ -189,7 +187,7 @@ class _MainShellState extends ConsumerState<MainShell> {
       ref.read(currentTabProvider.notifier).state = index;
     }
 
-    // Ctrl+1…4 переключают вкладки: клики по нижней панели — путь для
+    // Ctrl+1…3 переключают вкладки: клики по нижней панели — путь для
     // планшета, но на ПК это медленно.
     return BackgroundSyncHost(
       child: AppShortcuts(
@@ -220,11 +218,6 @@ class _MainShellState extends ConsumerState<MainShell> {
                 icon: Icons.calendar_today_outlined,
                 selectedIcon: Icons.calendar_today,
                 label: 'Расписание',
-              ),
-              AppNavDestination(
-                icon: Icons.menu_book_outlined,
-                selectedIcon: Icons.menu_book,
-                label: 'Журнал',
               ),
               AppNavDestination(
                 icon: Icons.assessment_outlined,
